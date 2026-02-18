@@ -1,0 +1,90 @@
+name: CD
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux targets — cross-compiled from ubuntu (no ARM runner needed)
+          - runner: ubuntu-latest
+            target: bun-linux-x64
+            artifact: github-code-search-linux-x64
+          - runner: ubuntu-latest
+            target: bun-linux-x64-baseline
+            artifact: github-code-search-linux-x64-baseline
+          - runner: ubuntu-latest
+            target: bun-linux-arm64
+            artifact: github-code-search-linux-arm64
+          # Windows — cross-compiled from ubuntu
+          - runner: ubuntu-latest
+            target: bun-windows-x64
+            artifact: github-code-search-windows-x64.exe
+          # macOS — must run on macOS for ad-hoc codesigning
+          - runner: macos-latest
+            target: bun-darwin-x64
+            artifact: github-code-search-macos-x64
+          - runner: macos-latest
+            target: bun-darwin-arm64
+            artifact: github-code-search-macos-arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3 # v2.1.2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run tests
+        run: bun test
+
+      - name: Build binary
+        run: bun run build.ts --target=${{ matrix.target }}
+
+      - name: Rename artifact
+        # build.ts outputs dist/github-code-search-<target-without-bun->
+        # Rename to the canonical artifact name defined in the matrix.
+        shell: bash
+        run: |
+          src="dist/github-code-search-$(echo '${{ matrix.target }}' | sed 's/^bun-//')"
+          [ -f "${src}.exe" ] && src="${src}.exe"
+          mv -v "$src" "dist/${{ matrix.artifact }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.artifact }}
+
+  release:
+    name: Create GitHub release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: dist/
+          merge-multiple: true
+
+      - name: Create release
+        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
+        with:
+          files: dist/*
+          generate_release_notes: true
