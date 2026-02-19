@@ -54,21 +54,12 @@ export async function runInteractive(
   const redraw = () => {
     const activeFilter = filterMode ? filterInput : filterPath;
     const rows = buildRows(groups, activeFilter);
-    const rendered = renderGroups(
-      groups,
-      cursor,
-      rows,
-      termHeight,
-      scrollOffset,
-      query,
-      org,
-      {
-        filterPath,
-        filterMode,
-        filterInput,
-        showHelp,
-      },
-    );
+    const rendered = renderGroups(groups, cursor, rows, termHeight, scrollOffset, query, org, {
+      filterPath,
+      filterMode,
+      filterInput,
+      showHelp,
+    });
     process.stdout.write(ANSI_CLEAR);
     process.stdout.write(rendered);
   };
@@ -132,15 +123,7 @@ export async function runInteractive(
       process.stdout.write(ANSI_CLEAR);
       process.stdin.setRawMode(false);
       console.log(
-        buildOutput(
-          groups,
-          query,
-          org,
-          excludedRepos,
-          excludedExtractRefs,
-          format,
-          outputType,
-        ),
+        buildOutput(groups, query, org, excludedRepos, excludedExtractRefs, format, outputType),
       );
       process.exit(0);
     }
@@ -204,9 +187,7 @@ export async function runInteractive(
       if (row?.type === "repo") {
         groups[row.repoIndex].folded = true;
       } else if (row?.type === "extract") {
-        const parentIdx = rows.findIndex(
-          (r) => r.type === "repo" && r.repoIndex === row.repoIndex,
-        );
+        const parentIdx = rows.findIndex((r) => r.type === "repo" && r.repoIndex === row.repoIndex);
         groups[row.repoIndex].folded = true;
         cursor = parentIdx;
         if (cursor < scrollOffset) scrollOffset = cursor;
@@ -224,9 +205,7 @@ export async function runInteractive(
       if (row.type === "repo") {
         const group = groups[row.repoIndex];
         group.repoSelected = !group.repoSelected;
-        group.extractSelected = group.extractSelected.map(
-          () => group.repoSelected,
-        );
+        group.extractSelected = group.extractSelected.map(() => group.repoSelected);
       } else {
         const group = groups[row.repoIndex];
         const ei = row.extractIndex!;

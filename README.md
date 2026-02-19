@@ -24,7 +24,7 @@ The script automatically detects your OS (Linux, macOS) and architecture (x64, a
 To install a specific version or to a custom directory:
 
 ```bash
-INSTALL_DIR=~/.local/bin VERSION=v1.2.0 \
+INSTALL_DIR=~/.local/bin VERSION=v1.0.6 \
   curl -fsSL https://raw.githubusercontent.com/fulll/github-code-search/main/install.sh | bash
 ```
 
@@ -150,7 +150,6 @@ GitHub Code Search: useFeatureFlag in fulll
 
 After pressing **Enter**:
 
-```
 3 repos · 6 files · 7 matches selected
 
 - **fulll/auth-service** (2 matches)
@@ -164,10 +163,15 @@ After pressing **Enter**:
   - [src/hooks/useFeatureFlag.ts:1:1](https://github.com/fulll/frontend-app/blob/main/src/hooks/useFeatureFlag.ts#L1)
   - [src/components/Dashboard.tsx:4:3](https://github.com/fulll/frontend-app/blob/main/src/components/Dashboard.tsx#L4)
 
-# Replay:
+<details>
+<summary>replay command</summary>
+
+```bash
 github-code-search "useFeatureFlag" --org fulll --no-interactive \
   --exclude-repositories legacy-monolith
 ```
+
+</details>
 
 ## Non-interactive mode (CI)
 
@@ -202,7 +206,6 @@ github-code-search "useFeatureFlag" --org fulll --no-interactive
 $ CI=true github-code-search "useFeatureFlag" --org fulll
 ```
 
-```
 3 repos · 5 matches selected
 
 - **fulll/auth-service**
@@ -214,9 +217,14 @@ $ CI=true github-code-search "useFeatureFlag" --org fulll
 - **fulll/frontend-app**
   - [src/hooks/useFeatureFlag.ts:1:1](https://github.com/fulll/frontend-app/blob/main/src/hooks/useFeatureFlag.ts#L1)
 
-# Replay:
+<details>
+<summary>replay command</summary>
+
+```bash
 github-code-search "useFeatureFlag" --org fulll --no-interactive
 ```
+
+</details>
 
 ## Exclusion options
 
@@ -265,7 +273,6 @@ github-code-search "useFeatureFlag" --org fulll
 
 **2. Output + replay command:**
 
-```
 2 repos · 3 matches selected
 
 - **fulll/auth-service**
@@ -276,11 +283,16 @@ github-code-search "useFeatureFlag" --org fulll
 - **fulll/frontend-app**
   - [src/hooks/useFeatureFlag.ts:1:1](https://github.com/fulll/frontend-app/blob/main/src/hooks/useFeatureFlag.ts#L1)
 
-# Replay:
+<details>
+<summary>replay command</summary>
+
+```bash
 github-code-search "useFeatureFlag" --org fulll --no-interactive \
   --exclude-repositories legacy-monolith \
   --exclude-extracts auth-service:tests/unit/featureFlags.test.ts:0
 ```
+
+</details>
 
 **3. Replay without UI (CI, scripting, documentation):**
 
