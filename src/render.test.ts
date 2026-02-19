@@ -16,7 +16,12 @@ import {
 } from "./render.ts";
 import type { RepoGroup, Row } from "./types.ts";
 
-function makeGroup(repo: string, paths: string[], folded = true, withFragments = false): RepoGroup {
+function makeGroup(
+  repo: string,
+  paths: string[],
+  folded = true,
+  withFragments = false,
+): RepoGroup {
   return {
     repoFullName: repo,
     matches: paths.map((p) => ({
@@ -24,7 +29,9 @@ function makeGroup(repo: string, paths: string[], folded = true, withFragments =
       repoFullName: repo,
       htmlUrl: `https://github.com/${repo}/blob/main/${p}`,
       archived: false,
-      textMatches: withFragments ? [{ fragment: `some code with ${p}`, matches: [] }] : [],
+      textMatches: withFragments
+        ? [{ fragment: `some code with ${p}`, matches: [] }]
+        : [],
     })),
     folded,
     repoSelected: true,
@@ -87,7 +94,9 @@ describe("highlightFragment", () => {
 
   it("adds 'more lines' indicator when fragment exceeds 6 lines", () => {
     // 8 lines → 6 shown + 1 indicator line
-    const longFragment = Array.from({ length: 8 }, (_, i) => `line${i}`).join("\n");
+    const longFragment = Array.from({ length: 8 }, (_, i) => `line${i}`).join(
+      "\n",
+    );
     const result = highlightFragment(longFragment, [], "file.ts");
     // 6 code lines + the indicator
     expect(result).toHaveLength(7);
@@ -217,14 +226,20 @@ describe("buildSummary", () => {
   });
 
   it("returns plural for multiple repos / unique paths", () => {
-    const groups = [makeGroup("org/repoA", ["a.ts", "b.ts"]), makeGroup("org/repoB", ["c.ts"])];
+    const groups = [
+      makeGroup("org/repoA", ["a.ts", "b.ts"]),
+      makeGroup("org/repoB", ["c.ts"]),
+    ];
     const summary = buildSummary(groups);
     const stripped = summary.replace(/\x1b\[[0-9;]*m/g, "");
     expect(stripped).toBe("2 repos · 3 files");
   });
 
   it("shows files · matches when same path appears in multiple repos", () => {
-    const groups = [makeGroup("org/repoA", ["a.ts"]), makeGroup("org/repoB", ["a.ts"])];
+    const groups = [
+      makeGroup("org/repoA", ["a.ts"]),
+      makeGroup("org/repoB", ["a.ts"]),
+    ];
     const summary = buildSummary(groups);
     const stripped = summary.replace(/\x1b\[[0-9;]*m/g, "");
     expect(stripped).toBe("2 repos · 1 file · 2 matches");
@@ -385,7 +400,9 @@ describe("isCursorVisible", () => {
   });
 
   it("returns false when cursor is above scrollOffset", () => {
-    const groups = [makeGroup("org/repo", ["a.ts", "b.ts", "c.ts"], false, false)];
+    const groups = [
+      makeGroup("org/repo", ["a.ts", "b.ts", "c.ts"], false, false),
+    ];
     const rows = buildRows(groups);
     // cursor=0, scrollOffset=1 → row 0 is above the viewport
     expect(isCursorVisible(rows, groups, 0, 1, 5)).toBe(false);
@@ -393,7 +410,9 @@ describe("isCursorVisible", () => {
 
   it("returns false when cursor would exceed viewportHeight (2-line rows)", () => {
     // 3 extract rows with fragments = 2 lines each → 6 terminal lines
-    const groups = [makeGroup("org/repo", ["a.ts", "b.ts", "c.ts"], false, true)];
+    const groups = [
+      makeGroup("org/repo", ["a.ts", "b.ts", "c.ts"], false, true),
+    ];
     const rows = buildRows(groups);
     // rows: [repo(0), extract(0,0), extract(0,1), extract(0,2)]
     // viewportHeight=4 lines, scrollOffset=0
@@ -413,19 +432,28 @@ describe("isCursorVisible", () => {
 
 describe("buildSummaryFull", () => {
   it("shows plain file counts when everything is selected (unique paths)", () => {
-    const groups = [makeGroup("org/repoA", ["a.ts", "b.ts"]), makeGroup("org/repoB", ["c.ts"])];
+    const groups = [
+      makeGroup("org/repoA", ["a.ts", "b.ts"]),
+      makeGroup("org/repoB", ["c.ts"]),
+    ];
     const stripped = buildSummaryFull(groups).replace(/\x1b\[[0-9;]*m/g, "");
     expect(stripped).toBe("2 repos · 3 files");
   });
 
   it("shows files · matches when same path appears in multiple repos", () => {
-    const groups = [makeGroup("org/repoA", ["a.ts"]), makeGroup("org/repoB", ["a.ts"])];
+    const groups = [
+      makeGroup("org/repoA", ["a.ts"]),
+      makeGroup("org/repoB", ["a.ts"]),
+    ];
     const stripped = buildSummaryFull(groups).replace(/\x1b\[[0-9;]*m/g, "");
     expect(stripped).toBe("2 repos · 1 file · 2 matches");
   });
 
   it("annotates repos with selected count when some are deselected", () => {
-    const groups = [makeGroup("org/repoA", ["a.ts"]), makeGroup("org/repoB", ["b.ts"], true)];
+    const groups = [
+      makeGroup("org/repoA", ["a.ts"]),
+      makeGroup("org/repoB", ["b.ts"], true),
+    ];
     groups[1].repoSelected = false;
     const stripped = buildSummaryFull(groups).replace(/\x1b\[[0-9;]*m/g, "");
     expect(stripped).toContain("2 repos (1 selected)");
@@ -442,7 +470,10 @@ describe("buildSummaryFull", () => {
     // a.ts appears in both repos; repoA keeps it selected, repoB deselects it.
     // Unique file a.ts is still selected (via repoA) → no (selected) annotation on files.
     // But match count is 2 total, 1 selected → matches gets a (1 selected) annotation.
-    const groups = [makeGroup("org/repoA", ["a.ts"]), makeGroup("org/repoB", ["a.ts"])];
+    const groups = [
+      makeGroup("org/repoA", ["a.ts"]),
+      makeGroup("org/repoB", ["a.ts"]),
+    ];
     groups[1].extractSelected[0] = false;
     const stripped = buildSummaryFull(groups).replace(/\x1b\[[0-9;]*m/g, "");
     expect(stripped).toContain("1 file");
@@ -460,8 +491,13 @@ describe("buildSelectionSummary", () => {
   });
 
   it("shows files · matches when same path appears in multiple repos", () => {
-    const groups = [makeGroup("org/repoA", ["a.ts"]), makeGroup("org/repoB", ["a.ts"])];
-    expect(buildSelectionSummary(groups)).toBe("2 repos · 1 file · 2 matches selected");
+    const groups = [
+      makeGroup("org/repoA", ["a.ts"]),
+      makeGroup("org/repoB", ["a.ts"]),
+    ];
+    expect(buildSelectionSummary(groups)).toBe(
+      "2 repos · 1 file · 2 matches selected",
+    );
   });
 
   it("respects deselected extracts", () => {
@@ -478,7 +514,10 @@ describe("buildSelectionSummary", () => {
 // ─── applySelectAll ───────────────────────────────────────────────────────────────────
 describe("applySelectAll", () => {
   it("selects all repos+extracts when context is a repo row", () => {
-    const groups = [makeGroup("org/repoA", ["a.ts", "b.ts"]), makeGroup("org/repoB", ["c.ts"])];
+    const groups = [
+      makeGroup("org/repoA", ["a.ts", "b.ts"]),
+      makeGroup("org/repoB", ["c.ts"]),
+    ];
     groups[0].repoSelected = false;
     groups[0].extractSelected = [false, false];
     const repoRow: import("./types.ts").Row = { type: "repo", repoIndex: 0 };
@@ -489,7 +528,10 @@ describe("applySelectAll", () => {
   });
 
   it("selects only current-repo extracts when context is an extract row", () => {
-    const groups = [makeGroup("org/repoA", ["a.ts", "b.ts"]), makeGroup("org/repoB", ["c.ts"])];
+    const groups = [
+      makeGroup("org/repoA", ["a.ts", "b.ts"]),
+      makeGroup("org/repoB", ["c.ts"]),
+    ];
     groups[0].extractSelected = [false, false];
     groups[1].repoSelected = false;
     const extractRow: import("./types.ts").Row = {
@@ -507,7 +549,10 @@ describe("applySelectAll", () => {
 // ─── applySelectNone ────────────────────────────────────────────────────────────────
 describe("applySelectNone", () => {
   it("deselects all repos+extracts when context is a repo row", () => {
-    const groups = [makeGroup("org/repoA", ["a.ts", "b.ts"]), makeGroup("org/repoB", ["c.ts"])];
+    const groups = [
+      makeGroup("org/repoA", ["a.ts", "b.ts"]),
+      makeGroup("org/repoB", ["c.ts"]),
+    ];
     const repoRow: import("./types.ts").Row = { type: "repo", repoIndex: 0 };
     applySelectNone(groups, repoRow);
     expect(groups[0].repoSelected).toBe(false);
@@ -516,7 +561,10 @@ describe("applySelectNone", () => {
   });
 
   it("deselects only current-repo extracts when context is an extract row", () => {
-    const groups = [makeGroup("org/repoA", ["a.ts", "b.ts"]), makeGroup("org/repoB", ["c.ts"])];
+    const groups = [
+      makeGroup("org/repoA", ["a.ts", "b.ts"]),
+      makeGroup("org/repoB", ["c.ts"]),
+    ];
     const extractRow: import("./types.ts").Row = {
       type: "extract",
       repoIndex: 0,
@@ -626,7 +674,9 @@ describe("buildRows with filterPath", () => {
   });
 
   it("does not show extracts of folded repos even with filter", () => {
-    const groups = [makeGroup("org/repo", ["src/a.ts", "src/b.ts"], true /* folded */)];
+    const groups = [
+      makeGroup("org/repo", ["src/a.ts", "src/b.ts"], true /* folded */),
+    ];
     const rows = buildRows(groups, "src");
     expect(rows.length).toBe(1); // only repo row, folded
     expect(rows[0].type).toBe("repo");
@@ -666,7 +716,9 @@ describe("buildFilterStats", () => {
 
 describe("applySelectAll with filterPath", () => {
   it("selects only matching extracts when filter is active", () => {
-    const groups = [makeGroup("org/repo", ["src/a.ts", "lib/b.ts"], false, false)];
+    const groups = [
+      makeGroup("org/repo", ["src/a.ts", "lib/b.ts"], false, false),
+    ];
     groups[0].repoSelected = false;
     groups[0].extractSelected = [false, false];
     const row: Row = { type: "repo", repoIndex: 0 };
@@ -779,6 +831,20 @@ describe("renderGroups filter opts", () => {
     expect(stripped).toContain("Filter:");
     expect(stripped).toContain("src");
     expect(stripped).toContain("Enter confirm");
+  });
+
+  it("live-filters rows by filterInput when filterMode=true", () => {
+    // The caller (tui.ts) builds rows with filterInput as the active filter
+    // while in filterMode so the view updates as the user types.
+    const groups = [makeGroup("org/repo", ["src/a.ts", "lib/b.ts"], false)];
+    const rows = buildRows(groups, "src"); // rows already filtered by filterInput
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", {
+      filterMode: true,
+      filterInput: "src",
+    });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).toContain("src/a.ts");
+    expect(stripped).not.toContain("lib/b.ts");
   });
 
   it("shows confirmed filter path with stats when filterPath is set", () => {

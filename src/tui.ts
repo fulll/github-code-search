@@ -52,13 +52,23 @@ export async function runInteractive(
   let showHelp = false;
 
   const redraw = () => {
-    const rows = buildRows(groups, filterPath);
-    const rendered = renderGroups(groups, cursor, rows, termHeight, scrollOffset, query, org, {
-      filterPath,
-      filterMode,
-      filterInput,
-      showHelp,
-    });
+    const activeFilter = filterMode ? filterInput : filterPath;
+    const rows = buildRows(groups, activeFilter);
+    const rendered = renderGroups(
+      groups,
+      cursor,
+      rows,
+      termHeight,
+      scrollOffset,
+      query,
+      org,
+      {
+        filterPath,
+        filterMode,
+        filterInput,
+        showHelp,
+      },
+    );
     process.stdout.write(ANSI_CLEAR);
     process.stdout.write(rendered);
   };
@@ -88,11 +98,15 @@ export async function runInteractive(
         cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
         scrollOffset = Math.min(scrollOffset, cursor);
       } else if (key === "\x7f" || key === "\b") {
-        // Backspace
+        // Backspace — trim and clamp cursor to new live-filtered row list
         filterInput = filterInput.slice(0, -1);
+        const newRows = buildRows(groups, filterInput);
+        cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
       } else if (key.length === 1 && key >= " ") {
-        // Printable character
+        // Printable character — clamp cursor to new live-filtered row list
         filterInput += key;
+        const newRows = buildRows(groups, filterInput);
+        cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
       }
       redraw();
       continue;
@@ -118,7 +132,15 @@ export async function runInteractive(
       process.stdout.write(ANSI_CLEAR);
       process.stdin.setRawMode(false);
       console.log(
-        buildOutput(groups, query, org, excludedRepos, excludedExtractRefs, format, outputType),
+        buildOutput(
+          groups,
+          query,
+          org,
+          excludedRepos,
+          excludedExtractRefs,
+          format,
+          outputType,
+        ),
       );
       process.exit(0);
     }
@@ -182,7 +204,9 @@ export async function runInteractive(
       if (row?.type === "repo") {
         groups[row.repoIndex].folded = true;
       } else if (row?.type === "extract") {
-        const parentIdx = rows.findIndex((r) => r.type === "repo" && r.repoIndex === row.repoIndex);
+        const parentIdx = rows.findIndex(
+          (r) => r.type === "repo" && r.repoIndex === row.repoIndex,
+        );
         groups[row.repoIndex].folded = true;
         cursor = parentIdx;
         if (cursor < scrollOffset) scrollOffset = cursor;
@@ -200,7 +224,9 @@ export async function runInteractive(
       if (row.type === "repo") {
         const group = groups[row.repoIndex];
         group.repoSelected = !group.repoSelected;
-        group.extractSelected = group.extractSelected.map(() => group.repoSelected);
+        group.extractSelected = group.extractSelected.map(
+          () => group.repoSelected,
+        );
       } else {
         const group = groups[row.repoIndex];
         const ei = row.extractIndex!;
