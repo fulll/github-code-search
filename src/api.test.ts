@@ -77,6 +77,13 @@ describe("searchCode", () => {
 
 // ─── fetchAllResults ──────────────────────────────────────────────────────────
 
+const makeFetchItem = (i: number) => ({
+  path: `src/file${i}.ts`,
+  html_url: `https://github.com/org/repo/blob/main/src/file${i}.ts`,
+  repository: { full_name: "org/repo", archived: false },
+  text_matches: [],
+});
+
 describe("fetchAllResults", () => {
   afterEach(() => {
     globalThis.fetch = originalFetch;
@@ -180,12 +187,6 @@ describe("fetchAllResults", () => {
   });
 
   it("fetches multiple pages until total is reached", async () => {
-    const makeItem = (i: number) => ({
-      path: `src/file${i}.ts`,
-      html_url: `https://github.com/org/repo/blob/main/src/file${i}.ts`,
-      repository: { full_name: "org/repo", archived: false },
-      text_matches: [],
-    });
     let searchPage = 0;
     globalThis.fetch = (async (url: string | URL | Request) => {
       const urlStr = url.toString();
@@ -195,8 +196,8 @@ describe("fetchAllResults", () => {
       searchPage++;
       const items =
         searchPage === 1
-          ? Array.from({ length: 2 }, (_, i) => makeItem(i))
-          : Array.from({ length: 1 }, (_, i) => makeItem(2 + i));
+          ? Array.from({ length: 2 }, (_, i) => makeFetchItem(i))
+          : Array.from({ length: 1 }, (_, i) => makeFetchItem(2 + i));
       return new Response(JSON.stringify({ items, total_count: 3 }), {
         status: 200,
         headers: { "content-type": "application/json" },
