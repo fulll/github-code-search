@@ -781,6 +781,20 @@ describe("renderGroups filter opts", () => {
     expect(stripped).toContain("Enter confirm");
   });
 
+  it("live-filters rows by filterInput when filterMode=true", () => {
+    // The caller (tui.ts) builds rows with filterInput as the active filter
+    // while in filterMode so the view updates as the user types.
+    const groups = [makeGroup("org/repo", ["src/a.ts", "lib/b.ts"], false)];
+    const rows = buildRows(groups, "src"); // rows already filtered by filterInput
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", {
+      filterMode: true,
+      filterInput: "src",
+    });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).toContain("src/a.ts");
+    expect(stripped).not.toContain("lib/b.ts");
+  });
+
   it("shows confirmed filter path with stats when filterPath is set", () => {
     const groups = [makeGroup("org/repo", ["src/a.ts", "lib/b.ts"], false)];
     const rows = buildRows(groups, "src");

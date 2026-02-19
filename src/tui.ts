@@ -52,7 +52,8 @@ export async function runInteractive(
   let showHelp = false;
 
   const redraw = () => {
-    const rows = buildRows(groups, filterPath);
+    const activeFilter = filterMode ? filterInput : filterPath;
+    const rows = buildRows(groups, activeFilter);
     const rendered = renderGroups(groups, cursor, rows, termHeight, scrollOffset, query, org, {
       filterPath,
       filterMode,
@@ -88,11 +89,15 @@ export async function runInteractive(
         cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
         scrollOffset = Math.min(scrollOffset, cursor);
       } else if (key === "\x7f" || key === "\b") {
-        // Backspace
+        // Backspace — trim and clamp cursor to new live-filtered row list
         filterInput = filterInput.slice(0, -1);
+        const newRows = buildRows(groups, filterInput);
+        cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
       } else if (key.length === 1 && key >= " ") {
-        // Printable character
+        // Printable character — clamp cursor to new live-filtered row list
         filterInput += key;
+        const newRows = buildRows(groups, filterInput);
+        cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
       }
       redraw();
       continue;
