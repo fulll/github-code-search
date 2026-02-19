@@ -63,7 +63,7 @@ jobs:
         run: |
           src="dist/github-code-search-$(echo '${{ matrix.target }}' | sed 's/^bun-//')"
           [ -f "${src}.exe" ] && src="${src}.exe"
-          mv -fv "$src" "dist/${{ matrix.artifact }}"
+          [ -f "dist/${{ matrix.artifact }}" ] || mv -v "$src" "dist/${{ matrix.artifact }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6
