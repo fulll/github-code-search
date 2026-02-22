@@ -18,6 +18,16 @@ export function shortExtractRef(full: string, org: string): string {
   return shortRepo(repoPart, org) + rest;
 }
 
+// ─── Replay options ───────────────────────────────────────────────────────────
+
+/** Options that affect the generated replay command. */
+export interface ReplayOptions {
+  format?: OutputFormat;
+  outputType?: OutputType;
+  includeArchived?: boolean;
+  groupByTeamPrefix?: string;
+}
+
 // ─── Replay command ───────────────────────────────────────────────────────────
 
 export function buildReplayCommand(
@@ -26,7 +36,10 @@ export function buildReplayCommand(
   org: string,
   excludedRepos: Set<string>,
   excludedExtractRefs: Set<string>,
+  // Fix: forward all input options so the replay command is fully reproducible — see issue #11
+  options: ReplayOptions = {},
 ): string {
+  const { format, outputType, includeArchived, groupByTeamPrefix } = options;
   const parts: string[] = [
     `github-code-search ${JSON.stringify(query)} --org ${org} --no-interactive`,
   ];
@@ -60,6 +73,19 @@ export function buildReplayCommand(
     parts.push(`--exclude-extracts ${excludedExtractsList.join(",")}`);
   }
 
+  if (format && format !== "markdown") {
+    parts.push(`--format ${format}`);
+  }
+  if (outputType && outputType !== "repo-and-matches") {
+    parts.push(`--output-type ${outputType}`);
+  }
+  if (includeArchived) {
+    parts.push("--include-archived");
+  }
+  if (groupByTeamPrefix) {
+    parts.push(`--group-by-team-prefix ${groupByTeamPrefix}`);
+  }
+
   return `# Replay:\n${parts.join(" \\\n  ")}`;
 }
 
@@ -75,8 +101,9 @@ export function buildReplayDetails(
   org: string,
   excludedRepos: Set<string>,
   excludedExtractRefs: Set<string>,
+  options: ReplayOptions = {},
 ): string {
-  const raw = buildReplayCommand(groups, query, org, excludedRepos, excludedExtractRefs);
+  const raw = buildReplayCommand(groups, query, org, excludedRepos, excludedExtractRefs, options);
   // Strip the leading "# Replay:\n" comment so only the runnable lines remain.
   const shellCmd = raw.replace(/^# Replay:\n/, "");
   return [
@@ -106,6 +133,7 @@ export function buildMarkdownOutput(
   excludedRepos: Set<string>,
   excludedExtractRefs: Set<string>,
   outputType: OutputType = "repo-and-matches",
+  options: ReplayOptions = {},
 ): string {
   // repo-only: return the repo names followed by the replay command
   if (outputType === "repo-only") {
@@ -116,7 +144,7 @@ export function buildMarkdownOutput(
     return (
       repos.join("\n") +
       "\n\n" +
-      buildReplayDetails(groups, query, org, excludedRepos, excludedExtractRefs) +
+      buildReplayDetails(groups, query, org, excludedRepos, excludedExtractRefs, options) +
       "\n"
     );
   }
@@ -154,7 +182,7 @@ export function buildMarkdownOutput(
   }
 
   lines.push("");
-  lines.push(buildReplayDetails(groups, query, org, excludedRepos, excludedExtractRefs));
+  lines.push(buildReplayDetails(groups, query, org, excludedRepos, excludedExtractRefs, options));
 
   return lines.join("\n");
 }
@@ -168,6 +196,7 @@ export function buildJsonOutput(
   excludedRepos: Set<string>,
   excludedExtractRefs: Set<string>,
   outputType: OutputType = "repo-and-matches",
+  options: ReplayOptions = {},
 ): string {
   const results = groups
     .filter((g) => g.repoSelected)
@@ -192,7 +221,14 @@ export function buildJsonOutput(
     0,
   );
 
-  const replayCommand = buildReplayCommand(groups, query, org, excludedRepos, excludedExtractRefs);
+  const replayCommand = buildReplayCommand(
+    groups,
+    query,
+    org,
+    excludedRepos,
+    excludedExtractRefs,
+    options,
+  );
 
   return JSON.stringify(
     {
@@ -217,9 +253,27 @@ export function buildOutput(
   excludedExtractRefs: Set<string>,
   format: OutputFormat,
   outputType: OutputType = "repo-and-matches",
+  extraOptions: Pick<ReplayOptions, "includeArchived" | "groupByTeamPrefix"> = {},
 ): string {
+  const options: ReplayOptions = { format, outputType, ...extraOptions };
   if (format === "json") {
-    return buildJsonOutput(groups, query, org, excludedRepos, excludedExtractRefs, outputType);
+    return buildJsonOutput(
+      groups,
+      query,
+      org,
+      excludedRepos,
+      excludedExtractRefs,
+      outputType,
+      options,
+    );
   }
-  return buildMarkdownOutput(groups, query, org, excludedRepos, excludedExtractRefs, outputType);
+  return buildMarkdownOutput(
+    groups,
+    query,
+    org,
+    excludedRepos,
+    excludedExtractRefs,
+    outputType,
+    options,
+  );
 }

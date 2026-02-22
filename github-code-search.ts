@@ -155,7 +155,10 @@ async function searchAction(
 
   if (isCI) {
     console.log(
-      buildOutput(groups, query, org, excludedRepos, excludedExtractRefs, format, outputType),
+      buildOutput(groups, query, org, excludedRepos, excludedExtractRefs, format, outputType, {
+        includeArchived,
+        groupByTeamPrefix: opts.groupByTeamPrefix,
+      }),
     );
   } else {
     await runInteractive(
@@ -166,6 +169,8 @@ async function searchAction(
       excludedExtractRefs,
       format,
       outputType,
+      includeArchived,
+      opts.groupByTeamPrefix,
     );
   }
 }
