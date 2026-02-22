@@ -1,5 +1,6 @@
 import pc from "picocolors";
 import type { CodeMatch } from "./types.ts";
+import { fetchWithRetry, paginatedFetch } from "./api-utils.ts";
 
 // ─── Raw GitHub API types (internal) ─────────────────────────────────────────
 
@@ -35,6 +36,20 @@ interface RawRepo {
 }
 
 // ─── API client ───────────────────────────────────────────────────────────────
+
+/**
+ * Build common GitHub API request headers.
+ */
+function githubHeaders(
+  token: string,
+  accept = "application/vnd.github.text-match+json",
+): HeadersInit {
+  return {
+    Authorization: `Bearer ${token}`,
+    Accept: accept,
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
+}
 
 /**
  * Convert a GitHub blob URL to its raw.githubusercontent.com equivalent.
@@ -79,16 +94,14 @@ export async function searchCode(
   page = 1,
 ): Promise<{ items: RawCodeItem[]; total: number }> {
   const params = new URLSearchParams({
+    // @see https://docs.github.com/en/rest/search/search?apiVersion=2022-11-28#constructing-a-search-query
     q: `${q} org:${org}`,
     per_page: "100",
     page: String(page),
   });
-  const res = await fetch(`https://api.github.com/search/code?${params}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/vnd.github.text-match+json",
-      "X-GitHub-Api-Version": "2022-11-28",
-    },
+  // @see https://docs.github.com/en/rest/search/search?apiVersion=2022-11-28#search-code
+  const res = await fetchWithRetry(`https://api.github.com/search/code?${params}`, {
+    headers: githubHeaders(token),
   });
   if (!res.ok) {
     const body = await res.text();
@@ -137,7 +150,7 @@ export async function fetchAllResults(
   await Promise.all(
     urlsToFetch.map(async (htmlUrl) => {
       try {
-        const res = await fetch(toRawUrl(htmlUrl), {
+        const res = await fetchWithRetry(toRawUrl(htmlUrl), {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) fileContentMap.set(htmlUrl, await res.text());
@@ -188,30 +201,22 @@ export async function fetchRepoTeams(
   const lowerPrefixes = prefixes.map((p) => p.toLowerCase());
 
   // ── 1. List all org teams (paginated) ──────────────────────────────────────
-  const matchingTeamSlugs: string[] = [];
-  let page = 1;
-  while (true) {
+  // @see https://docs.github.com/en/rest/teams/teams?apiVersion=2022-11-28#list-teams
+  const allTeams = await paginatedFetch<RawTeam>(async (page) => {
     const params = new URLSearchParams({ per_page: "100", page: String(page) });
-    const res = await fetch(`https://api.github.com/orgs/${org}/teams?${params}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-      },
+    const res = await fetchWithRetry(`https://api.github.com/orgs/${org}/teams?${params}`, {
+      headers: githubHeaders(token, "application/vnd.github+json"),
     });
     if (!res.ok) {
       const body = await res.text();
       throw new Error(`GitHub API error ${res.status} (list teams): ${body}`);
     }
-    const teams = (await res.json()) as RawTeam[];
-    for (const t of teams) {
-      if (lowerPrefixes.some((p) => t.slug.toLowerCase().startsWith(p))) {
-        matchingTeamSlugs.push(t.slug);
-      }
-    }
-    if (teams.length < 100) break;
-    page++;
-  }
+    return (await res.json()) as RawTeam[];
+  });
+
+  const matchingTeamSlugs = allTeams
+    .filter((t) => lowerPrefixes.some((p) => t.slug.toLowerCase().startsWith(p)))
+    .map((t) => t.slug);
 
   process.stderr.write(
     pc.dim(
@@ -220,35 +225,33 @@ export async function fetchRepoTeams(
   );
 
   // ── 2. For each matching team fetch its repos (paginated) ──────────────────
+  // @see https://docs.github.com/en/rest/teams/teams?apiVersion=2022-11-28#list-repos-in-a-team
   const repoTeams = new Map<string, string[]>();
 
   await Promise.all(
     matchingTeamSlugs.map(async (slug) => {
-      let p = 1;
-      while (true) {
-        const params = new URLSearchParams({
-          per_page: "100",
-          page: String(p),
-        });
-        const res = await fetch(
+      const repos = await paginatedFetch<RawRepo>(async (p) => {
+        const params = new URLSearchParams({ per_page: "100", page: String(p) });
+        const res = await fetchWithRetry(
           `https://api.github.com/orgs/${org}/teams/${slug}/repos?${params}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              Accept: "application/vnd.github+json",
-              "X-GitHub-Api-Version": "2022-11-28",
-            },
-          },
+          { headers: githubHeaders(token, "application/vnd.github+json") },
         );
-        if (!res.ok) break; // Skip on error (e.g. 404 for nested teams)
-        const repos = (await res.json()) as RawRepo[];
-        for (const r of repos) {
-          const list = repoTeams.get(r.full_name) ?? [];
-          if (!list.includes(slug)) list.push(slug);
-          repoTeams.set(r.full_name, list);
+        if (!res.ok) {
+          // 404 is expected for nested/secret teams — skip silently.
+          // Other errors are unexpected: log a warning and stop pagination.
+          if (res.status !== 404) {
+            process.stderr.write(
+              pc.dim(`Warning: could not fetch repos for team "${slug}" (HTTP ${res.status})\n`),
+            );
+          }
+          return [];
         }
-        if (repos.length < 100) break;
-        p++;
+        return (await res.json()) as RawRepo[];
+      });
+      for (const r of repos) {
+        const list = repoTeams.get(r.full_name) ?? [];
+        if (!list.includes(slug)) list.push(slug);
+        repoTeams.set(r.full_name, list);
       }
     }),
   );
