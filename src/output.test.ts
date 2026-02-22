@@ -9,6 +9,7 @@ import {
   shortExtractRef,
   shortRepo,
 } from "./output.ts";
+import type { ReplayOptions } from "./output.ts";
 import type { RepoGroup } from "./types.ts";
 
 const ORG = "myorg";
@@ -124,6 +125,62 @@ describe("buildReplayCommand", () => {
     const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(["myorg/repoA"]), new Set());
     const count = (cmd.match(/repoA/g) ?? []).length;
     expect(count).toBe(1);
+  });
+
+  it("includes --format json when format is json", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const opts: ReplayOptions = { format: "json" };
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
+    expect(cmd).toContain("--format json");
+  });
+
+  it("does not include --format when format is markdown (default)", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const opts: ReplayOptions = { format: "markdown" };
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
+    expect(cmd).not.toContain("--format");
+  });
+
+  it("includes --output-type repo-only when outputType is repo-only", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const opts: ReplayOptions = { outputType: "repo-only" };
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
+    expect(cmd).toContain("--output-type repo-only");
+  });
+
+  it("does not include --output-type when outputType is repo-and-matches (default)", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const opts: ReplayOptions = { outputType: "repo-and-matches" };
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
+    expect(cmd).not.toContain("--output-type");
+  });
+
+  it("includes --include-archived when includeArchived is true", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const opts: ReplayOptions = { includeArchived: true };
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
+    expect(cmd).toContain("--include-archived");
+  });
+
+  it("does not include --include-archived when includeArchived is false (default)", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const opts: ReplayOptions = { includeArchived: false };
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
+    expect(cmd).not.toContain("--include-archived");
+  });
+
+  it("includes --group-by-team-prefix when groupByTeamPrefix is set", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const opts: ReplayOptions = { groupByTeamPrefix: "squad-,chapter-" };
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
+    expect(cmd).toContain("--group-by-team-prefix squad-,chapter-");
+  });
+
+  it("does not include --group-by-team-prefix when groupByTeamPrefix is empty (default)", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const opts: ReplayOptions = { groupByTeamPrefix: "" };
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
+    expect(cmd).not.toContain("--group-by-team-prefix");
   });
 });
 
@@ -438,5 +495,54 @@ describe("buildOutput", () => {
     const out = buildOutput(groups, QUERY, ORG, new Set(), new Set(), "text", "repo-only");
     expect(out).not.toContain("[src/foo.ts]");
     expect(out).toContain("myorg/repoA");
+  });
+
+  it("threads --format json into replay command", () => {
+    const groups = [makeGroup("myorg/repoA", ["src/foo.ts"])];
+    const out = buildOutput(
+      groups,
+      QUERY,
+      ORG,
+      new Set(),
+      new Set(),
+      "markdown",
+      "repo-and-matches",
+      { includeArchived: false, groupByTeamPrefix: "" },
+    );
+    expect(out).not.toContain("--format");
+  });
+
+  it("threads --output-type repo-only into markdown replay command", () => {
+    const groups = [makeGroup("myorg/repoA", ["src/foo.ts"])];
+    const out = buildOutput(groups, QUERY, ORG, new Set(), new Set(), "markdown", "repo-only", {
+      includeArchived: false,
+      groupByTeamPrefix: "",
+    });
+    expect(out).toContain("--output-type repo-only");
+  });
+
+  it("threads --include-archived into markdown replay command", () => {
+    const groups = [makeGroup("myorg/repoA", ["src/foo.ts"])];
+    const out = buildOutput(
+      groups,
+      QUERY,
+      ORG,
+      new Set(),
+      new Set(),
+      "markdown",
+      "repo-and-matches",
+      { includeArchived: true, groupByTeamPrefix: "" },
+    );
+    expect(out).toContain("--include-archived");
+  });
+
+  it("threads --group-by-team-prefix into json replay command", () => {
+    const groups = [makeGroup("myorg/repoA", ["src/foo.ts"])];
+    const out = buildOutput(groups, QUERY, ORG, new Set(), new Set(), "json", "repo-and-matches", {
+      includeArchived: false,
+      groupByTeamPrefix: "squad-",
+    });
+    const parsed = JSON.parse(out);
+    expect(parsed.replayCommand).toContain("--group-by-team-prefix squad-");
   });
 });
