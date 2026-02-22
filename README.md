@@ -153,15 +153,15 @@ After pressing **Enter**:
 3 repos · 6 files · 7 matches selected
 
 - **fulll/auth-service** (2 matches)
-  - [src/middlewares/featureFlags.ts:2:19](https://github.com/fulll/auth-service/blob/main/src/middlewares/featureFlags.ts#L2)
-  - [tests/unit/featureFlags.test.ts:1:8](https://github.com/fulll/auth-service/blob/main/tests/unit/featureFlags.test.ts#L1)
+  - [ ] [src/middlewares/featureFlags.ts:2:19](https://github.com/fulll/auth-service/blob/main/src/middlewares/featureFlags.ts#L2)
+  - [ ] [tests/unit/featureFlags.test.ts:1:8](https://github.com/fulll/auth-service/blob/main/tests/unit/featureFlags.test.ts#L1)
 - **fulll/billing-api**
-  - [src/flags.ts:3:14](https://github.com/fulll/billing-api/blob/main/src/flags.ts#L3)
-  - [src/routes/invoices.ts:1:1](https://github.com/fulll/billing-api/blob/main/src/routes/invoices.ts#L1)
-  - [src/routes/subscriptions.ts:1:1](https://github.com/fulll/billing-api/blob/main/src/routes/subscriptions.ts#L1)
+  - [ ] [src/flags.ts:3:14](https://github.com/fulll/billing-api/blob/main/src/flags.ts#L3)
+  - [ ] [src/routes/invoices.ts:1:1](https://github.com/fulll/billing-api/blob/main/src/routes/invoices.ts#L1)
+  - [ ] [src/routes/subscriptions.ts:1:1](https://github.com/fulll/billing-api/blob/main/src/routes/subscriptions.ts#L1)
 - **fulll/frontend-app**
-  - [src/hooks/useFeatureFlag.ts:1:1](https://github.com/fulll/frontend-app/blob/main/src/hooks/useFeatureFlag.ts#L1)
-  - [src/components/Dashboard.tsx:4:3](https://github.com/fulll/frontend-app/blob/main/src/components/Dashboard.tsx#L4)
+  - [ ] [src/hooks/useFeatureFlag.ts:1:1](https://github.com/fulll/frontend-app/blob/main/src/hooks/useFeatureFlag.ts#L1)
+  - [ ] [src/components/Dashboard.tsx:4:3](https://github.com/fulll/frontend-app/blob/main/src/components/Dashboard.tsx#L4)
 
 <details>
 <summary>replay command</summary>
@@ -209,13 +209,13 @@ $ CI=true github-code-search "useFeatureFlag" --org fulll
 3 repos · 5 matches selected
 
 - **fulll/auth-service**
-  - [src/middlewares/featureFlags.ts:2:19](https://github.com/fulll/auth-service/blob/main/src/middlewares/featureFlags.ts#L2)
-  - [tests/unit/featureFlags.test.ts:1:8](https://github.com/fulll/auth-service/blob/main/tests/unit/featureFlags.test.ts#L1)
+  - [ ] [src/middlewares/featureFlags.ts:2:19](https://github.com/fulll/auth-service/blob/main/src/middlewares/featureFlags.ts#L2)
+  - [ ] [tests/unit/featureFlags.test.ts:1:8](https://github.com/fulll/auth-service/blob/main/tests/unit/featureFlags.test.ts#L1)
 - **fulll/billing-api**
-  - [src/flags.ts:3:14](https://github.com/fulll/billing-api/blob/main/src/flags.ts#L3)
-  - [src/routes/invoices.ts:1:1](https://github.com/fulll/billing-api/blob/main/src/routes/invoices.ts#L1)
+  - [ ] [src/flags.ts:3:14](https://github.com/fulll/billing-api/blob/main/src/flags.ts#L3)
+  - [ ] [src/routes/invoices.ts:1:1](https://github.com/fulll/billing-api/blob/main/src/routes/invoices.ts#L1)
 - **fulll/frontend-app**
-  - [src/hooks/useFeatureFlag.ts:1:1](https://github.com/fulll/frontend-app/blob/main/src/hooks/useFeatureFlag.ts#L1)
+  - [ ] [src/hooks/useFeatureFlag.ts:1:1](https://github.com/fulll/frontend-app/blob/main/src/hooks/useFeatureFlag.ts#L1)
 
 <details>
 <summary>replay command</summary>
@@ -276,12 +276,12 @@ github-code-search "useFeatureFlag" --org fulll
 2 repos · 3 matches selected
 
 - **fulll/auth-service**
-  - [src/middlewares/featureFlags.ts:2:19](https://github.com/fulll/auth-service/blob/main/src/middlewares/featureFlags.ts#L2)
+  - [ ] [src/middlewares/featureFlags.ts:2:19](https://github.com/fulll/auth-service/blob/main/src/middlewares/featureFlags.ts#L2)
 - **fulll/billing-api**
-  - [src/flags.ts:3:14](https://github.com/fulll/billing-api/blob/main/src/flags.ts#L3)
-  - [src/routes/invoices.ts:1:1](https://github.com/fulll/billing-api/blob/main/src/routes/invoices.ts#L1)
+  - [ ] [src/flags.ts:3:14](https://github.com/fulll/billing-api/blob/main/src/flags.ts#L3)
+  - [ ] [src/routes/invoices.ts:1:1](https://github.com/fulll/billing-api/blob/main/src/routes/invoices.ts#L1)
 - **fulll/frontend-app**
-  - [src/hooks/useFeatureFlag.ts:1:1](https://github.com/fulll/frontend-app/blob/main/src/hooks/useFeatureFlag.ts#L1)
+  - [ ] [src/hooks/useFeatureFlag.ts:1:1](https://github.com/fulll/frontend-app/blob/main/src/hooks/useFeatureFlag.ts#L1)
 
 <details>
 <summary>replay command</summary>
@@ -352,22 +352,22 @@ applies the following grouping algorithm:
 ## squad-backend
 
 - **fulll/billing-api** (3 matches)
-  - [src/flags.ts:3:14](https://github.com/fulll/billing-api/blob/main/src/flags.ts#L3)
+  - [ ] [src/flags.ts:3:14](https://github.com/fulll/billing-api/blob/main/src/flags.ts#L3)
 
 ## squad-frontend
 
 - **fulll/auth-service** (2 matches)
-  - [src/middlewares/featureFlags.ts:2:19](...)
+  - [ ] [src/middlewares/featureFlags.ts:2:19](...)
 
 ## squad-frontend + squad-mobile
 
 - **fulll/frontend-app** (1 match)
-  - [src/hooks/useFeatureFlag.ts:1:1](...)
+  - [ ] [src/hooks/useFeatureFlag.ts:1:1](...)
 
 ## other
 
 - **fulll/legacy-monolith** (1 match)
-  - [src/legacy.js:5:1](...)
+  - [ ] [src/legacy.js:5:1](...)
 ```
 
 ### TUI with sections
