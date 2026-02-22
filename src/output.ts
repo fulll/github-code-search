@@ -146,9 +146,9 @@ export function buildMarkdownOutput(
       // absolute line numbers).
       const seg = m.textMatches[0]?.matches[0];
       if (seg) {
-        lines.push(`  - [${m.path}:${seg.line}:${seg.col}](${m.htmlUrl}#L${seg.line})`);
+        lines.push(`  - [ ] [${m.path}:${seg.line}:${seg.col}](${m.htmlUrl}#L${seg.line})`);
       } else {
-        lines.push(`  - [${m.path}](${m.htmlUrl})`);
+        lines.push(`  - [ ] [${m.path}](${m.htmlUrl})`);
       }
     }
   }

@@ -204,8 +204,20 @@ describe("buildMarkdownOutput", () => {
   it("renders each file as an indented sub-bullet", () => {
     const groups = [makeGroup("myorg/repoA", ["src/a.ts", "src/b.ts"])];
     const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set());
-    expect(out).toContain("  - [src/a.ts](https://github.com/myorg/repoA/blob/main/src/a.ts)");
-    expect(out).toContain("  - [src/b.ts](https://github.com/myorg/repoA/blob/main/src/b.ts)");
+    expect(out).toContain("  - [ ] [src/a.ts](https://github.com/myorg/repoA/blob/main/src/a.ts)");
+    expect(out).toContain("  - [ ] [src/b.ts](https://github.com/myorg/repoA/blob/main/src/b.ts)");
+  });
+
+  it("renders file links as markdown TODO list items (- [ ] [...])", () => {
+    const groups = [makeGroup("myorg/repoA", ["src/foo.ts"])];
+    const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set());
+    expect(out).toContain("  - [ ] [src/foo.ts](");
+  });
+
+  it("renders file links with location as markdown TODO items", () => {
+    const groups = [makeGroupWithMatches("myorg/repoA", [{ path: "src/foo.ts", line: 3, col: 5 }])];
+    const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set());
+    expect(out).toContain("  - [ ] [src/foo.ts:3:5](");
   });
 
   it("omits deselected repos", () => {
