@@ -71,6 +71,8 @@ src/
   api.ts                 # GitHub REST API client (search, team fetching)
   api-utils.ts           # Shared retry (fetchWithRetry) and pagination (paginatedFetch)
                          #   helpers used exclusively by api.ts — performs network I/O
+  cache.ts               # Disk cache for the team list (getCacheDir, getCacheKey,
+                         #   readCache, writeCache) — performs filesystem I/O
   aggregate.ts           # Result grouping & filtering (applyFiltersAndExclusions)
   group.ts               # groupByTeamPrefix — team-prefix grouping logic
   render.ts              # Façade re-exporting sub-modules + top-level
@@ -94,7 +96,7 @@ src/
 ## Key architectural principles
 
 - **Pure functions first.** All business logic lives in pure, side-effect-free functions (`aggregate.ts`, `group.ts`, `output.ts`, `render/` sub-modules). This makes them straightforward to unit-test.
-- **Side effects are isolated.** API calls (`api.ts`, `api-utils.ts`), TTY interaction (`tui.ts`) and CLI parsing (`github-code-search.ts`) are the only side-effectful surfaces. `api-utils.ts` hosts shared retry/pagination helpers that perform network I/O and must not be used outside `api.ts`.
+- **Side effects are isolated.** API calls (`api.ts`, `api-utils.ts`), TTY interaction (`tui.ts`) and CLI parsing (`github-code-search.ts`) are the only side-effectful surfaces. `api-utils.ts` hosts shared retry/pagination helpers that perform network I/O and must not be used outside `api.ts`. `cache.ts` hosts disk-cache helpers that perform filesystem I/O and must not be used outside `api.ts`.
 - **`render.ts` is a façade.** It re-exports everything from `render/` and adds two top-level rendering functions. Consumers import from `render.ts`, not directly from sub-modules.
 - **`types.ts` is the single source of truth** for all shared interfaces. Any new shared type must go there.
 - **No classes** — the codebase uses plain TypeScript interfaces and functions throughout.
@@ -105,6 +107,7 @@ src/
 - Use `describe` / `it` / `expect` from Bun's test runner.
 - Only pure functions need tests; `tui.ts` and `api.ts` are not unit-tested.
   `api-utils.ts` is the exception: its helpers are unit-tested by mocking `globalThis.fetch`.
+  `cache.ts` is also tested: it uses the `GITHUB_CODE_SEARCH_CACHE_DIR` env var override to redirect to a temp directory, so tests have no filesystem side effects on the real cache dir.
 - When adding a function to an existing module, add the corresponding test case in the existing `<module>.test.ts`.
 - When creating a new module that contains pure functions, create a companion `<module>.test.ts`.
 - Tests must be self-contained: no network calls, no filesystem side effects.

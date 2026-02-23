@@ -1,6 +1,7 @@
 import pc from "picocolors";
 import type { CodeMatch } from "./types.ts";
 import { fetchWithRetry, paginatedFetch } from "./api-utils.ts";
+import { getCacheKey, readCache, writeCache } from "./cache.ts";
 
 // ─── Raw GitHub API types (internal) ─────────────────────────────────────────
 
@@ -192,7 +193,20 @@ export async function fetchRepoTeams(
   org: string,
   token: string,
   prefixes: string[],
+  useCache = true,
 ): Promise<Map<string, string[]>> {
+  // ── Cache lookup ────────────────────────────────────────────────────────────
+  // The team list is quasi-static; cache it for 24 h to avoid dozens of API
+  // calls on every run. Bypass with useCache = false (--no-cache flag).
+  const cacheKey = getCacheKey(org, prefixes);
+  if (useCache) {
+    const cached = readCache<[string, string[]][]>(cacheKey);
+    if (cached !== null) {
+      process.stderr.write(pc.dim("Using cached team data (— use --no-cache to refresh)\n"));
+      return new Map(cached);
+    }
+  }
+
   const lowerPrefixes = prefixes.map((p) => p.toLowerCase());
 
   // ── 1. List all org teams (paginated), filtering to matching prefixes per page ──
@@ -277,6 +291,12 @@ export async function fetchRepoTeams(
       }
     }),
   );
+
+  // ── Persist result ──────────────────────────────────────────────────────────
+  // Serialise the Map as an array of entries for JSON round-trip stability.
+  if (useCache) {
+    writeCache(cacheKey, [...repoTeams.entries()]);
+  }
 
   return repoTeams;
 }

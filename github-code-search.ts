@@ -90,6 +90,10 @@ function addSearchOptions(cmd: Command): Command {
         "then by the next prefix, and so on. Repos matching no prefix go into 'other'.",
       ].join("\n"),
       "",
+    )
+    .option(
+      "--no-cache",
+      "Bypass the 24 h team-list cache and re-fetch teams from GitHub (only applies with --group-by-team-prefix).",
     );
 }
 
@@ -105,6 +109,7 @@ async function searchAction(
     outputType: string;
     includeArchived: boolean;
     groupByTeamPrefix: string;
+    cache: boolean;
   },
 ): Promise<void> {
   // ─── GitHub API token ───────────────────────────────────────────────────────
@@ -144,7 +149,7 @@ async function searchAction(
       .map((p) => p.trim())
       .filter(Boolean);
     if (prefixes.length > 0) {
-      const teamMap = await fetchRepoTeams(org, GITHUB_TOKEN!, prefixes);
+      const teamMap = await fetchRepoTeams(org, GITHUB_TOKEN!, prefixes, opts.cache);
       // Attach team lists to each group
       for (const g of groups) {
         g.teams = teamMap.get(g.repoFullName) ?? [];
