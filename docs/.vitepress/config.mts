@@ -1,10 +1,24 @@
 import { defineConfig } from "vitepress";
+import versionsData from "../public/versions.json";
+
+// ── Versioning convention ────────────────────────────────────────────────────
+// • main branch  → always publishes the "latest" docs at /github-code-search/
+// • Major release tag (vX.0.0) → CI takes a snapshot:
+//     1. Builds with VITEPRESS_BASE=/github-code-search/vX/
+//     2. Publishes to gh-pages under /vX/
+//     3. Prepends the new entry to docs/public/versions.json on main
+//     4. The next main deploy re-builds this config and picks up the new entry
+//        → the nav dropdown (generated from versionsData below) shows the new version
+// Patch and minor releases (vX.Y.Z, Y>0 or Z>0) update main docs in-place only.
+// See .github/workflows/docs.yml for the full snapshot job.
 
 export default defineConfig({
   title: "github-code-search",
   description:
     "Interactive CLI to search GitHub code across an organization — per-repository aggregation, keyboard-driven TUI, markdown/JSON output.",
-  base: "/github-code-search/",
+  // VITEPRESS_BASE is injected by the snapshot CI job for versioned builds.
+  // Falls back to the canonical base for regular deploys.
+  base: (process.env.VITEPRESS_BASE ?? "/github-code-search/") as `/${string}/`,
 
   // ── Theme ──────────────────────────────────────────────────────────────────
   // "force-auto" = respect prefers-color-scheme by default; user can still toggle
@@ -41,16 +55,17 @@ export default defineConfig({
       { text: "Usage", link: "/usage/search-syntax" },
       { text: "Reference", link: "/reference/cli-options" },
       { text: "Architecture", link: "/architecture/overview" },
-      // Version dropdown — implemented as a plain VitePress nav group.
-      // vitepress-plugin-versions was evaluated but not adopted: it requires
-      // a non-trivial CI setup for snapshot publishing and adds a runtime
-      // dependency for a feature (multi-version docs) that is fully handled
-      // by the CI snapshot job in issue #30. The nav item and
-      // docs/public/versions.json are updated by that workflow.
+      // Version dropdown — items are read from docs/public/versions.json.
+      // The CI snapshot job prepends a new entry to that file on every major release;
+      // the next main deploy re-builds this config and picks up the change automatically.
+      // (vitepress-plugin-versions was evaluated but not adopted — see issue #30.)
       {
-        text: "v1 ▾",
+        text: `${versionsData[0].text} ▾`,
         items: [
-          { text: "v1 (latest)", link: "/" },
+          ...versionsData.map((v: { text: string; link: string }) => ({
+            text: v.text,
+            link: v.link,
+          })),
           {
             text: "Releases",
             link: "https://github.com/fulll/github-code-search/releases",
