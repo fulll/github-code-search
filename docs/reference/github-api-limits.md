@@ -26,7 +26,7 @@ If your query matches more than 1,000 files, `github-code-search` will only see 
 `github-code-search` always authenticates with `GITHUB_TOKEN`. Each paginated search call consumes one request. A query returning 1,000 results requires 10 requests (10 pages × 100 items).
 
 ::: warning Rate limit exceeded
-If the 30 req/min limit is reached, `github-code-search` surfaces a `GitHub API error 403` or `429`. Wait 60 seconds and retry, or break the query into multiple narrower searches.
+If the 30 req/min limit is reached, `github-code-search` surfaces a `GitHub API error 403` or `429`. Retry after the reset time indicated in the error output, or break the query into multiple narrower searches.
 :::
 
 ## Query syntax constraints
@@ -44,7 +44,7 @@ The `NOT` operator is supported in GitHub Code Search, but its behaviour differs
 
 ## Pagination behaviour
 
-`github-code-search` automatically fetches all available pages (up to page 10) using the GitHub Code Search REST API with `per_page=100`. Results from all pages are aggregated and deduplicated before being shown in the TUI or printed.
+`github-code-search` automatically fetches all available pages (up to page 10) using the GitHub Code Search REST API with `per_page=100`. Results from all pages are aggregated before being shown in the TUI or printed.
 
 If 1,000 results are returned and the last page is full, there may be additional results that are silently truncated by GitHub. Refine your query to avoid hitting the ceiling.
 

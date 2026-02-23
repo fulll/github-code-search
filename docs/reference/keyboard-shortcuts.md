@@ -1,15 +1,15 @@
 # Keyboard shortcuts
 
-All shortcuts are active in the interactive TUI. They are case-insensitive unless noted.
+All shortcuts are active in the interactive TUI. Keys are **case-sensitive** and must be typed in lowercase.
 
 ## Navigation
 
-| Key | Action                                |
-| --- | ------------------------------------- |
-| `↑` | Move cursor up (repos and extracts)   |
-| `↓` | Move cursor down (repos and extracts) |
-| `←` | Fold the repo under the cursor        |
-| `→` | Unfold the repo under the cursor      |
+| Key       | Action                                |
+| --------- | ------------------------------------- |
+| `↑` / `k` | Move cursor up (repos and extracts)   |
+| `↓` / `j` | Move cursor down (repos and extracts) |
+| `←`       | Fold the repo under the cursor        |
+| `→`       | Unfold the repo under the cursor      |
 
 Section header rows (shown when `--group-by-team-prefix` is active) are skipped automatically during navigation.
 
@@ -32,16 +32,17 @@ Section header rows (shown when `--group-by-team-prefix` is active) are skipped 
 
 When the filter bar is open (after pressing `f`):
 
-| Key     | Action                              |
-| ------- | ----------------------------------- |
-| Any key | Append character to the filter term |
-| `Enter` | Confirm the filter and apply it     |
-| `Esc`   | Cancel without applying the filter  |
+| Key                  | Action                                       |
+| -------------------- | -------------------------------------------- |
+| Printable characters | Append character to the filter term          |
+| `Backspace`          | Delete the last character of the filter term |
+| `Enter`              | Confirm the filter and apply it              |
+| `Esc`                | Cancel without applying the filter           |
 
 ## Help and exit
 
-| Key            | Action                                                        |
-| -------------- | ------------------------------------------------------------- |
-| `h` / `?`      | Toggle the help overlay (shows all key bindings)              |
-| `Enter`        | Confirm and print selected results (also closes help overlay) |
-| `q` / `Ctrl+C` | Quit without printing results                                 |
+| Key            | Action                                                                                                 |
+| -------------- | ------------------------------------------------------------------------------------------------------ |
+| `h` / `?`      | Toggle the help overlay (shows all key bindings)                                                       |
+| `Enter`        | When help overlay is **closed**: confirm and print selected results. When **open**: close the overlay. |
+| `q` / `Ctrl+C` | Quit without printing results                                                                          |
