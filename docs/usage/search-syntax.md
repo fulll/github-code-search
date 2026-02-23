@@ -1,6 +1,6 @@
 # Search syntax
 
-`github-code-search` passes your query verbatim to the [GitHub Code Search API](https://docs.github.com/en/search-github/searching-on-github/searching-code). Any syntax that works in the GitHub search bar also works here.
+`github-code-search` automatically injects an `org:<org>` qualifier from `--org` and otherwise passes the rest of your query unchanged to the [GitHub Code Search API](https://docs.github.com/en/search-github/searching-on-github/searching-code). Any syntax that works in the GitHub search bar also works here.
 
 ## Basic query
 
