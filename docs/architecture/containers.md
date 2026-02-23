@@ -1,34 +1,92 @@
-# Containers (C4 L2)
+# Level 2: Containers
 
-This diagram zooms into `github-code-search` to show its internal processes and
-the boundaries between them. Each box represents one of the main source files and
-its primary responsibility. Arrows show the call direction at runtime.
+The containers are split across two focused diagrams to keep relations readable.
+Each arrow has a single, clear crossing-free path.
+
+## 2a — Search & API layer
+
+How the CLI fetches data: invocation → search → cache → GitHub.
 
 ```mermaid
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Poppins, Aestetico, Arial, sans-serif", "primaryColor": "#66CCFF", "primaryTextColor": "#000000", "lineColor": "#0000CC", "tertiaryColor": "#FFCC33"}, "themeCSS": ".label,.nodeLabel,.cluster-label > span{font-family:Poppins,Arial,sans-serif;letter-spacing:.2px} .cluster-label > span{font-weight:600;font-size:13px} .edgePath .path{stroke-width:2px}"}}%%
 C4Container
-  title Containers — github-code-search
+  title Level 2a: Search & API layer
 
-  Person(user, "Developer", "Runs the CLI from a terminal or CI pipeline")
-  System_Ext(github, "GitHub REST API", "/search/code · /orgs/{org}/teams · /orgs/{org}/teams/{slug}/repos")
+  UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
+
+  Person(user, "Developer", "Runs the CLI from<br/>a terminal or CI pipeline")
+  System_Ext(github, "GitHub REST API", "/search/code<br/>/orgs/{org}/teams<br/>/orgs/{org}/teams/{slug}/repos")
 
   System_Boundary(tool, "github-code-search") {
-    Container(cli, "CLI parser", "TypeScript / Commander", "Parses subcommands and flags, orchestrates the full flow — github-code-search.ts")
-    Container(api, "API client", "TypeScript", "Authenticates with GitHub, paginates results, retries on rate limit — src/api.ts + src/api-utils.ts")
-    Container(tui, "TUI", "TypeScript / raw TTY", "Reads keyboard input, renders the interactive result browser — src/tui.ts")
-    Container(output, "Output renderer", "TypeScript", "Formats selected results as markdown or JSON — src/output.ts")
-    Container(upgrade, "Upgrader", "TypeScript", "Fetches the latest release and replaces the running binary in-place — src/upgrade.ts")
-    Container(cache, "Team cache", "TypeScript / disk", "Caches the org team list to avoid redundant API calls — src/cache.ts")
+    Container(cli, "CLI parser", "TypeScript / Commander", "Parses subcommands & flags,<br/>orchestrates the full flow<br/>github-code-search.ts")
+    Container(api, "API client", "TypeScript", "Auth, pagination, retry<br/>src/api.ts + api-utils.ts")
+    Container(cache, "Team cache", "TypeScript / disk", "Caches org team list<br/>src/cache.ts")
   }
 
   Rel(user, cli, "Invokes", "argv / stdin")
-  Rel(cli, api, "Calls to search and list teams")
-  Rel(api, github, "HTTPS")
-  Rel(api, cache, "Reads/writes team list")
-  Rel(cli, tui, "Renders if interactive")
-  Rel(tui, output, "Triggers on confirm")
-  Rel(output, user, "Prints to stdout")
-  Rel(cli, upgrade, "Triggers on upgrade subcommand")
-  Rel(upgrade, github, "Fetches latest release assets", "HTTPS")
+  UpdateRelStyle(user, cli, $offsetX="15", $offsetY="-45")
+
+  Rel(cli, api, "Search &<br/>team listing")
+  UpdateRelStyle(cli, api, $offsetX="-35", $offsetY="-25")
+
+  Rel(api, github, "REST calls", "HTTPS")
+  UpdateRelStyle(api, github, $offsetX="10", $offsetY="-35")
+
+  Rel(api, cache, "Read / write<br/>team list")
+  UpdateRelStyle(api, cache, $offsetX="-30", $offsetY="-25")
+
+  UpdateElementStyle(user, $bgColor="#66CCFF", $borderColor="#0000CC", $fontColor="#000000")
+  UpdateElementStyle(cli, $bgColor="#FFCC33", $borderColor="#0000CC", $fontColor="#000000")
+  UpdateElementStyle(api, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
+  UpdateElementStyle(cache, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
+  UpdateElementStyle(github, $bgColor="#FF9933", $borderColor="#0000CC", $fontColor="#000000")
+```
+
+## 2b — Display & output layer
+
+How the CLI drives the TUI for interactive use, produces output, and self-upgrades.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Poppins, Aestetico, Arial, sans-serif", "primaryColor": "#66CCFF", "primaryTextColor": "#000000", "lineColor": "#0000CC", "tertiaryColor": "#FFCC33"}, "themeCSS": ".label,.nodeLabel,.cluster-label > span{font-family:Poppins,Arial,sans-serif;letter-spacing:.2px} .cluster-label > span{font-weight:600;font-size:13px} .edgePath .path{stroke-width:2px}"}}%%
+C4Container
+  title Level 2b: Display & output layer
+
+  UpdateLayoutConfig($c4ShapeInRow="2", $c4BoundaryInRow="1")
+
+  Person(user, "Developer", "Reads results<br/>on stdout")
+  System_Ext(github, "GitHub REST API", "Releases endpoint<br/>/repos/{owner}/{repo}/releases")
+
+  System_Boundary(tool, "github-code-search") {
+    Container(output, "Output renderer", "TypeScript", "Markdown & JSON<br/>formatter — src/output.ts")
+    Container(upgrade, "Upgrader", "TypeScript", "Self-replace binary<br/>src/upgrade.ts")
+    Container(tui, "TUI", "TypeScript / raw TTY", "Keyboard input,<br/>interactive result browser<br/>src/tui.ts")
+    Container(cli, "CLI parser", "TypeScript / Commander", "Orchestrates all flows<br/>github-code-search.ts")
+  }
+
+  Rel(user, cli, "Invokes", "argv / stdin")
+  UpdateRelStyle(user, cli, $offsetX="-68", $offsetY="-145")
+
+  Rel(cli, upgrade, "upgrade<br/>subcommand")
+  UpdateRelStyle(cli, upgrade, $offsetX="10", $offsetY="-5")
+
+  Rel(upgrade, github, "Fetch<br/>latest release", "HTTPS")
+  UpdateRelStyle(upgrade, github, $offsetX="10", $offsetY="-35")
+
+  Rel(cli, tui, "Renders if<br/>interactive")
+  UpdateRelStyle(cli, tui, $offsetX="-25", $offsetY="-25")
+
+  Rel(tui, output, "Triggers<br/>on confirm")
+  UpdateRelStyle(tui, output, $offsetX="10", $offsetY="-5")
+
+  Rel(output, user, "Prints to<br/> stdout")
+  UpdateRelStyle(output, user, $offsetX="4", $offsetY="-20")
+
+  UpdateElementStyle(user, $bgColor="#66CCFF", $borderColor="#0000CC", $fontColor="#000000")
+  UpdateElementStyle(cli, $bgColor="#FFCC33", $borderColor="#0000CC", $fontColor="#000000")
+  UpdateElementStyle(upgrade, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
+  UpdateElementStyle(tui, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
+  UpdateElementStyle(output, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
+  UpdateElementStyle(github, $bgColor="#FF9933", $borderColor="#0000CC", $fontColor="#000000")
 ```
 
 ## Container descriptions

@@ -1,39 +1,92 @@
-# Components (C4 L3)
+# Level 3: Components
 
-This diagram zooms into the **pure-function core** — the modules that contain all
-business logic with no side effects. Every component here is fully unit-tested and
-takes in data structures defined in `src/types.ts`; none of them perform I/O.
+The pure-function core is split into two focused diagrams: the **CLI data pipeline**
+(filter → group → format) and the **TUI render layer** (all display components).
+Every component is side-effect-free and fully unit-tested.
 
-The CLI parser (`github-code-search.ts`) and the TUI (`src/tui.ts`) call these
-components after fetching raw data from the API.
+## 3a — CLI data pipeline
+
+The three pure functions called by the CLI parser to transform raw API results
+into a filtered, grouped, formatted output.
 
 ```mermaid
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Poppins, Aestetico, Arial, sans-serif", "primaryColor": "#66CCFF", "primaryTextColor": "#000000", "lineColor": "#0000CC", "tertiaryColor": "#FFCC33"}, "themeCSS": ".label,.nodeLabel,.cluster-label > span{font-family:Poppins,Arial,sans-serif;letter-spacing:.2px} .cluster-label > span{font-weight:600;font-size:13px} .edgePath .path{stroke-width:2px}"}}%%
 C4Component
-  title Components — pure-function core
+  title Level 3a: CLI data pipeline
 
-  Container_Boundary(core, "Pure-function core") {
-    Component(aggregate, "Filter & aggregation", "src/aggregate.ts", "applyFiltersAndExclusions() — applies --exclude-repositories and --exclude-extracts, normalises org-prefixed names")
-    Component(group, "Team grouping", "src/group.ts", "groupByTeamPrefix() / flattenTeamSections() — groups RepoGroups by team prefix, falls back to flat list")
-    Component(rows, "Row builder", "src/render/rows.ts", "buildRows() — converts RepoGroups into terminal Row[], computes visibility and cursor position")
-    Component(summary, "Summary builder", "src/render/summary.ts", "buildSummary() / buildSummaryFull() / buildSelectionSummary() — header and footer lines rendered in the TUI")
-    Component(filter, "Filter stats", "src/render/filter.ts", "buildFilterStats() — counts visible vs total rows for the status bar")
-    Component(selection, "Selection helpers", "src/render/selection.ts", "applySelectAll() / applySelectNone() — bulk selection mutations on Row[]")
-    Component(highlight, "Syntax highlighter", "src/render/highlight.ts", "highlight() — detects language from filename, applies token-level ANSI colouring")
-    Component(outputFn, "Output formatter", "src/output.ts", "buildOutput() — serialises selected RepoGroup[] to markdown or JSON")
+  UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
+
+  Container(cli, "CLI parser", "github-code-search.ts", "Orchestrates filter,<br/>group and output")
+
+  Container_Boundary(core, "Pure-function core — no I/O") {
+    Component(aggregate, "Filter & aggregation", "src/aggregate.ts", "applyFiltersAndExclusions()<br/>exclude repos & extracts")
+    Component(group, "Team grouping", "src/group.ts", "groupByTeamPrefix()<br/>flattenTeamSections()")
+    Component(outputFn, "Output formatter", "src/output.ts", "buildOutput()<br/>markdown or JSON")
   }
 
-  Container(tui, "TUI", "src/tui.ts", "Calls render components on every redraw")
-  Container(cli, "CLI parser", "github-code-search.ts", "Calls aggregate + group, then TUI or output directly")
+  Rel(cli, aggregate, "Filter<br/>CodeMatch[]")
+  UpdateRelStyle(cli, aggregate, $offsetX="0", $offsetY="-17")
 
-  Rel(cli, aggregate, "Filters raw CodeMatch[]")
-  Rel(cli, group, "Groups into TeamSection[]")
-  Rel(cli, outputFn, "Formats selection (non-interactive mode)")
-  Rel(tui, rows, "Builds terminal rows")
-  Rel(tui, summary, "Builds header / footer lines")
-  Rel(tui, filter, "Builds filter status bar")
-  Rel(tui, selection, "Applies select-all / none")
-  Rel(tui, highlight, "Highlights code extracts")
-  Rel(tui, outputFn, "Formats selection on Enter")
+  Rel(cli, group, "Group into<br/>TeamSection[]")
+  UpdateRelStyle(cli, group, $offsetX="-33", $offsetY="-17")
+
+  Rel(cli, outputFn, "Format<br/>(non-interactive)")
+  UpdateRelStyle(cli, outputFn, $offsetX="-60", $offsetY="-17")
+
+  UpdateElementStyle(cli, $bgColor="#FFCC33", $borderColor="#0000CC", $fontColor="#000000")
+  UpdateElementStyle(aggregate, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
+  UpdateElementStyle(group, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
+  UpdateElementStyle(outputFn, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
+```
+
+## 3b — TUI render layer
+
+The six pure render functions called by the TUI on every redraw. All six live in
+`src/render/` and are re-exported through the `src/render.ts` façade.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Poppins, Aestetico, Arial, sans-serif", "primaryColor": "#66CCFF", "primaryTextColor": "#000000", "lineColor": "#0000CC", "tertiaryColor": "#FFCC33"}, "themeCSS": ".label,.nodeLabel,.cluster-label > span{font-family:Poppins,Arial,sans-serif;letter-spacing:.2px} .cluster-label > span{font-weight:600;font-size:13px} .edgePath .path{stroke-width:2px}"}}%%
+C4Component
+  title Level 3b: TUI render layer
+
+  UpdateLayoutConfig($c4ShapeInRow="5", $c4BoundaryInRow="1")
+
+  Container(tui, "TUI", "src/tui.ts", "Calls render functions<br/>on every redraw;<br/>formats output on Enter")
+
+  Container_Boundary(render, "src/render/ — pure functions") {
+    Component(rows, "Row builder", "src/render/rows.ts", "buildRows()<br/>rowTerminalLines()<br/>isCursorVisible()")
+    Component(summary, "Summary builder", "src/render/summary.ts", "buildSummary()<br/>buildSummaryFull()<br/>buildSelectionSummary()")
+    Component(filter, "Filter stats", "src/render/filter.ts", "buildFilterStats()<br/>visible vs total rows")
+    Component(selection, "Selection helpers", "src/render/selection.ts", "applySelectAll()<br/>applySelectNone()")
+    Component(highlight, "Syntax highlighter", "src/render/highlight.ts", "highlight()<br/>ANSI token colouring")
+    Component(outputFn, "Output formatter", "src/output.ts", "buildOutput()<br/>markdown or JSON")
+  }
+
+  Rel(tui, rows, "Build terminal<br/>rows")
+  UpdateRelStyle(tui, rows, $offsetX="-1", $offsetY="-15")
+
+  Rel(tui, summary, "Build header <br>/ footer")
+  UpdateRelStyle(tui, summary, $offsetX="-44", $offsetY="-16")
+
+  Rel(tui, filter, "Build<br/>status bar")
+  UpdateRelStyle(tui, filter, $offsetX="-64", $offsetY="-16")
+
+  Rel(tui, selection, "Select all<br/>/ none")
+  UpdateRelStyle(tui, selection, $offsetX="-105", $offsetY="-12")
+
+  Rel(tui, highlight, "Highlight<br/>extracts")
+  UpdateRelStyle(tui, highlight, $offsetX="-150", $offsetY="-16")
+
+  Rel(tui, outputFn, "Format<br/>on Enter")
+  UpdateRelStyle(tui, outputFn, $offsetX="17", $offsetY="160")
+
+  UpdateElementStyle(tui, $bgColor="#FFCC33", $borderColor="#0000CC", $fontColor="#000000")
+  UpdateElementStyle(rows, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
+  UpdateElementStyle(summary, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
+  UpdateElementStyle(filter, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
+  UpdateElementStyle(selection, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
+  UpdateElementStyle(highlight, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
+  UpdateElementStyle(outputFn, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
 ```
 
 ## Component descriptions

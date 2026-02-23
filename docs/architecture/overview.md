@@ -1,4 +1,4 @@
-# System context (C4 L1)
+# Level 1: System context
 
 `github-code-search` is a self-contained command-line tool. It mediates between
 a developer and the GitHub REST API: the developer types a query, the tool
@@ -8,17 +8,29 @@ prints structured output so downstream tooling can consume it.
 The diagram below shows the two actors and the single external dependency.
 
 ```mermaid
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Poppins, Aestetico, Arial, sans-serif", "primaryColor": "#66CCFF", "primaryTextColor": "#000000", "lineColor": "#0000CC", "tertiaryColor": "#FFCC33"}, "themeCSS": ".label,.nodeLabel,.cluster-label > span{font-family:Poppins,Arial,sans-serif;letter-spacing:.2px} .cluster-label > span{font-weight:600;font-size:13px} .edgePath .path{stroke-width:2px}"}}%%
 C4Context
-  title System Context — github-code-search
+  title Level 1: github-code-search — System Context
 
-  Person(user, "Developer", "Runs github-code-search from a terminal or CI pipeline")
+  UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
 
-  System(cli, "github-code-search", "Interactive CLI — aggregates GitHub code search results, drives a keyboard-navigable TUI, and outputs markdown or JSON")
+  Person(user, "Developer", "Runs github-code-search<br/>from a terminal or CI pipeline")
 
-  System_Ext(github, "GitHub REST API", "Code search endpoint (/search/code), organisation team listing (/orgs/{org}/teams) and team repository listing (/orgs/{org}/teams/{slug}/repos)")
+  Enterprise_Boundary(fulll, "fulll") {
+    System(cli, "github-code-search", "Interactive CLI — aggregates<br/>GitHub code search results,<br/>drives a TUI, outputs<br/>markdown or JSON")
+  }
 
-  Rel(user, cli, "Runs query, navigates TUI, confirms selection", "stdin / stdout")
-  Rel(cli, github, "Searches code, lists org teams and team repos", "HTTPS")
+  System_Ext(github, "GitHub REST API", "Code search<br/>· org team listing<br/>· team repo listing")
+
+  Rel(user, cli, "Runs query,<br/>navigates TUI", "stdin / stdout")
+  UpdateRelStyle(user, cli, $offsetX="10", $offsetY="-55")
+
+  Rel(cli, github, "Searches code,<br/>lists teams & repos", "HTTPS")
+  UpdateRelStyle(cli, github, $offsetX="10", $offsetY="-30")
+
+  UpdateElementStyle(user, $bgColor="#66CCFF", $borderColor="#0000CC", $fontColor="#000000")
+  UpdateElementStyle(cli, $bgColor="#FFCC33", $borderColor="#0000CC", $fontColor="#000000")
+  UpdateElementStyle(github, $bgColor="#FF9933", $borderColor="#0000CC", $fontColor="#000000")
 ```
 
 ## Actors
