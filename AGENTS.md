@@ -69,6 +69,8 @@ src/
                          #   TextMatch, CodeMatch, RepoGroup, Row, TeamSection,
                          #   OutputFormat, OutputType)
   api.ts                 # GitHub REST API client (search, team fetching)
+  api-utils.ts           # Shared retry (fetchWithRetry) and pagination (paginatedFetch)
+                         #   helpers used exclusively by api.ts — performs network I/O
   aggregate.ts           # Result grouping & filtering (applyFiltersAndExclusions)
   group.ts               # groupByTeamPrefix — team-prefix grouping logic
   render.ts              # Façade re-exporting sub-modules + top-level
@@ -102,6 +104,7 @@ src/
 - Test files are named `<module>.test.ts` and sit next to their source file.
 - Use `describe` / `it` / `expect` from Bun's test runner.
 - Only pure functions need tests; `tui.ts` and `api.ts` are not unit-tested.
+  `api-utils.ts` is the exception: its helpers are unit-tested by mocking `globalThis.fetch`.
 - When adding a function to an existing module, add the corresponding test case in the existing `<module>.test.ts`.
 - When creating a new module that contains pure functions, create a companion `<module>.test.ts`.
 - Tests must be self-contained: no network calls, no filesystem side effects.
