@@ -69,7 +69,7 @@ github-code-search "password= language:TypeScript NOT filename:test" --org fulll
 
 ## API limits
 
-The GitHub Code Search API returns at most **1 000 results** per query. If your query returns more, refine it with qualifiers (especially `language:` or `path:`) to stay below the limit.
+The GitHub Code Search API returns at most **1,000 results** per query. If your query returns more, refine it with qualifiers (especially `language:` or `path:`) to stay below the limit.
 
 See the [GitHub API limits](/reference/github-api-limits) reference for details on rate limits and pagination.
 
