@@ -11,16 +11,18 @@ on:
       - "docs/**"
       - ".github/workflows/docs.yml"
     tags:
-      - "v[0-9]+.0.0"
+      # Glob pattern (not regex): matches v1.0.0, v2.0.0, v10.0.0 …
+      - "v[0-9]*.0.0"
   workflow_dispatch:
 
-# ── Deploy job needs pages + id-token write.
-# Snapshot job needs contents write to push to gh-pages and commit versions.json.
-# Declare the broadest set here; jobs narrow further with job-level permissions.
+# Deployment strategy: single mechanism — peaceiris/actions-gh-pages (gh-pages branch).
+# • latest docs      → pushed to gh-pages root (keep_files: true preserves snapshots)
+# • versioned snapshot → pushed to gh-pages/<major>/ on major release tags
+# GitHub Pages must be configured to serve from the gh-pages branch (not GitHub Actions).
+#
+# Snapshot job needs contents write to push to gh-pages and commit versions.json back to main.
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 # Only one concurrent deployment for the same ref; cancel outdated runs.
 concurrency:
@@ -28,17 +30,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ── Build (latest) ──────────────────────────────────────────────────────────
-  # Runs on every push to main (or workflow_dispatch). Produces the Pages artifact
-  # consumed by the deploy job.
-  build:
-    name: Build docs (latest)
+  # ── Deploy (latest) ─────────────────────────────────────────────────────────
+  # Builds docs and pushes them to the gh-pages root.
+  # keep_files: true ensures versioned snapshots (v1/, v2/ …) are not wiped.
+  # Requires: Settings → Pages → Source: Deploy from a branch → gh-pages / root.
+  deploy:
+    name: Deploy docs (latest)
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3 # v2.1.2
@@ -50,32 +53,15 @@ jobs:
 
       - name: Build docs
         run: bun run docs:build
-        # Base URL is /github-code-search/ (default in config.mts)
+        # Base URL: /github-code-search/ (default in config.mts)
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Publish to gh-pages root
+        uses: peaceiris/actions-gh-pages@4f9cc6602d3f66b9c108549d231e62369c1b474e # v4.0.0
         with:
-          path: docs/.vitepress/dist
-
-  # ── Deploy (latest) ─────────────────────────────────────────────────────────
-  # Deploys the Pages artifact to GitHub Pages.
-  # Requires: Settings → Pages → Source: GitHub Actions.
-  deploy:
-    name: Deploy docs (latest)
-    needs: build
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: docs/.vitepress/dist
+          # Preserve versioned snapshots already pushed to gh-pages (v1/, v2/ …)
+          keep_files: true
 
   # ── Snapshot (versioned) ────────────────────────────────────────────────────
   # Triggered by a major release tag (e.g. v2.0.0).
@@ -95,7 +81,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           # Full history needed to push the versions.json commit back to main.
           fetch-depth: 0
@@ -134,7 +120,9 @@ jobs:
       - name: Prepend new version entry to versions.json
         run: |
           MAJOR="${{ steps.ver.outputs.major }}"
-          LINK="/github-code-search/${MAJOR}/"
+          # Link is relative to the VitePress base — VitePress will not add the base a
+          # second time (same convention as the initial "v1 (latest)" entry: link "/")
+          LINK="/${MAJOR}/"
           # Idempotent: skip if the entry already exists
           jq --arg text "$MAJOR" --arg link "$LINK" \
             'if any(.[]; .link == $link) then . else [{"text": $text, "link": $link}] + . end' \
