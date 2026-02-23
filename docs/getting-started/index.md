@@ -12,11 +12,11 @@ A GitHub personal access token (PAT) is required to call the GitHub code search 
 
 ### Required scopes
 
-| Scope         | When needed                                             |
-| ------------- | ------------------------------------------------------- |
-| `repo`        | Searching **private** repositories                      |
-| `public_repo` | Searching public repositories only                      |
-| `read:org`    | Using `--group-by-team-prefix` to group results by team |
+| Scope         | When needed                                                                     |
+| ------------- | ------------------------------------------------------------------------------- |
+| `repo`        | Searching **private** repositories                                              |
+| `public_repo` | Searching public repositories only                                              |
+| `read:org`    | Using [`--group-by-team-prefix`](/usage/team-grouping) to group results by team |
 
 ::: tip Classic vs fine-grained tokens
 Both token types work. Classic tokens are simpler to configure for org-wide searches.
