@@ -112,6 +112,45 @@ src/
 - When creating a new module that contains pure functions, create a companion `<module>.test.ts`.
 - Tests must be self-contained: no network calls, no filesystem side effects.
 
+## Git conventions
+
+### Signed commits (required)
+
+All commits to this repository **must be cryptographically signed**. Unsigned commits will be rejected by branch protection rules.
+
+**For local commits** — configure GPG or SSH signing once:
+
+```bash
+# Recommended: sign every commit automatically
+git config --global commit.gpgsign true
+
+# Or sign a single commit manually
+git commit -S -m "feat: my change"
+```
+
+Verify your setup:
+
+```bash
+git log --show-signature -1   # should show "Good signature from …"
+```
+
+**For agent-created commits** — commits pushed via the GitHub REST API (e.g. by Copilot Coding Agent or any MCP tool) are automatically marked **Verified** by GitHub using its own key. No extra configuration is required for these.
+
+### Branch & commit conventions
+
+| Branch type   | Pattern                        | Example                             |
+| ------------- | ------------------------------ | ----------------------------------- |
+| Feature       | `feat/<short-description>`     | `feat/json-output-type`             |
+| Bug fix       | `fix/<short-description>`      | `fix/exclude-repos-with-org-prefix` |
+| Refactoring   | `refactor/<short-description>` | `refactor/extract-filter-module`    |
+| Documentation | `docs/<short-description>`     | `docs/25-init-vitepress`            |
+
+Commit messages use **imperative mood**: `Add …`, `Fix …`, `Extract …`, not `Added` or `Fixing`.
+
+For epics spanning multiple PRs, create a long-lived **feature branch** (`feat/<epic-name>`) and merge each sub-issue PR into it. Open a final PR from the feature branch into `main` when the epic is complete.
+
+---
+
 ## Development notes
 
 - **TypeScript throughout** — no `.js` files in `src/`.

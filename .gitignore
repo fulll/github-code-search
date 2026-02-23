@@ -3,3 +3,7 @@ dist/
 coverage/
 .env
 *.local
+
+# VitePress
+docs/.vitepress/cache
+docs/.vitepress/dist

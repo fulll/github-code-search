@@ -13,7 +13,10 @@
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "lint": "oxlint .",
-    "knip": "knip"
+    "knip": "knip",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "dependencies": {
     "commander": "^14.0.3",
@@ -22,7 +25,10 @@
   "devDependencies": {
     "bun-types": "^1.3.9",
     "knip": "^5.84.1",
+    "mermaid": "^11.4.1",
     "oxfmt": "^0.33.0",
-    "oxlint": "^1.48.0"
+    "oxlint": "^1.48.0",
+    "vitepress": "^1.6.3",
+    "vitepress-plugin-mermaid": "^2.0.17"
   }
 }
