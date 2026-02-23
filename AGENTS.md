@@ -92,7 +92,7 @@ src/
 ## Key architectural principles
 
 - **Pure functions first.** All business logic lives in pure, side-effect-free functions (`aggregate.ts`, `group.ts`, `output.ts`, `render/` sub-modules). This makes them straightforward to unit-test.
-- **Side effects are isolated.** API calls (`api.ts`), TTY interaction (`tui.ts`) and CLI parsing (`github-code-search.ts`) are the only side-effectful surfaces.
+- **Side effects are isolated.** API calls (`api.ts`, `api-utils.ts`), TTY interaction (`tui.ts`) and CLI parsing (`github-code-search.ts`) are the only side-effectful surfaces. `api-utils.ts` hosts shared retry/pagination helpers that perform network I/O and must not be used outside `api.ts`.
 - **`render.ts` is a façade.** It re-exports everything from `render/` and adds two top-level rendering functions. Consumers import from `render.ts`, not directly from sub-modules.
 - **`types.ts` is the single source of truth** for all shared interfaces. Any new shared type must go there.
 - **No classes** — the codebase uses plain TypeScript interfaces and functions throughout.

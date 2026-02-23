@@ -1,7 +1,8 @@
-import { afterEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { fetchAllResults, fetchRepoTeams, searchCode, segmentLineCol } from "./api.ts";
 
 const originalFetch = globalThis.fetch;
+const originalSetTimeout = globalThis.setTimeout;
 
 // ─── segmentLineCol ───────────────────────────────────────────────────────────
 
@@ -85,8 +86,17 @@ const makeFetchItem = (i: number) => ({
 });
 
 describe("fetchAllResults", () => {
+  beforeEach(() => {
+    // biome-ignore lint/suspicious/noExplicitAny: test-only shim
+    globalThis.setTimeout = ((fn: () => void, _delay?: number) => {
+      fn();
+      return 0;
+    }) as any;
+  });
+
   afterEach(() => {
     globalThis.fetch = originalFetch;
+    globalThis.setTimeout = originalSetTimeout;
   });
 
   it("returns empty array when API returns no items", async () => {
@@ -187,6 +197,9 @@ describe("fetchAllResults", () => {
   });
 
   it("fetches multiple pages until total is reached", async () => {
+    // paginatedFetch stops when a page returns fewer than pageSize (100) items.
+    // Page 1: exactly 100 items → full page → continue
+    // Page 2: 3 items → partial page → stop
     let searchPage = 0;
     globalThis.fetch = (async (url: string | URL | Request) => {
       const urlStr = url.toString();
@@ -196,16 +209,16 @@ describe("fetchAllResults", () => {
       searchPage++;
       const items =
         searchPage === 1
-          ? Array.from({ length: 2 }, (_, i) => makeFetchItem(i))
-          : Array.from({ length: 1 }, (_, i) => makeFetchItem(2 + i));
-      return new Response(JSON.stringify({ items, total_count: 3 }), {
+          ? Array.from({ length: 100 }, (_, i) => makeFetchItem(i))
+          : Array.from({ length: 3 }, (_, i) => makeFetchItem(100 + i));
+      return new Response(JSON.stringify({ items, total_count: 103 }), {
         status: 200,
         headers: { "content-type": "application/json" },
       });
     }) as typeof fetch;
 
     const results = await fetchAllResults("q", "org", "tok");
-    expect(results).toHaveLength(3);
+    expect(results).toHaveLength(103);
     expect(searchPage).toBe(2);
   });
 
