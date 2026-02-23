@@ -19,7 +19,7 @@ C4Component
   Container(cli, "CLI parser", "github-code-search.ts", "Orchestrates filter,<br/>group and output")
 
   Container_Boundary(core, "Pure-function core — no I/O") {
-    Component(aggregate, "Filter & aggregation", "src/aggregate.ts", "applyFiltersAndExclusions()<br/>exclude repos & extracts")
+    Component(aggregate, "Filter & aggregation", "src/aggregate.ts", "aggregate()<br/>exclude repos & extracts")
     Component(group, "Team grouping", "src/group.ts", "groupByTeamPrefix()<br/>flattenTeamSections()")
     Component(outputFn, "Output formatter", "src/output.ts", "buildOutput()<br/>markdown or JSON")
   }
@@ -58,7 +58,7 @@ C4Component
     Component(summary, "Summary builder", "src/render/summary.ts", "buildSummary()<br/>buildSummaryFull()<br/>buildSelectionSummary()")
     Component(filter, "Filter stats", "src/render/filter.ts", "buildFilterStats()<br/>visible vs total rows")
     Component(selection, "Selection helpers", "src/render/selection.ts", "applySelectAll()<br/>applySelectNone()")
-    Component(highlight, "Syntax highlighter", "src/render/highlight.ts", "highlight()<br/>ANSI token colouring")
+    Component(highlight, "Syntax highlighter", "src/render/highlight.ts", "highlightFragment()<br/>ANSI token colouring")
     Component(outputFn, "Output formatter", "src/output.ts", "buildOutput()<br/>markdown or JSON")
   }
 
@@ -93,14 +93,14 @@ C4Component
 
 | Component                | Source file               | Key exports                                                                                                                                                                 |
 | ------------------------ | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Filter & aggregation** | `src/aggregate.ts`        | `applyFiltersAndExclusions()` — filters `CodeMatch[]` by repository and extract exclusion lists; normalises both `repoName` and `org/repoName` forms.                       |
+| **Filter & aggregation** | `src/aggregate.ts`        | `aggregate()` — filters `CodeMatch[]` by repository and extract exclusion lists; normalises both `repoName` and `org/repoName` forms.                                       |
 | **Team grouping**        | `src/group.ts`            | `groupByTeamPrefix()` — groups `RepoGroup[]` into `TeamSection[]` keyed by team slug; `flattenTeamSections()` — converts back to a flat list for the TUI row builder.       |
 | **Row builder**          | `src/render/rows.ts`      | `buildRows()` — converts `RepoGroup[]` into `Row[]` with expanded/collapsed state; `rowTerminalLines()` — measures wrapped height; `isCursorVisible()` — viewport clipping. |
 | **Summary builder**      | `src/render/summary.ts`   | `buildSummary()` — compact header line; `buildSummaryFull()` — detailed counts; `buildSelectionSummary()` — "N files selected" footer.                                      |
 | **Filter stats**         | `src/render/filter.ts`    | `buildFilterStats()` — produces the `FilterStats` object (visible count, total count, active filter string) used by the TUI status bar.                                     |
 | **Selection helpers**    | `src/render/selection.ts` | `applySelectAll()` — marks all visible rows as selected; `applySelectNone()` — deselects all.                                                                               |
-| **Syntax highlighter**   | `src/render/highlight.ts` | `highlight()` — maps file extension to a language token ruleset and applies ANSI escape sequences. Falls back to plain text for unknown extensions.                         |
-| **Output formatter**     | `src/output.ts`           | `buildOutput()` — entry point for both `--format markdown` and `--output-type json` serialisation of the confirmed selection.                                               |
+| **Syntax highlighter**   | `src/render/highlight.ts` | `highlightFragment()` — maps file extension to a language token ruleset and applies ANSI escape sequences. Falls back to plain text for unknown extensions.                 |
+| **Output formatter**     | `src/output.ts`           | `buildOutput()` — entry point for both `--format markdown` and `--format json` serialisation of the confirmed selection.                                                    |
 
 ## Design principles
 
