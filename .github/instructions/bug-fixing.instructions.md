@@ -75,6 +75,8 @@ Add a one-line comment above the fix if the root cause is non-obvious:
 
 - Branch name: `fix/<short-description>` (e.g. `fix/exclude-repos-with-org-prefix`).
 - Commit message: imperative mood, e.g. `Fix --exclude-repositories ignoring org-prefixed names`.
+- **All commits must be signed** (GPG or SSH). Configure once with `git config --global commit.gpgsign true`.
+  Commits pushed via the GitHub API (Copilot Coding Agent, MCP tools) are automatically Verified by GitHub.
 - PR description:
   - Root cause explanation.
   - Steps to reproduce (before the fix).

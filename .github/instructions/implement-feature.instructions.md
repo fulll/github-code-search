@@ -66,4 +66,6 @@ bun run build.ts       # binary compiles without errors
 
 - Branch name: `feat/<short-description>` (e.g. `feat/json-output-type`).
 - Commit message: imperative mood, e.g. `Add --output-type flag for JSON format`.
+- **All commits must be signed** (GPG or SSH). Configure once with `git config --global commit.gpgsign true`.
+  Commits pushed via the GitHub API (Copilot Coding Agent, MCP tools) are automatically Verified by GitHub.
 - PR description: motivation, what changed, how to test manually.
