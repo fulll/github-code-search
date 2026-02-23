@@ -308,7 +308,7 @@ describe("fetchAllResults", () => {
   });
 });
 
-// ─── fetchRepoTeams ───────────────────────────────────────────────────────────
+// ─── fetchRepoTeams ──────────────────────────────────────────────────────────
 
 describe("fetchRepoTeams", () => {
   afterEach(() => {
@@ -456,6 +456,35 @@ describe("fetchRepoTeams", () => {
     const result = await fetchRepoTeams("myorg", "tok", ["frontend"], false);
     expect(result.has("myorg/repo-extra")).toBe(true);
     expect(result.has("myorg/repo-0")).toBe(true);
+  });
+
+  it("throws a clean rate-limit error when the team repo list returns 403 rate-limit", async () => {
+    const resetTimestamp = Math.ceil((Date.now() + 300_000) / 1_000); // 5 minutes from now
+    globalThis.fetch = (async (url: string | URL | Request) => {
+      const urlStr = url.toString();
+      if (urlStr.includes("/teams?")) {
+        return new Response(JSON.stringify([{ slug: "frontend-web", name: "FE" }]), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      // Team repos endpoint → rate-limited
+      return new Response(
+        JSON.stringify({ message: "API rate limit exceeded for user ID 1234.", status: "403" }),
+        {
+          status: 403,
+          headers: {
+            "content-type": "application/json",
+            "x-ratelimit-remaining": "0",
+            "x-ratelimit-reset": String(resetTimestamp),
+          },
+        },
+      );
+    }) as typeof fetch;
+
+    await expect(fetchRepoTeams("myorg", "tok", ["frontend"], false)).rejects.toThrow(
+      /GitHub API rate limit exceeded\. Please retry in \d+ minute/,
+    );
   });
 
   it("prefix matching is case-insensitive", async () => {

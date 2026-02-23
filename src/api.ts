@@ -45,11 +45,12 @@ interface RawRepo {
  */
 async function throwApiError(res: Response, context?: string): Promise<never> {
   let apiMsg = "";
-  let resetHeader: string | null = null;
+  // Read rate-limit headers before consuming the body so they are always
+  // available even when the response body is malformed JSON.
+  const resetHeader = res.headers.get("x-ratelimit-reset");
   try {
     const body = (await res.json()) as { message?: string };
     apiMsg = body.message ?? "";
-    resetHeader = res.headers.get("x-ratelimit-reset");
   } catch {
     // Ignore JSON parse errors; fall through to generic message
   }
@@ -288,35 +289,10 @@ export async function fetchRepoTeams(
         );
         if (!res.ok) {
           // 404 is expected for nested/secret teams — skip silently.
-          if (res.status === 404) {
-            break;
-          }
-          // Rate-limit 403: throw a clean error like every other rate-limit hit.
-          const bodyJson = await res.json().catch(() => ({}) as { message?: string });
-          const apiMsg: string = (bodyJson as { message?: string }).message ?? "";
-          if (
-            res.status === 403 &&
-            (res.headers.get("x-ratelimit-remaining") === "0" ||
-              apiMsg.toLowerCase().includes("rate limit"))
-          ) {
-            const resetHeader = res.headers.get("x-ratelimit-reset");
-            let wait = "";
-            if (resetHeader !== null) {
-              const resetMs = parseInt(resetHeader, 10) * 1_000 - Date.now();
-              if (resetMs > 0) wait = ` Please retry in ${formatRetryWait(resetMs)}.`;
-            }
-            throw new Error(`GitHub API rate limit exceeded.${wait}`);
-          }
-          // Other errors are unexpected: log a warning and skip this team.
-          let bodyText = apiMsg || JSON.stringify(bodyJson);
-          if (bodyText.length > 200) bodyText = bodyText.slice(0, 200) + "…";
-          const message = bodyText ? `; body: ${bodyText}` : "";
-          process.stderr.write(
-            pc.dim(
-              `Warning: could not fetch repos for team "${slug}" (HTTP ${res.status}${message})\n`,
-            ),
-          );
-          break;
+          if (res.status === 404) break;
+          // All other errors (rate-limit included) delegate to throwApiError
+          // which detects rate-limits and produces a clean message.
+          await throwApiError(res);
         }
         const repos = (await res.json()) as RawRepo[];
         for (const r of repos) {
