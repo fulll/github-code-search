@@ -1,0 +1,149 @@
+name: Docs
+
+# Triggers:
+# - push to main touching docs/** or this workflow → deploy latest to GitHub Pages
+# - push of a major release tag (v2.0.0, v3.0.0 …)  → versioned snapshot
+# - workflow_dispatch                                 → manual deploy of latest
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - ".github/workflows/docs.yml"
+    tags:
+      - "v[0-9]+.0.0"
+  workflow_dispatch:
+
+# ── Deploy job needs pages + id-token write.
+# Snapshot job needs contents write to push to gh-pages and commit versions.json.
+# Declare the broadest set here; jobs narrow further with job-level permissions.
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+# Only one concurrent deployment for the same ref; cancel outdated runs.
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Build (latest) ──────────────────────────────────────────────────────────
+  # Runs on every push to main (or workflow_dispatch). Produces the Pages artifact
+  # consumed by the deploy job.
+  build:
+    name: Build docs (latest)
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3 # v2.1.2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build docs
+        run: bun run docs:build
+        # Base URL is /github-code-search/ (default in config.mts)
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/.vitepress/dist
+
+  # ── Deploy (latest) ─────────────────────────────────────────────────────────
+  # Deploys the Pages artifact to GitHub Pages.
+  # Requires: Settings → Pages → Source: GitHub Actions.
+  deploy:
+    name: Deploy docs (latest)
+    needs: build
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  # ── Snapshot (versioned) ────────────────────────────────────────────────────
+  # Triggered by a major release tag (e.g. v2.0.0).
+  # Builds docs with a versioned base URL (/github-code-search/v2/) and publishes
+  # the static output to the gh-pages branch under /v2/.
+  # Also appends the new entry to docs/public/versions.json on main so that
+  # future deployments expose the version in the nav dropdown.
+  #
+  # Convention: only tags matching vX.0.0 (major bumps) trigger a snapshot.
+  # Patch and minor releases update the main docs in-place via the deploy job.
+  snapshot:
+    name: Snapshot versioned docs
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history needed to push the versions.json commit back to main.
+          fetch-depth: 0
+
+      - name: Extract major version from tag
+        id: ver
+        run: |
+          TAG="${GITHUB_REF_NAME}"                     # e.g. v2.0.0
+          MAJOR="$(echo "$TAG" | cut -d. -f1)"        # e.g. v2
+          echo "tag=$TAG"   >> "$GITHUB_OUTPUT"
+          echo "major=$MAJOR" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3 # v2.1.2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build versioned snapshot
+        env:
+          # config.mts reads VITEPRESS_BASE when set; falls back to /github-code-search/
+          VITEPRESS_BASE: /github-code-search/${{ steps.ver.outputs.major }}/
+        run: bun run docs:build
+
+      - name: Publish snapshot to gh-pages
+        uses: peaceiris/actions-gh-pages@4f9cc6602d3f66b9c108549d231e62369c1b474e # v4.0.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: docs/.vitepress/dist
+          destination_dir: ${{ steps.ver.outputs.major }}
+          # Preserve all existing pages (other versions, latest, etc.)
+          keep_files: true
+
+      - name: Prepend new version entry to versions.json
+        run: |
+          MAJOR="${{ steps.ver.outputs.major }}"
+          LINK="/github-code-search/${MAJOR}/"
+          # Idempotent: skip if the entry already exists
+          jq --arg text "$MAJOR" --arg link "$LINK" \
+            'if any(.[]; .link == $link) then . else [{"text": $text, "link": $link}] + . end' \
+            docs/public/versions.json > /tmp/versions_new.json
+          mv /tmp/versions_new.json docs/public/versions.json
+
+      - name: Commit updated versions.json to main
+        uses: stefanzweifel/git-auto-commit-action@8621497c8c39c72f3e2a999a26b4ca1b5590082e # v5.0.1
+        with:
+          commit_message: "docs: add ${{ steps.ver.outputs.major }} to versions.json [skip ci]"
+          file_pattern: docs/public/versions.json
+          branch: main

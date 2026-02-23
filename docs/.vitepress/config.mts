@@ -1,10 +1,22 @@
 import { defineConfig } from "vitepress";
 
+// ── Versioning convention ──────────────────────────────────────────────────────
+// • main branch  → always publishes the "latest" docs at /github-code-search/
+// • Major release tag (vX.0.0) → CI takes a snapshot:
+//     1. Builds with VITEPRESS_BASE=/github-code-search/vX/
+//     2. Publishes to gh-pages under /vX/
+//     3. Prepends the new entry to docs/public/versions.json on main
+//     4. The nav dropdown is updated on the next main deploy
+// Patch and minor releases (vX.Y.Z, Y>0 or Z>0) update main docs in-place only.
+// See .github/workflows/docs.yml for the full snapshot job.
+
 export default defineConfig({
   title: "github-code-search",
   description:
     "Interactive CLI to search GitHub code across an organization — per-repository aggregation, keyboard-driven TUI, markdown/JSON output.",
-  base: "/github-code-search/",
+  // VITEPRESS_BASE is injected by the snapshot CI job for versioned builds.
+  // Falls back to the canonical base for regular deploys.
+  base: (process.env.VITEPRESS_BASE ?? "/github-code-search/") as `/${string}/`,
 
   // ── Theme ──────────────────────────────────────────────────────────────────
   // "force-auto" = respect prefers-color-scheme by default; user can still toggle
