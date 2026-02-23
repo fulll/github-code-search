@@ -245,6 +245,12 @@ async function main(): Promise<void> {
       writeFileSync(2, queryCmd.helpInformation() + "\n");
       process.exit(1);
     }
+    // Any other known Error (e.g. rate-limit exceeded) → print a clean message
+    // to stderr without a stack trace, then exit 1.
+    if (e instanceof Error) {
+      writeFileSync(2, `error: ${e.message}\n`);
+      process.exit(1);
+    }
     throw e;
   }
 }

@@ -1,6 +1,6 @@
 import pc from "picocolors";
 import type { CodeMatch } from "./types.ts";
-import { fetchWithRetry, paginatedFetch } from "./api-utils.ts";
+import { fetchWithRetry, formatRetryWait, paginatedFetch } from "./api-utils.ts";
 import { getCacheKey, readCache, writeCache } from "./cache.ts";
 
 // ─── Raw GitHub API types (internal) ─────────────────────────────────────────
@@ -37,6 +37,41 @@ interface RawRepo {
 }
 
 // ─── API client ───────────────────────────────────────────────────────────────
+
+/**
+ * Read a GitHub API error response and throw a human-readable Error.
+ * When the response body signals a rate-limit condition the message includes
+ * the wait time derived from the x-ratelimit-reset header.
+ */
+async function throwApiError(res: Response, context?: string): Promise<never> {
+  let apiMsg = "";
+  // Read rate-limit headers before consuming the body so they are always
+  // available even when the response body is malformed JSON.
+  const resetHeader = res.headers.get("x-ratelimit-reset");
+  try {
+    const body = (await res.json()) as { message?: string };
+    apiMsg = body.message ?? "";
+  } catch {
+    // Ignore JSON parse errors; fall through to generic message
+  }
+
+  // Fix: detect rate-limit by body message when headers are absent — see issue #22
+  if (
+    res.status === 403 &&
+    (res.headers.get("x-ratelimit-remaining") === "0" ||
+      apiMsg.toLowerCase().includes("rate limit"))
+  ) {
+    let wait = "";
+    if (resetHeader !== null) {
+      const resetMs = parseInt(resetHeader, 10) * 1_000 - Date.now();
+      if (resetMs > 0) wait = ` Please retry in ${formatRetryWait(resetMs)}.`;
+    }
+    throw new Error(`GitHub API rate limit exceeded.${wait}`);
+  }
+
+  const ctx = context ? ` (${context})` : "";
+  throw new Error(`GitHub API error ${res.status}${ctx}: ${apiMsg || "(no message)"}`);
+}
 
 /**
  * Build common GitHub API request headers.
@@ -104,10 +139,7 @@ export async function searchCode(
   const res = await fetchWithRetry(`https://api.github.com/search/code?${params}`, {
     headers: githubHeaders(token),
   });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`GitHub API error ${res.status}: ${body}`);
-  }
+  if (!res.ok) await throwApiError(res);
   const data = (await res.json()) as SearchCodeResponse;
   return { items: data.items ?? [], total: data.total_count ?? 0 };
 }
@@ -222,10 +254,7 @@ export async function fetchRepoTeams(
       const res = await fetchWithRetry(`https://api.github.com/orgs/${org}/teams?${params}`, {
         headers: githubHeaders(token, "application/vnd.github+json"),
       });
-      if (!res.ok) {
-        const body = await res.text();
-        throw new Error(`GitHub API error ${res.status} (list teams): ${body}`);
-      }
+      if (!res.ok) await throwApiError(res, "list teams");
       const teams = (await res.json()) as RawTeam[];
       for (const t of teams) {
         if (lowerPrefixes.some((p) => t.slug.toLowerCase().startsWith(p))) {
@@ -260,25 +289,10 @@ export async function fetchRepoTeams(
         );
         if (!res.ok) {
           // 404 is expected for nested/secret teams — skip silently.
-          // Other errors are unexpected: read the body, log a warning, and stop.
-          if (res.status !== 404) {
-            let bodyText = "";
-            try {
-              bodyText = (await res.text()).trim();
-            } catch {
-              // Ignore errors while reading the body; we still want to log something.
-            }
-            if (bodyText.length > 200) {
-              bodyText = bodyText.slice(0, 200) + "…";
-            }
-            const message = bodyText ? `; body: ${bodyText}` : "";
-            process.stderr.write(
-              pc.dim(
-                `Warning: could not fetch repos for team "${slug}" (HTTP ${res.status}${message})\n`,
-              ),
-            );
-          }
-          break;
+          if (res.status === 404) break;
+          // All other errors (rate-limit included) delegate to throwApiError
+          // which detects rate-limits and produces a clean message.
+          await throwApiError(res);
         }
         const repos = (await res.json()) as RawRepo[];
         for (const r of repos) {
