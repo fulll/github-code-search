@@ -14,8 +14,26 @@ export default withMermaid(
 
     // ── Head ───────────────────────────────────────────────────────────────────
     head: [
-      ["link", { rel: "icon", href: "/github-code-search/favicon.ico" }],
-      ["meta", { name: "theme-color", content: "#3b82f6" }],
+      // Favicons — fulll brand assets
+      [
+        "link",
+        {
+          rel: "icon",
+          type: "image/png",
+          sizes: "72x72",
+          href: "/github-code-search/favicon-72.png",
+        },
+      ],
+      [
+        "link",
+        {
+          rel: "apple-touch-icon",
+          sizes: "114x114",
+          href: "/github-code-search/apple-touch-icon.png",
+        },
+      ],
+      // fulll violet as browser theme colour
+      ["meta", { name: "theme-color", content: "#9933FF" }],
     ],
 
     themeConfig: {
@@ -45,7 +63,10 @@ export default withMermaid(
             items: [
               { text: "Prerequisites", link: "/getting-started/" },
               { text: "Installation", link: "/getting-started/installation" },
-              { text: "Your first search", link: "/getting-started/first-search" },
+              {
+                text: "Your first search",
+                link: "/getting-started/first-search",
+              },
             ],
           },
         ],
@@ -55,7 +76,10 @@ export default withMermaid(
             items: [
               { text: "Search syntax", link: "/usage/search-syntax" },
               { text: "Interactive mode", link: "/usage/interactive-mode" },
-              { text: "Non-interactive mode", link: "/usage/non-interactive-mode" },
+              {
+                text: "Non-interactive mode",
+                link: "/usage/non-interactive-mode",
+              },
               { text: "Output formats", link: "/usage/output-formats" },
               { text: "Filtering", link: "/usage/filtering" },
               { text: "Team grouping", link: "/usage/team-grouping" },
@@ -68,8 +92,14 @@ export default withMermaid(
             text: "Reference",
             items: [
               { text: "CLI options", link: "/reference/cli-options" },
-              { text: "Keyboard shortcuts", link: "/reference/keyboard-shortcuts" },
-              { text: "GitHub API limits", link: "/reference/github-api-limits" },
+              {
+                text: "Keyboard shortcuts",
+                link: "/reference/keyboard-shortcuts",
+              },
+              {
+                text: "GitHub API limits",
+                link: "/reference/github-api-limits",
+              },
               { text: "Environment variables", link: "/reference/environment" },
             ],
           },
@@ -78,7 +108,10 @@ export default withMermaid(
           {
             text: "Architecture",
             items: [
-              { text: "System context (C4 L1)", link: "/architecture/overview" },
+              {
+                text: "System context (C4 L1)",
+                link: "/architecture/overview",
+              },
               { text: "Containers (C4 L2)", link: "/architecture/containers" },
               { text: "Components (C4 L3)", link: "/architecture/components" },
             ],
@@ -92,14 +125,11 @@ export default withMermaid(
       },
 
       // ── Social ────────────────────────────────────────────────────────────────
-      socialLinks: [
-        { icon: "github", link: "https://github.com/fulll/github-code-search" },
-      ],
+      socialLinks: [{ icon: "github", link: "https://github.com/fulll/github-code-search" }],
 
       // ── Edit link ─────────────────────────────────────────────────────────────
       editLink: {
-        pattern:
-          "https://github.com/fulll/github-code-search/edit/main/docs/:path",
+        pattern: "https://github.com/fulll/github-code-search/edit/main/docs/:path",
         text: "Edit this page on GitHub",
       },
 
@@ -118,4 +148,13 @@ export default withMermaid(
       },
     },
   }),
+  {
+    // ── Mermaid: use the built-in theme without CSS filter hacks.
+    // vitepress-plugin-mermaid toggles dark/default automatically based on
+    // the VitePress colour scheme — no custom CSS needed.
+    mermaid: {
+      startOnLoad: false,
+      theme: "default",
+    },
+  },
 );

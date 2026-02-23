@@ -138,12 +138,12 @@ git log --show-signature -1   # should show "Good signature from …"
 
 ### Branch & commit conventions
 
-| Branch type | Pattern | Example |
-| ----------- | ------- | ------- |
-| Feature | `feat/<short-description>` | `feat/json-output-type` |
-| Bug fix | `fix/<short-description>` | `fix/exclude-repos-with-org-prefix` |
-| Refactoring | `refactor/<short-description>` | `refactor/extract-filter-module` |
-| Documentation | `docs/<short-description>` | `docs/25-init-vitepress` |
+| Branch type   | Pattern                        | Example                             |
+| ------------- | ------------------------------ | ----------------------------------- |
+| Feature       | `feat/<short-description>`     | `feat/json-output-type`             |
+| Bug fix       | `fix/<short-description>`      | `fix/exclude-repos-with-org-prefix` |
+| Refactoring   | `refactor/<short-description>` | `refactor/extract-filter-module`    |
+| Documentation | `docs/<short-description>`     | `docs/25-init-vitepress`            |
 
 Commit messages use **imperative mood**: `Add …`, `Fix …`, `Extract …`, not `Added` or `Fixing`.
 
