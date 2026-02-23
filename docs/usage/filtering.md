@@ -40,15 +40,15 @@ github-code-search "useFeatureFlag" --org fulll \
   --exclude-extracts fulll/billing-api:src/flags.ts:0
 ```
 
-The index is **zero-based** and corresponds to the order returned by the GitHub API for that file. Use it to target a specific occurrence when a file contains multiple matches.
+The index is **zero-based** and corresponds to the position of the file in the GitHub API result list for that repository — not the position of the match within the file itself. Each `(repo, file)` pair is one extract with a unique index.
 
 ::: warning
-An extract's index is relative to the GitHub API response. It may change if GitHub re-indexes the repository between calls. For greater stability, prefer `--exclude-repositories` when the entire repository should be excluded.
+An extract's index is relative to the GitHub API response for that repo. It may change if GitHub re-indexes the repository between calls. For greater stability, prefer `--exclude-repositories` when the entire repository should be excluded.
 :::
 
 ### How to find the index
 
-In the TUI, each extract row shows its index in the status bar when focused. In non-interactive mode, extracts are listed in API order: index 0 is the first extract listed for that file.
+In the TUI, the extract rows are listed in API order: the first file shown for a repo has index 0, the second has index 1, and so on. In non-interactive mode, extracts are printed in the same order.
 
 The **replay command** printed at the end of an interactive session automatically includes the correct `--exclude-extracts` values for any extracts you deselected — you don't need to figure out indices manually.
 

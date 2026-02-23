@@ -108,11 +108,11 @@ Press `Enter`. The selected results are printed to stdout, along with a replay c
 After pressing `Enter`:
 
 ```text
-2 repos · 3 matches selected
+2 repos · 2 files selected
 
-- **fulll/auth-service**
+- **fulll/auth-service** (1 match)
   - [ ] [src/middlewares/featureFlags.ts:2:19](https://github.com/fulll/auth-service/blob/main/src/middlewares/featureFlags.ts#L2)
-- **fulll/billing-api**
+- **fulll/billing-api** (1 match)
   - [ ] [src/flags.ts:3:14](https://github.com/fulll/billing-api/blob/main/src/flags.ts#L3)
 ```
 

@@ -61,6 +61,16 @@ github-code-search "filename:docker-compose.yml" --org fulll
 github-code-search "useFeatureFlag NOT filename:test NOT filename:spec" --org fulll
 ```
 
+### Restrict to specific repositories
+
+Although `--org` already limits the search to your organisation, you can further narrow results to one or more specific repositories using `repo:` qualifiers in the query string:
+
+```bash
+github-code-search "useFeatureFlag repo:fulll/billing-api repo:fulll/auth-service" --org fulll
+```
+
+`--org` is still required for the API call even when `repo:` qualifiers are present. The `org:<org>` qualifier is injected automatically alongside your query.
+
 ### Find hardcoded secrets (audit use case)
 
 ```bash

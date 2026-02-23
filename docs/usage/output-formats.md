@@ -11,16 +11,24 @@ github-code-search "useFeatureFlag" --org fulll --format markdown --no-interacti
 ```
 
 ```text
-3 repos · 5 matches selected
+3 repos · 4 files selected
 
-- **fulll/auth-service**
-  - [ ] [src/middlewares/featureFlags.ts:2:19](https://github.com/fulll/auth-service/blob/main/src/middlewares/featureFlags.ts#L2)
-  - [ ] [tests/unit/featureFlags.test.ts:1:8](https://github.com/fulll/auth-service/blob/main/tests/unit/featureFlags.test.ts#L1)
-- **fulll/billing-api**
-  - [ ] [src/flags.ts:3:14](https://github.com/fulll/billing-api/blob/main/src/flags.ts#L3)
-- **fulll/frontend-app**
-  - [ ] [src/hooks/useFeatureFlag.ts:1:1](https://github.com/fulll/frontend-app/blob/main/src/hooks/useFeatureFlag.ts#L1)
+- **fulll/auth-service** (2 matches)
+  - [ ] [src/middlewares/featureFlags.ts:2:19](...)
+  - [ ] [tests/unit/featureFlags.test.ts:1:8](...)
+- **fulll/billing-api** (1 match)
+  - [ ] [src/flags.ts:3:14](...)
+- **fulll/frontend-app** (1 match)
+  - [ ] [src/hooks/useFeatureFlag.ts:1:1](...)
 ```
+
+::: details replay command
+
+```bash
+github-code-search "useFeatureFlag" --org fulll --no-interactive
+```
+
+:::
 
 Each extract link points directly to the matching line on GitHub.
 
@@ -50,7 +58,7 @@ github-code-search "useFeatureFlag" --org fulll --format json --no-interactive
       ]
     }
   ],
-  "replayCommand": "# Replay:\ngithub-code-search \"useFeatureFlag\" --org fulll --no-interactive"
+  "replayCommand": "# Replay:\ngithub-code-search \"useFeatureFlag\" --org fulll --format json --no-interactive"
 }
 ```
 
@@ -75,12 +83,18 @@ github-code-search "useFeatureFlag" --org fulll \
 ```
 
 ```text
-3 repos selected
-
-- **fulll/auth-service**
-- **fulll/billing-api**
-- **fulll/frontend-app**
+fulll/auth-service
+fulll/billing-api
+fulll/frontend-app
 ```
+
+::: details replay command
+
+```bash
+github-code-search "useFeatureFlag" --org fulll --no-interactive --output-type repo-only
+```
+
+:::
 
 ### Example — repo-only JSON
 
@@ -93,13 +107,13 @@ github-code-search "useFeatureFlag" --org fulll \
 {
   "query": "useFeatureFlag",
   "org": "fulll",
-  "selection": { "repos": 3, "matches": 0 },
+  "selection": { "repos": 3, "matches": 5 },
   "results": [
-    { "repo": "fulll/auth-service", "matches": [] },
-    { "repo": "fulll/billing-api", "matches": [] },
-    { "repo": "fulll/frontend-app", "matches": [] }
+    { "repo": "fulll/auth-service" },
+    { "repo": "fulll/billing-api" },
+    { "repo": "fulll/frontend-app" }
   ],
-  "replayCommand": "# Replay:\ngithub-code-search \"useFeatureFlag\" --org fulll --no-interactive"
+  "replayCommand": "# Replay:\ngithub-code-search \"useFeatureFlag\" --org fulll --format json --no-interactive --output-type repo-only"
 }
 ```
 

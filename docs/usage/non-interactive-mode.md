@@ -6,18 +6,25 @@ Non-interactive mode bypasses the TUI and prints results directly to stdout. Use
 
 Three equivalent methods:
 
-```bash
-# 1. Set the standard CI environment variable
-CI=true github-code-search "useFeatureFlag" --org fulll
+1. Set the standard CI environment variable:
 
-# 2. Use the explicit flag
-github-code-search "useFeatureFlag" --org fulll --no-interactive
+   ```bash
+   CI=true github-code-search "useFeatureFlag" --org fulll
+   ```
 
-# 3. GitHub Actions — CI=true is set automatically
-- run: github-code-search "useFeatureFlag" --org fulll
-  env:
-    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-```
+2. Use the explicit flag:
+
+   ```bash
+   github-code-search "useFeatureFlag" --org fulll --no-interactive
+   ```
+
+3. GitHub Actions — `CI=true` is set automatically:
+
+   ```yaml
+   - run: github-code-search "useFeatureFlag" --org fulll
+     env:
+       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+   ```
 
 ::: tip
 In any environment where `CI=true` is set (GitHub Actions, GitLab CI, CircleCI, etc.), non-interactive mode is activated automatically — you don't need `--no-interactive`.
@@ -30,15 +37,15 @@ $ CI=true github-code-search "useFeatureFlag" --org fulll
 ```
 
 ```text
-3 repos · 5 matches selected
+3 repos · 5 files selected
 
-- **fulll/auth-service**
+- **fulll/auth-service** (2 matches)
   - [ ] [src/middlewares/featureFlags.ts:2:19](https://github.com/fulll/auth-service/blob/main/src/middlewares/featureFlags.ts#L2)
   - [ ] [tests/unit/featureFlags.test.ts:1:8](https://github.com/fulll/auth-service/blob/main/tests/unit/featureFlags.test.ts#L1)
-- **fulll/billing-api**
+- **fulll/billing-api** (2 matches)
   - [ ] [src/flags.ts:3:14](https://github.com/fulll/billing-api/blob/main/src/flags.ts#L3)
   - [ ] [src/routes/invoices.ts:1:1](https://github.com/fulll/billing-api/blob/main/src/routes/invoices.ts#L1)
-- **fulll/frontend-app**
+- **fulll/frontend-app** (1 match)
   - [ ] [src/hooks/useFeatureFlag.ts:1:1](https://github.com/fulll/frontend-app/blob/main/src/hooks/useFeatureFlag.ts#L1)
 ```
 
@@ -81,9 +88,10 @@ This is the recommended bridge between an interactive exploration session and a 
 The Markdown output can be piped directly into other tools:
 
 ```bash
-# Count how many repos contain the pattern
+# Count how many repos contain the pattern (JSON is cleaner for scripting)
 CI=true github-code-search "TODO" --org fulll \
-  --output-type repo-only | grep -c "^\- \*\*"
+  --format json --output-type repo-only \
+  | jq '.selection.repos'
 ```
 
 ```bash

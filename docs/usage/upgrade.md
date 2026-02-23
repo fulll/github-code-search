@@ -17,13 +17,15 @@ The command:
 
 ```text
 $ github-code-search upgrade
-✓  Already up to date (v1.2.0)
+Checking for updates…
+Already up to date (v1.2.0).
 ```
 
 ```text
 $ github-code-search upgrade
-↓  Downloading v1.3.0 (darwin/arm64)…
-✓  Upgraded github-code-search to v1.3.0
+Checking for updates…
+Upgrading v1.2.0 → v1.3.0…
+Successfully upgraded to v1.3.0.
 ```
 
 ## Token requirement
