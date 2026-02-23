@@ -41,6 +41,90 @@ describe("getCacheDir", () => {
     delete process.env.GITHUB_CODE_SEARCH_CACHE_DIR;
     expect(getCacheDir()).toContain("github-code-search");
   });
+
+  it("uses LOCALAPPDATA on win32 when the env var is set", () => {
+    delete process.env.GITHUB_CODE_SEARCH_CACHE_DIR;
+    const originalPlatform = Object.getOwnPropertyDescriptor(process, "platform");
+    const originalLocalAppData = process.env.LOCALAPPDATA;
+    try {
+      Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+      process.env.LOCALAPPDATA = "C:\\Users\\user\\AppData\\Local";
+      const dir = getCacheDir();
+      // path.join uses the host OS separator in tests (macOS: /), so we just
+      // assert both components are present rather than hard-coding a separator.
+      expect(dir).toContain("AppData");
+      expect(dir).toContain("Local");
+      expect(dir).toContain("github-code-search");
+    } finally {
+      if (originalPlatform) Object.defineProperty(process, "platform", originalPlatform);
+      if (originalLocalAppData !== undefined) process.env.LOCALAPPDATA = originalLocalAppData;
+      else delete process.env.LOCALAPPDATA;
+    }
+  });
+
+  it("falls back to ~/AppData/Local on win32 when LOCALAPPDATA is not set", () => {
+    delete process.env.GITHUB_CODE_SEARCH_CACHE_DIR;
+    const originalPlatform = Object.getOwnPropertyDescriptor(process, "platform");
+    const originalLocalAppData = process.env.LOCALAPPDATA;
+    try {
+      Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+      delete process.env.LOCALAPPDATA;
+      const dir = getCacheDir();
+      expect(dir).toContain("AppData");
+      expect(dir).toContain("Local");
+      expect(dir).toContain("github-code-search");
+    } finally {
+      if (originalPlatform) Object.defineProperty(process, "platform", originalPlatform);
+      if (originalLocalAppData !== undefined) process.env.LOCALAPPDATA = originalLocalAppData;
+    }
+  });
+
+  it("uses XDG_CACHE_HOME on linux when set", () => {
+    delete process.env.GITHUB_CODE_SEARCH_CACHE_DIR;
+    const originalPlatform = Object.getOwnPropertyDescriptor(process, "platform");
+    const originalXdg = process.env.XDG_CACHE_HOME;
+    try {
+      Object.defineProperty(process, "platform", { value: "linux", configurable: true });
+      process.env.XDG_CACHE_HOME = "/custom/xdg/cache";
+      const dir = getCacheDir();
+      expect(dir).toContain("custom");
+      expect(dir).toContain("xdg");
+      expect(dir).toContain("github-code-search");
+    } finally {
+      if (originalPlatform) Object.defineProperty(process, "platform", originalPlatform);
+      if (originalXdg !== undefined) process.env.XDG_CACHE_HOME = originalXdg;
+      else delete process.env.XDG_CACHE_HOME;
+    }
+  });
+
+  it("falls back to ~/.cache on linux when XDG_CACHE_HOME is not set", () => {
+    delete process.env.GITHUB_CODE_SEARCH_CACHE_DIR;
+    const originalPlatform = Object.getOwnPropertyDescriptor(process, "platform");
+    const originalXdg = process.env.XDG_CACHE_HOME;
+    try {
+      Object.defineProperty(process, "platform", { value: "linux", configurable: true });
+      delete process.env.XDG_CACHE_HOME;
+      const dir = getCacheDir();
+      expect(dir).toContain(".cache");
+      expect(dir).toContain("github-code-search");
+    } finally {
+      if (originalPlatform) Object.defineProperty(process, "platform", originalPlatform);
+      if (originalXdg !== undefined) process.env.XDG_CACHE_HOME = originalXdg;
+    }
+  });
+
+  it("falls back to ~/.github-code-search/cache on unknown platforms", () => {
+    delete process.env.GITHUB_CODE_SEARCH_CACHE_DIR;
+    const originalPlatform = Object.getOwnPropertyDescriptor(process, "platform");
+    try {
+      Object.defineProperty(process, "platform", { value: "freebsd", configurable: true });
+      const dir = getCacheDir();
+      expect(dir).toContain(".github-code-search");
+      expect(dir).toContain("cache");
+    } finally {
+      if (originalPlatform) Object.defineProperty(process, "platform", originalPlatform);
+    }
+  });
 });
 
 // ─── getCacheKey ─────────────────────────────────────────────────────────────

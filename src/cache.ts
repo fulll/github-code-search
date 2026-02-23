@@ -12,9 +12,10 @@ export const CACHE_TTL_MS = 24 * 60 * 60 * 1_000; // 24 hours
 
 /**
  * Returns the OS-appropriate cache directory for the application:
- * - macOS  → ~/Library/Caches/github-code-search
- * - Linux  → $XDG_CACHE_HOME/github-code-search  (fallback: ~/.cache/github-code-search)
- * - Other  → ~/.github-code-search/cache
+ * - macOS   → ~/Library/Caches/github-code-search
+ * - Linux   → $XDG_CACHE_HOME/github-code-search  (fallback: ~/.cache/github-code-search)
+ * - Windows → %LOCALAPPDATA%\github-code-search   (fallback: ~/AppData/Local/github-code-search)
+ * - Other   → ~/.github-code-search/cache
  *
  * Override with `GITHUB_CODE_SEARCH_CACHE_DIR` env var (useful in tests and CI).
  */
@@ -29,6 +30,14 @@ export function getCacheDir(): string {
   if (platform === "linux") {
     const xdg = process.env.XDG_CACHE_HOME;
     const base = xdg && xdg.trim() !== "" ? xdg : join(homedir(), ".cache");
+    return join(base, "github-code-search");
+  }
+  if (platform === "win32") {
+    const localAppData = process.env.LOCALAPPDATA;
+    const base =
+      localAppData && localAppData.trim() !== ""
+        ? localAppData
+        : join(homedir(), "AppData", "Local");
     return join(base, "github-code-search");
   }
   return join(homedir(), ".github-code-search", "cache");

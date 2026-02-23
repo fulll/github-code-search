@@ -399,10 +399,11 @@ disk for **24 hours** to avoid repeating dozens of API calls on every run.
 
 ### Cache location
 
-| OS    | Path                                                                    |
-| ----- | ----------------------------------------------------------------------- |
-| macOS | `~/Library/Caches/github-code-search/`                                  |
-| Linux | `$XDG_CACHE_HOME/github-code-search/` or `~/.cache/github-code-search/` |
+| OS      | Path                                                                    |
+| ------- | ----------------------------------------------------------------------- |
+| macOS   | `~/Library/Caches/github-code-search/`                                  |
+| Linux   | `$XDG_CACHE_HOME/github-code-search/` or `~/.cache/github-code-search/` |
+| Windows | `%LOCALAPPDATA%\github-code-search\`                                    |
 
 You can also override the cache directory with the `GITHUB_CODE_SEARCH_CACHE_DIR`
 environment variable.
@@ -419,11 +420,14 @@ github-code-search "useFeatureFlag" --org fulll \
 ### Purging the cache
 
 ```bash
-# macOS
-rm -rf ~/Library/Caches/github-code-search
+# macOS / Linux
+rm -rf ~/Library/Caches/github-code-search   # macOS
+rm -rf "${XDG_CACHE_HOME:-$HOME/.cache}/github-code-search"  # Linux
+```
 
-# Linux
-rm -rf "${XDG_CACHE_HOME:-$HOME/.cache}/github-code-search"
+```powershell
+# Windows (PowerShell)
+Remove-Item -Recurse -Force "$env:LOCALAPPDATA\github-code-search"
 ```
 
 ## Known limitations
