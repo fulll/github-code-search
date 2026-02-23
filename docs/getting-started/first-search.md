@@ -87,9 +87,7 @@ The **replay command** at the bottom lets you reproduce the exact same selection
 
 ## What's next?
 
-- **Search syntax**: learn how to target specific repos, file paths or languages
-- **Interactive mode**: full guide to the TUI (filter bar, select all/none, …)
-- **Non-interactive mode**: use `--no-interactive` in CI
-- **Output formats**: get JSON instead of Markdown
-
-_These guides are available in the Usage section._
+- [Search syntax](/usage/search-syntax) — target specific repos, file paths or languages
+- [Interactive mode](/usage/interactive-mode) — full guide to the TUI (filter bar, select all/none, …)
+- [Non-interactive mode](/usage/non-interactive-mode) — use `--no-interactive` in CI
+- [Output formats](/usage/output-formats) — get JSON instead of Markdown
