@@ -43,6 +43,12 @@ export default withMermaid(
         { text: "Usage", link: "/usage/search-syntax" },
         { text: "Reference", link: "/reference/cli-options" },
         { text: "Architecture", link: "/architecture/overview" },
+        // Version dropdown — implemented as a plain VitePress nav group.
+        // vitepress-plugin-versions was evaluated but not adopted: it requires
+        // a non-trivial CI setup for snapshot publishing and adds a runtime
+        // dependency for a feature (multi-version docs) that is fully handled
+        // by the CI snapshot job in issue #30. The nav item and
+        // docs/public/versions.json are updated by that workflow.
         {
           text: "v1 ▾",
           items: [
