@@ -1,5 +1,5 @@
 {
   "$schema": "https://unpkg.com/knip@latest/schema.json",
   "ignore": ["docs/**"],
-  "ignoreDependencies": ["bun-types", "vitepress-plugin-mermaid", "mermaid"]
+  "ignoreDependencies": ["bun-types", "mermaid", "vitepress-mermaid-renderer"]
 }
