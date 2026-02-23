@@ -322,7 +322,7 @@ describe("fetchRepoTeams", () => {
         headers: { "content-type": "application/json" },
       })) as typeof fetch;
 
-    const result = await fetchRepoTeams("myorg", "tok", ["frontend"]);
+    const result = await fetchRepoTeams("myorg", "tok", ["frontend"], false);
     expect(result.size).toBe(0);
   });
 
@@ -342,7 +342,7 @@ describe("fetchRepoTeams", () => {
       });
     }) as typeof fetch;
 
-    const result = await fetchRepoTeams("myorg", "tok", ["frontend"]);
+    const result = await fetchRepoTeams("myorg", "tok", ["frontend"], false);
     expect(result.get("myorg/my-repo")).toEqual(["frontend-web"]);
   });
 
@@ -365,7 +365,7 @@ describe("fetchRepoTeams", () => {
       });
     }) as typeof fetch;
 
-    const result = await fetchRepoTeams("myorg", "tok", ["frontend"]);
+    const result = await fetchRepoTeams("myorg", "tok", ["frontend"], false);
     const slugs = result.get("myorg/shared-ui") ?? [];
     expect(slugs).toContain("frontend-web");
     expect(slugs).toContain("frontend-mobile");
@@ -374,7 +374,7 @@ describe("fetchRepoTeams", () => {
   it("throws when the teams list request fails", async () => {
     globalThis.fetch = (async () => new Response("Forbidden", { status: 403 })) as typeof fetch;
 
-    await expect(fetchRepoTeams("myorg", "tok", ["frontend"])).rejects.toThrow("403");
+    await expect(fetchRepoTeams("myorg", "tok", ["frontend"], false)).rejects.toThrow("403");
   });
 
   it("silently skips a team's repos when its repo list request fails", async () => {
@@ -389,7 +389,7 @@ describe("fetchRepoTeams", () => {
       return new Response("Not Found", { status: 404 });
     }) as typeof fetch;
 
-    const result = await fetchRepoTeams("myorg", "tok", ["frontend"]);
+    const result = await fetchRepoTeams("myorg", "tok", ["frontend"], false);
     expect(result.size).toBe(0);
   });
 
@@ -422,7 +422,7 @@ describe("fetchRepoTeams", () => {
       });
     }) as typeof fetch;
 
-    await fetchRepoTeams("myorg", "tok", ["frontend"]);
+    await fetchRepoTeams("myorg", "tok", ["frontend"], false);
     expect(teamPage).toBe(2);
   });
 
@@ -453,7 +453,7 @@ describe("fetchRepoTeams", () => {
       });
     }) as typeof fetch;
 
-    const result = await fetchRepoTeams("myorg", "tok", ["frontend"]);
+    const result = await fetchRepoTeams("myorg", "tok", ["frontend"], false);
     expect(result.has("myorg/repo-extra")).toBe(true);
     expect(result.has("myorg/repo-0")).toBe(true);
   });
@@ -473,7 +473,7 @@ describe("fetchRepoTeams", () => {
       });
     }) as typeof fetch;
 
-    const result = await fetchRepoTeams("myorg", "tok", ["FRONTEND"]);
+    const result = await fetchRepoTeams("myorg", "tok", ["FRONTEND"], false);
     expect(result.has("myorg/repo-a")).toBe(true);
   });
 });

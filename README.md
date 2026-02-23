@@ -65,6 +65,7 @@ github-code-search upgrade
 | `--output-type <type>`           | ❌       | Output type: `repo-and-matches` (default) or `repo-only`                                              |
 | `--include-archived`             | ❌       | Include archived repositories in results (default: false)                                             |
 | `--group-by-team-prefix <pfxs>`  | ❌       | Comma-separated team-name prefixes to group repos by GitHub team (e.g. `squad-,chapter-`)             |
+| `--no-cache`                     | ❌       | Bypass the 24 h team-list cache and re-fetch teams from GitHub (only with `--group-by-team-prefix`)   |
 
 ## Interactive mode
 
@@ -390,6 +391,40 @@ Navigation (↑ / ↓) automatically skips section header rows.
 
 Fetching team membership requires the token to have the **`read:org`** (or
 `admin:org`) scope in addition to `repo` / `public_repo`.
+
+## Cache
+
+When `--group-by-team-prefix` is used, the tool caches the GitHub team list on
+disk for **24 hours** to avoid repeating dozens of API calls on every run.
+
+### Cache location
+
+| OS    | Path                                                                    |
+| ----- | ----------------------------------------------------------------------- |
+| macOS | `~/Library/Caches/github-code-search/`                                  |
+| Linux | `$XDG_CACHE_HOME/github-code-search/` or `~/.cache/github-code-search/` |
+
+You can also override the cache directory with the `GITHUB_CODE_SEARCH_CACHE_DIR`
+environment variable.
+
+### Bypassing the cache
+
+Pass `--no-cache` to skip the cache and force a fresh fetch:
+
+```bash
+github-code-search "useFeatureFlag" --org fulll \
+  --group-by-team-prefix squad- --no-cache
+```
+
+### Purging the cache
+
+```bash
+# macOS
+rm -rf ~/Library/Caches/github-code-search
+
+# Linux
+rm -rf "${XDG_CACHE_HOME:-$HOME/.cache}/github-code-search"
+```
 
 ## Known limitations
 
