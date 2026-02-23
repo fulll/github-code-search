@@ -1,12 +1,10 @@
 # Prerequisites
 
-Before using `github-code-search`, you need two things: **Bun** and a **GitHub personal access token**.
+The only runtime prerequisite is a **GitHub personal access token**. The pre-compiled binary is self-contained and has no runtime dependency — you do not need Bun to run it.
 
-## Bun ≥ 1.0
-
-`github-code-search` is a self-contained binary compiled with [Bun](https://bun.sh). You do **not** need Bun installed to run the pre-compiled binary — it has no runtime dependency.
-
-You only need Bun if you want to [build from source](/getting-started/installation#from-source).
+::: tip Building from source?
+If you want to build `github-code-search` from source, you will additionally need [Bun](https://bun.sh) ≥ 1.0. See the [Installation guide](/getting-started/installation#from-source).
+:::
 
 ## GitHub token
 
@@ -14,11 +12,11 @@ A GitHub personal access token (PAT) is required to call the GitHub code search 
 
 ### Required scopes
 
-| Scope         | When needed                                                                     |
-| ------------- | ------------------------------------------------------------------------------- |
-| `repo`        | Searching **private** repositories                                              |
-| `public_repo` | Searching public repositories only                                              |
-| `read:org`    | Using [`--group-by-team-prefix`](/usage/team-grouping) to group results by team |
+| Scope         | When needed                                             |
+| ------------- | ------------------------------------------------------- |
+| `repo`        | Searching **private** repositories                      |
+| `public_repo` | Searching public repositories only                      |
+| `read:org`    | Using `--group-by-team-prefix` to group results by team |
 
 ::: tip Classic vs fine-grained tokens
 Both token types work. Classic tokens are simpler to configure for org-wide searches.

@@ -21,11 +21,11 @@ Or using the backward-compatible shorthand (no `query` subcommand):
 github-code-search "useFeatureFlag" --org my-org
 ```
 
-`github-code-search` fetches all matching code items across your organisation (up to 1 000 results — see [GitHub API limits](/reference/github-api-limits)) and opens the **interactive TUI**.
+`github-code-search` fetches all matching code items across your organisation (up to 1 000 results) and opens the **interactive TUI**.
 
 ## The interactive TUI
 
-```
+```text
 GitHub Code Search: useFeatureFlag in my-org
 4 repos · 11 files
 ← / → fold/unfold  ↑ / ↓ navigate  spc select  a all  n none  f filter  h help  ↵ confirm  q quit
@@ -61,13 +61,11 @@ Use the keyboard to explore results:
 | `f`       | Open the file-path filter bar           |
 | `h`       | Toggle the help overlay                 |
 
-Full keymap → [Keyboard shortcuts](/reference/keyboard-shortcuts)
-
 ## Confirm and get output
 
 Press **`Enter`** to confirm. The selected results are printed to stdout:
 
-```
+```text
 2 repos · 3 files · 3 matches selected
 
 - **my-org/auth-service**
@@ -89,7 +87,9 @@ The **replay command** at the bottom lets you reproduce the exact same selection
 
 ## What's next?
 
-- **Search syntax**: learn how to target specific repos, file paths or languages → [Search syntax](/usage/search-syntax)
-- **Interactive mode**: full guide to the TUI (filter bar, select all/none, …) → [Interactive mode](/usage/interactive-mode)
-- **Non-interactive mode**: use `--no-interactive` in CI → [Non-interactive mode](/usage/non-interactive-mode)
-- **Output formats**: get JSON instead of Markdown → [Output formats](/usage/output-formats)
+- **Search syntax**: learn how to target specific repos, file paths or languages
+- **Interactive mode**: full guide to the TUI (filter bar, select all/none, …)
+- **Non-interactive mode**: use `--no-interactive` in CI
+- **Output formats**: get JSON instead of Markdown
+
+_These guides are available in the Usage section._

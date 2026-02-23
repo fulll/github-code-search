@@ -134,7 +134,7 @@ Verify your setup:
 git log --show-signature -1   # should show "Good signature from …"
 ```
 
-**For agent-created commits** — when using `run_in_terminal` to run `git commit -S`, the local GPG/SSH key is used and the commit bears the developer's own verified signature. This is the **required approach** in this repository.
+**For agent-created commits** — ensure the agent runs a local `git commit -S` so the local GPG/SSH key is used and the commit bears the developer's own verified signature. This is the **required approach** in this repository.
 
 > ⚠️ **Do NOT use MCP REST API push tools** (`mcp_github_push_files`, `mcp_github_create_or_update_file`) to create commits in this repo.  
 > Those tools push files via the GitHub REST API and create commits signed by GitHub's own key — not the developer's personal key. While GitHub marks them as "Verified", they do not carry the developer's identity.  
