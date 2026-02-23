@@ -48,6 +48,7 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pages: write
       id-token: write
     environment:
@@ -56,13 +57,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@v4.2.2
         with:
           # Needed to fetch the gh-pages storage branch for versioned snapshots.
           fetch-depth: 0
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3 # v2.1.2
+        uses: oven-sh/setup-bun@v2.1.2
         with:
           bun-version: latest
 
@@ -75,14 +76,22 @@ jobs:
 
       - name: Merge versioned snapshots from gh-pages storage
         run: |
+          set -euo pipefail
           if git ls-remote --heads origin gh-pages | grep -q gh-pages; then
             git fetch origin gh-pages
-            # Copy each vX/ directory from the storage branch into the artifact root.
-            for entry in $(git ls-tree --name-only origin/gh-pages); do
+            # List only top-level entries that match v<integer> (e.g. v1, v2).
+            # Using a pathspec glob and a strict regex avoids iterating over
+            # unrelated files (.nojekyll, README, etc.) at the branch root.
+            for entry in $(git ls-tree --name-only origin/gh-pages -- 'v[0-9]*'); do
               if echo "$entry" | grep -qE '^v[0-9]+$'; then
                 echo "Merging snapshot: $entry"
                 mkdir -p "docs/.vitepress/dist/$entry"
                 git archive origin/gh-pages "$entry" | tar -x -C docs/.vitepress/dist/
+                # Validate: warn and remove if the extracted directory is empty.
+                if [ -z "$(ls -A "docs/.vitepress/dist/$entry" 2>/dev/null)" ]; then
+                  echo "Warning: snapshot '$entry' is empty after extraction — removing."
+                  rmdir "docs/.vitepress/dist/$entry"
+                fi
               fi
             done
           else
@@ -90,13 +99,13 @@ jobs:
           fi
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
+        uses: actions/upload-pages-artifact@v3.0.1
         with:
           path: docs/.vitepress/dist
 
       - name: Deploy to GitHub Pages
         id: deploy
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
+        uses: actions/deploy-pages@v4.0.5
 
   # ── Snapshot (versioned) ────────────────────────────────────────────────────
   # Triggered by a major release tag (e.g. v2.0.0).
@@ -118,7 +127,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@v4.2.2
         with:
           # Full history needed to push to gh-pages and commit versions.json to main.
           fetch-depth: 0
@@ -126,11 +135,18 @@ jobs:
       - name: Extract major version from tag
         id: ver
         run: |
-          MAJOR="$(echo "$GITHUB_REF_NAME" | cut -d. -f1)"  # e.g. v2
+          # Validate that the tag strictly matches vX.0.0 before proceeding.
+          # The workflow trigger filter (v[0-9]*.0.0) is the primary guard, but
+          # this ensures the script fails fast if triggered with an unexpected ref.
+          if ! echo "$GITHUB_REF_NAME" | grep -Eq '^v[0-9]+\.0\.0$'; then
+            echo "Error: '$GITHUB_REF_NAME' does not match expected pattern vX.0.0" >&2
+            exit 1
+          fi
+          MAJOR="${GITHUB_REF_NAME%%.*}"  # e.g. v2 from v2.0.0
           echo "major=$MAJOR" >> "$GITHUB_OUTPUT"
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3 # v2.1.2
+        uses: oven-sh/setup-bun@v2.1.2
         with:
           bun-version: latest
 
@@ -145,6 +161,7 @@ jobs:
 
       - name: Store snapshot in gh-pages branch
         run: |
+          set -euo pipefail
           MAJOR="${{ steps.ver.outputs.major }}"
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -164,6 +181,8 @@ jobs:
           git add .
           git diff --staged --quiet || git commit -m "docs: store snapshot $MAJOR [skip ci]"
           git push origin gh-pages
+          # Explicit cleanup — belt-and-suspenders even on ephemeral runners.
+          git worktree remove /tmp/gh-pages-storage
 
       - name: Prepend new version entry to versions.json
         run: |
@@ -176,7 +195,7 @@ jobs:
           mv /tmp/versions_new.json docs/public/versions.json
 
       - name: Commit versions.json to main
-        uses: stefanzweifel/git-auto-commit-action@8621497c8c39c72f3e2a999a26b4ca1b5590082e # v5.0.1
+        uses: stefanzweifel/git-auto-commit-action@v5.0.1
         with:
           # No [skip ci] — the push to main matches paths: docs/** and re-triggers
           # the deploy job, which merges the new snapshot into the Pages artifact.
