@@ -15,7 +15,7 @@ github-code-search "useFeatureFlag" --org fulll \
   --group-by-team-prefix squad-
 ```
 
-Pass one or more **comma-separated prefixes**. The tool fetches all org teams whose names start with any of the given prefixes, then groups repositories accordingly.
+Pass one or more **comma-separated prefixes**. The tool fetches all org teams whose **slugs** (derived from the team name) start with any of the given prefixes, then groups repositories accordingly.
 
 ```bash
 # Multiple prefixes
