@@ -15,14 +15,20 @@ on:
       - "v[0-9]*.0.0"
   workflow_dispatch:
 
-# Deployment strategy: single mechanism — peaceiris/actions-gh-pages (gh-pages branch).
-# • latest docs      → pushed to gh-pages root (keep_files: true preserves snapshots)
-# • versioned snapshot → pushed to gh-pages/<major>/ on major release tags
-# GitHub Pages must be configured to serve from the gh-pages branch (not GitHub Actions).
-#
-# Snapshot job needs contents write to push to gh-pages and commit versions.json back to main.
+# Deployment strategy: GitHub Actions Pages source (actions/deploy-pages — official, no third party).
+# • gh-pages branch = versioned snapshot STORAGE only (not served directly by Pages)
+# • Every deploy job assembles a combined artifact:
+#     - latest docs built from main at the artifact root
+#     - each vX/ snapshot from the gh-pages branch merged in
+#   → single artifact deployed via actions/deploy-pages
+# • Snapshot job stores the built snapshot in gh-pages branch via plain git,
+#   then pushes the updated versions.json to main (no [skip ci]) which
+#   re-triggers the deploy job to include the new snapshot immediately.
+# Requires: Settings → Pages → Source: GitHub Actions.
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 # Only one concurrent deployment for the same ref; cancel outdated runs.
 concurrency:
@@ -31,44 +37,84 @@ concurrency:
 
 jobs:
   # ── Deploy (latest) ─────────────────────────────────────────────────────────
-  # Builds docs and pushes them to the gh-pages root.
-  # keep_files: true ensures versioned snapshots (v1/, v2/ …) are not wiped.
-  # Requires: Settings → Pages → Source: Deploy from a branch → gh-pages / root.
+  # Assembles a combined Pages artifact:
+  #   1. Builds the latest docs (base: /github-code-search/)
+  #   2. Merges existing versioned snapshots from the gh-pages storage branch
+  #      into the artifact (docs/.vitepress/dist/vX/ for each stored version)
+  #   3. Uploads the artifact and deploys via actions/deploy-pages
+  # Requires: Settings → Pages → Source: GitHub Actions.
   deploy:
-    name: Deploy docs (latest)
+    name: Build and deploy docs
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@v4.2.2
+        with:
+          # Needed to fetch the gh-pages storage branch for versioned snapshots.
+          fetch-depth: 0
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3 # v2.1.2
+        uses: oven-sh/setup-bun@v2.1.2
         with:
           bun-version: latest
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build docs
+      - name: Build latest docs
         run: bun run docs:build
         # Base URL: /github-code-search/ (default in config.mts)
 
-      - name: Publish to gh-pages root
-        uses: peaceiris/actions-gh-pages@4f9cc6602d3f66b9c108549d231e62369c1b474e # v4.0.0
+      - name: Merge versioned snapshots from gh-pages storage
+        run: |
+          set -euo pipefail
+          if git ls-remote --heads origin gh-pages | grep -q gh-pages; then
+            git fetch origin gh-pages
+            # List only top-level entries that match v<integer> (e.g. v1, v2).
+            # Using a pathspec glob and a strict regex avoids iterating over
+            # unrelated files (.nojekyll, README, etc.) at the branch root.
+            for entry in $(git ls-tree --name-only origin/gh-pages -- 'v[0-9]*'); do
+              if echo "$entry" | grep -qE '^v[0-9]+$'; then
+                echo "Merging snapshot: $entry"
+                mkdir -p "docs/.vitepress/dist/$entry"
+                git archive origin/gh-pages "$entry" | tar -x -C docs/.vitepress/dist/
+                # Validate: warn and remove if the extracted directory is empty.
+                if [ -z "$(ls -A "docs/.vitepress/dist/$entry" 2>/dev/null)" ]; then
+                  echo "Warning: snapshot '$entry' is empty after extraction — removing."
+                  rmdir "docs/.vitepress/dist/$entry"
+                fi
+              fi
+            done
+          else
+            echo "No gh-pages branch yet — skipping snapshot merge"
+          fi
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3.0.1
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: docs/.vitepress/dist
-          # Preserve versioned snapshots already pushed to gh-pages (v1/, v2/ …)
-          keep_files: true
+          path: docs/.vitepress/dist
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4.0.5
 
   # ── Snapshot (versioned) ────────────────────────────────────────────────────
   # Triggered by a major release tag (e.g. v2.0.0).
-  # Builds docs with a versioned base URL (/github-code-search/v2/) and publishes
-  # the static output to the gh-pages branch under /v2/.
-  # Also appends the new entry to docs/public/versions.json on main so that
-  # future deployments expose the version in the nav dropdown.
+  # 1. Builds docs with a versioned base URL (/github-code-search/v2/).
+  # 2. Stores the output in the gh-pages branch under /v2/ using plain git
+  #    (no third-party action). The gh-pages branch is storage only — Pages
+  #    still points to GitHub Actions; the deploy job merges snapshots in.
+  # 3. Prepends the entry to versions.json on main WITHOUT [skip ci], which
+  #    re-triggers the deploy job so the new snapshot is live immediately.
   #
   # Convention: only tags matching vX.0.0 (major bumps) trigger a snapshot.
   # Patch and minor releases update the main docs in-place via the deploy job.
@@ -81,21 +127,26 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@v4.2.2
         with:
-          # Full history needed to push the versions.json commit back to main.
+          # Full history needed to push to gh-pages and commit versions.json to main.
           fetch-depth: 0
 
       - name: Extract major version from tag
         id: ver
         run: |
-          TAG="${GITHUB_REF_NAME}"                     # e.g. v2.0.0
-          MAJOR="$(echo "$TAG" | cut -d. -f1)"        # e.g. v2
-          echo "tag=$TAG"   >> "$GITHUB_OUTPUT"
+          # Validate that the tag strictly matches vX.0.0 before proceeding.
+          # The workflow trigger filter (v[0-9]*.0.0) is the primary guard, but
+          # this ensures the script fails fast if triggered with an unexpected ref.
+          if ! echo "$GITHUB_REF_NAME" | grep -Eq '^v[0-9]+\.0\.0$'; then
+            echo "Error: '$GITHUB_REF_NAME' does not match expected pattern vX.0.0" >&2
+            exit 1
+          fi
+          MAJOR="${GITHUB_REF_NAME%%.*}"  # e.g. v2 from v2.0.0
           echo "major=$MAJOR" >> "$GITHUB_OUTPUT"
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3 # v2.1.2
+        uses: oven-sh/setup-bun@v2.1.2
         with:
           bun-version: latest
 
@@ -108,30 +159,46 @@ jobs:
           VITEPRESS_BASE: /github-code-search/${{ steps.ver.outputs.major }}/
         run: bun run docs:build
 
-      - name: Publish snapshot to gh-pages
-        uses: peaceiris/actions-gh-pages@4f9cc6602d3f66b9c108549d231e62369c1b474e # v4.0.0
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: docs/.vitepress/dist
-          destination_dir: ${{ steps.ver.outputs.major }}
-          # Preserve all existing pages (other versions, latest, etc.)
-          keep_files: true
+      - name: Store snapshot in gh-pages branch
+        run: |
+          set -euo pipefail
+          MAJOR="${{ steps.ver.outputs.major }}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Set up the gh-pages worktree (create orphan branch if it doesn't exist yet).
+          if git ls-remote --heads origin gh-pages | grep -q gh-pages; then
+            git fetch origin gh-pages
+            git worktree add /tmp/gh-pages-storage origin/gh-pages
+          else
+            git worktree add --orphan -b gh-pages /tmp/gh-pages-storage
+            touch /tmp/gh-pages-storage/.nojekyll  # prevent Jekyll processing
+          fi
+          # Copy the built snapshot into its versioned directory.
+          rm -rf "/tmp/gh-pages-storage/$MAJOR"
+          cp -r docs/.vitepress/dist "/tmp/gh-pages-storage/$MAJOR"
+          # Commit and push.
+          cd /tmp/gh-pages-storage
+          git add .
+          git diff --staged --quiet || git commit -m "docs: store snapshot $MAJOR [skip ci]"
+          git push origin gh-pages
+          # Explicit cleanup — belt-and-suspenders even on ephemeral runners.
+          git worktree remove /tmp/gh-pages-storage
 
       - name: Prepend new version entry to versions.json
         run: |
           MAJOR="${{ steps.ver.outputs.major }}"
-          # Link is relative to the VitePress base — VitePress will not add the base a
-          # second time (same convention as the initial "v1 (latest)" entry: link "/")
           LINK="/${MAJOR}/"
-          # Idempotent: skip if the entry already exists
+          # Idempotent — skip if the entry already exists.
           jq --arg text "$MAJOR" --arg link "$LINK" \
             'if any(.[]; .link == $link) then . else [{"text": $text, "link": $link}] + . end' \
             docs/public/versions.json > /tmp/versions_new.json
           mv /tmp/versions_new.json docs/public/versions.json
 
-      - name: Commit updated versions.json to main
-        uses: stefanzweifel/git-auto-commit-action@8621497c8c39c72f3e2a999a26b4ca1b5590082e # v5.0.1
+      - name: Commit versions.json to main
+        uses: stefanzweifel/git-auto-commit-action@v5.0.1
         with:
-          commit_message: "docs: add ${{ steps.ver.outputs.major }} to versions.json [skip ci]"
+          # No [skip ci] — the push to main matches paths: docs/** and re-triggers
+          # the deploy job, which merges the new snapshot into the Pages artifact.
+          commit_message: "docs: add ${{ steps.ver.outputs.major }} to versions.json"
           file_pattern: docs/public/versions.json
           branch: main
