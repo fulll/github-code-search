@@ -292,9 +292,7 @@ export async function fetchRepoTeams(
             break;
           }
           // Rate-limit 403: throw a clean error like every other rate-limit hit.
-          const bodyJson = await res
-            .json()
-            .catch(() => ({}) as { message?: string });
+          const bodyJson = await res.json().catch(() => ({}) as { message?: string });
           const apiMsg: string = (bodyJson as { message?: string }).message ?? "";
           if (
             res.status === 403 &&
