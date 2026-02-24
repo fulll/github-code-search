@@ -88,14 +88,33 @@ console.log(`  Built ${outfile}`);
 // ─── Ad-hoc codesign (macOS only) ────────────────────────────────────────────
 
 if (targetOs === "darwin" && process.platform === "darwin") {
-  const sign = Bun.spawn(["codesign", "--force", "--sign", "-", outfile], {
-    stdout: "inherit",
-    stderr: "inherit",
-  });
+  const sign = Bun.spawn(
+    [
+      "codesign",
+      "--deep",
+      "--force",
+      "--sign",
+      "-",
+      "--entitlements",
+      `${import.meta.dir}/entitlements.plist`,
+      outfile,
+    ],
+    { stdout: "inherit", stderr: "inherit" },
+  );
   const signCode = await sign.exited;
   if (signCode !== 0) {
     console.error(`codesign failed (exit ${signCode})`);
     process.exit(signCode);
   }
   console.log(`  Codesigned ${outfile}`);
+
+  const verify = Bun.spawn(["codesign", "--verify", "--verbose", outfile], {
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  const verifyCode = await verify.exited;
+  if (verifyCode !== 0) {
+    console.error(`codesign verification failed (exit ${verifyCode})`);
+    process.exit(verifyCode);
+  }
 }
