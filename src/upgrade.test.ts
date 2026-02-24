@@ -53,21 +53,21 @@ function makeAsset(name: string): ReleaseAsset {
 
 describe("selectAsset", () => {
   const assets: ReleaseAsset[] = [
-    makeAsset("github-code-search-darwin-arm64"),
-    makeAsset("github-code-search-darwin-x64"),
+    makeAsset("github-code-search-macos-arm64"),
+    makeAsset("github-code-search-macos-x64"),
     makeAsset("github-code-search-linux-x64"),
     makeAsset("github-code-search-linux-arm64"),
-    makeAsset("github-code-search-win32-x64.exe"),
+    makeAsset("github-code-search-windows-x64.exe"),
   ];
 
-  it("selects darwin-arm64 asset", () => {
+  it("selects macos-arm64 asset for darwin/arm64", () => {
     const asset = selectAsset(assets, "darwin", "arm64");
-    expect(asset?.name).toBe("github-code-search-darwin-arm64");
+    expect(asset?.name).toBe("github-code-search-macos-arm64");
   });
 
-  it("selects darwin-x64 asset", () => {
+  it("selects macos-x64 asset for darwin/x64", () => {
     const asset = selectAsset(assets, "darwin", "x64");
-    expect(asset?.name).toBe("github-code-search-darwin-x64");
+    expect(asset?.name).toBe("github-code-search-macos-x64");
   });
 
   it("selects linux-x64 asset", () => {
@@ -80,9 +80,9 @@ describe("selectAsset", () => {
     expect(asset?.name).toBe("github-code-search-linux-arm64");
   });
 
-  it("selects win32-x64 asset with .exe suffix", () => {
+  it("selects windows-x64 asset with .exe suffix for win32/x64", () => {
     const asset = selectAsset(assets, "win32", "x64");
-    expect(asset?.name).toBe("github-code-search-win32-x64.exe");
+    expect(asset?.name).toBe("github-code-search-windows-x64.exe");
   });
 
   it("returns null when no matching asset is found", () => {
