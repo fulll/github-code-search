@@ -44,17 +44,27 @@ export function isNewerVersion(current: string, latest: string): boolean {
  * Node.js/Bun platform names are mapped to artifact names:
  *   darwin → macos
  *   win32  → windows
+ *
+ * A legacy fallback also tries the raw Node.js platform name (darwin, win32)
+ * so that binaries built before v1.2.1 can still upgrade themselves.
  */
 export function selectAsset(
   assets: ReleaseAsset[],
   platform: string,
   arch: string,
 ): ReleaseAsset | null {
-  const platformMap: Record<string, string> = { darwin: "macos", win32: "windows" };
+  const platformMap: Record<string, string> = {
+    darwin: "macos",
+    win32: "windows",
+  };
   const artifactPlatform = platformMap[platform] ?? platform;
   const suffix = artifactPlatform === "windows" ? ".exe" : "";
   const name = `github-code-search-${artifactPlatform}-${arch}${suffix}`;
-  return assets.find((a) => a.name === name) ?? null;
+  // Fix: fall back to legacy platform names (darwin, win32) published alongside
+  // the canonical names for backward-compat with pre-v1.2.1 binaries — see issue #45
+  const legacySuffix = platform === "win32" ? ".exe" : "";
+  const legacyName = `github-code-search-${platform}-${arch}${legacySuffix}`;
+  return assets.find((a) => a.name === name) ?? assets.find((a) => a.name === legacyName) ?? null;
 }
 
 // ─── GitHub API ───────────────────────────────────────────────────────────────
