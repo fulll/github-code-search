@@ -38,16 +38,22 @@ export function isNewerVersion(current: string, latest: string): boolean {
 /**
  * Picks the release asset matching the current platform and architecture.
  * Expected asset naming convention:
- *   github-code-search-<platform>-<arch>          (e.g. darwin-arm64)
+ *   github-code-search-<platform>-<arch>          (e.g. macos-arm64)
  *   github-code-search-<platform>-<arch>.exe      (Windows)
+ *
+ * Node.js/Bun platform names are mapped to artifact names:
+ *   darwin → macos
+ *   win32  → windows
  */
 export function selectAsset(
   assets: ReleaseAsset[],
   platform: string,
   arch: string,
 ): ReleaseAsset | null {
-  const suffix = platform === "win32" ? ".exe" : "";
-  const name = `github-code-search-${platform}-${arch}${suffix}`;
+  const platformMap: Record<string, string> = { darwin: "macos", win32: "windows" };
+  const artifactPlatform = platformMap[platform] ?? platform;
+  const suffix = artifactPlatform === "windows" ? ".exe" : "";
+  const name = `github-code-search-${artifactPlatform}-${arch}${suffix}`;
   return assets.find((a) => a.name === name) ?? null;
 }
 
