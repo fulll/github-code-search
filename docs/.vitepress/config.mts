@@ -31,6 +31,14 @@ export default defineConfig({
       "link",
       {
         rel: "icon",
+        type: "image/svg+xml",
+        href: "/github-code-search/favicon.svg",
+      },
+    ],
+    [
+      "link",
+      {
+        rel: "icon",
         type: "image/png",
         sizes: "72x72",
         href: "/github-code-search/favicon-72.png",
@@ -49,6 +57,9 @@ export default defineConfig({
   ],
 
   themeConfig: {
+    // ── Logo (top-left, next to title) ───────────────────────────────────────
+    logo: "/logo.svg",
+
     // ── Nav ──────────────────────────────────────────────────────────────────
     nav: [
       {

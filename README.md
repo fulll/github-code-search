@@ -1,5 +1,7 @@
 # github-code-search
 
+<img src="docs/public/logo.svg" alt="github-code-search logo" width="80" align="right">
+
 [![Docs](https://img.shields.io/badge/docs-fulll.github.io%2Fgithub--code--search-blue)](https://fulll.github.io/github-code-search/)
 [![Latest release](https://img.shields.io/github/v/release/fulll/github-code-search)](https://github.com/fulll/github-code-search/releases/latest)
 

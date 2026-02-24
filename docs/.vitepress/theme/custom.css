@@ -81,6 +81,10 @@ body::before {
   );
 }
 
+.VPNavBarTitle span {
+  letter-spacing: -1px;
+}
+
 /* ── Hero terminal demo image ────────────────────────────────────────────── */
 .VPHero .image {
   display: flex;
