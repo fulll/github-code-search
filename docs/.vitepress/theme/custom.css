@@ -40,6 +40,269 @@
   --vp-c-brand-soft: rgba(204, 136, 255, 0.16);
 }
 
-span.name.clip {
+/* ── Hero title gradient ─────────────────────────────────────────────────── */
+/* VitePress reads these two variables to apply a gradient clip to .name.clip  */
+:root {
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(135deg, #9933ff 0%, #cc88ff 55%, #ffcc33 100%);
+}
+
+.VPHero span.name.clip {
   min-width: 100%;
+}
+
+/* ── Top accent bar ──────────────────────────────────────────────────────── */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #9933ff 0%, #cc88ff 40%, #ffcc33 70%, #ff9933 100%);
+  z-index: 9999;
+  pointer-events: none;
+}
+
+/* ── Home page background glow ───────────────────────────────────────────── */
+.VPHome {
+  background: radial-gradient(
+    ellipse 90% 45% at 50% -5%,
+    rgba(153, 51, 255, 0.09) 0%,
+    transparent 100%
+  );
+}
+
+.dark .VPHome {
+  background: radial-gradient(
+    ellipse 90% 45% at 50% -5%,
+    rgba(153, 51, 255, 0.16) 0%,
+    transparent 100%
+  );
+}
+
+/* ── Hero terminal demo image ────────────────────────────────────────────── */
+.VPHero .image {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* Cancel VitePress's decorative translate(-32px,-32px) that causes overlap  */
+.VPHero .image-container {
+  max-width: unset !important;
+  width: auto !important;
+  height: auto !important;
+  transform: none !important;
+}
+
+/* Hide the decorative radial bg blob (designed for icon images, not terminal) */
+.VPHero .image-bg {
+  display: none !important;
+}
+
+/* Below 1280px: hide the image column — mobile slot takes over             */
+@media (max-width: 1279px) {
+  .VPHero .image {
+    display: none !important;
+  }
+
+  .VPHero span.text {
+    min-width: 100%;
+  }
+
+  .VPHero p.tagline {
+    min-width: 100%;
+  }
+}
+
+/* ≥1280px: constrain image column to prevent it eating into the text       */
+@media (min-width: 1280px) {
+  /* Gap between the text column and the terminal */
+  .VPHero.has-image .container {
+    gap: 64px;
+  }
+
+  .VPHero.has-image .image {
+    flex: 0 0 450px !important;
+    max-width: 450px !important;
+  }
+
+  .td-slot-desktop .td {
+    width: 450px;
+  }
+}
+
+/* 960-1279px: image hidden but container is still flex-row — force column  */
+@media (min-width: 960px) and (max-width: 1279px) {
+  .VPHero.has-image .container {
+    flex-direction: column !important;
+    align-items: center !important;
+  }
+
+  .VPHero.has-image .main {
+    max-width: 720px !important;
+    text-align: center !important;
+  }
+
+  .VPHero.has-image .actions {
+    justify-content: center !important;
+  }
+}
+
+/* Slot shown on desktop only (home-hero-image, ≥1280px) */
+.td-slot-desktop {
+  display: none;
+}
+
+/* Slot shown on mobile/tablet only (home-hero-info-after, <1280px) */
+.td-slot-mobile {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: 28px;
+  margin-bottom: 28px;
+}
+
+/* On desktop (≥1280px): swap which slot is visible */
+@media (min-width: 1280px) {
+  .td-slot-desktop {
+    display: block;
+  }
+
+  .td-slot-mobile {
+    display: none;
+  }
+}
+
+/* On mobile: constrain terminal width so it doesn't overflow */
+@media (max-width: 640px) {
+  .td-slot-mobile .td {
+    width: 100%;
+    font-size: 10.5px;
+  }
+}
+
+/* ── Feature cards ───────────────────────────────────────────────────────── */
+.VPFeature {
+  border-color: rgba(153, 51, 255, 0.14) !important;
+  background: linear-gradient(
+    155deg,
+    var(--vp-c-bg-soft) 0%,
+    rgba(153, 51, 255, 0.04) 100%
+  ) !important;
+  transition:
+    border-color 0.25s,
+    box-shadow 0.25s,
+    transform 0.25s !important;
+}
+
+.VPFeature:hover {
+  border-color: rgba(153, 51, 255, 0.38) !important;
+  box-shadow: 0 8px 32px rgba(153, 51, 255, 0.13) !important;
+  transform: translateY(-3px);
+}
+
+.dark .VPFeature {
+  border-color: rgba(204, 136, 255, 0.12) !important;
+  background: linear-gradient(
+    155deg,
+    var(--vp-c-bg-soft) 0%,
+    rgba(153, 51, 255, 0.07) 100%
+  ) !important;
+}
+
+.dark .VPFeature:hover {
+  border-color: rgba(204, 136, 255, 0.32) !important;
+  box-shadow: 0 8px 36px rgba(153, 51, 255, 0.22) !important;
+}
+
+/* Icon: no background, use brand colour, scale up slightly */
+.VPFeature .icon {
+  background-color: transparent !important;
+  color: var(--vp-c-brand-1);
+  font-size: 32px;
+}
+
+.VPFeature .icon svg {
+  width: 36px;
+  height: 36px;
+}
+
+/* ── Hero buttons ────────────────────────────────────────────────────────── */
+.VPHero .VPButton.brand {
+  background: linear-gradient(135deg, #9933ff 0%, #7a1fd4 100%);
+  border-color: transparent;
+  box-shadow: 0 2px 16px rgba(153, 51, 255, 0.4);
+  transition:
+    box-shadow 0.2s,
+    transform 0.18s;
+}
+
+.VPHero .VPButton.brand:hover {
+  background: linear-gradient(135deg, #aa44ff 0%, #9933ff 100%);
+  box-shadow: 0 6px 28px rgba(153, 51, 255, 0.55);
+  transform: translateY(-2px);
+}
+
+.VPHero .VPButton.alt {
+  border-color: rgba(153, 51, 255, 0.35);
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+}
+
+.VPHero .VPButton.alt:hover {
+  border-color: rgba(153, 51, 255, 0.6);
+  background: rgba(153, 51, 255, 0.08);
+}
+
+.dark .VPHero .VPButton.alt {
+  border-color: rgba(204, 136, 255, 0.35);
+}
+
+.dark .VPHero .VPButton.alt:hover {
+  border-color: rgba(204, 136, 255, 0.6);
+  background: rgba(153, 51, 255, 0.12);
+}
+
+/* ── Navigation bar ──────────────────────────────────────────────────────── */
+.VPNavBar {
+  border-bottom: 1px solid rgba(153, 51, 255, 0.12) !important;
+}
+
+.dark .VPNavBar {
+  border-bottom-color: rgba(204, 136, 255, 0.1) !important;
+}
+
+/* ── Doc pages background (non-home) ──────────────────────────────────────── */
+.VPDoc {
+  background: radial-gradient(
+    ellipse 80% 30% at 50% 0%,
+    rgba(153, 51, 255, 0.05) 0%,
+    transparent 100%
+  );
+}
+
+.dark .VPDoc {
+  background: radial-gradient(
+    ellipse 80% 30% at 50% 0%,
+    rgba(153, 51, 255, 0.09) 0%,
+    transparent 100%
+  );
+}
+
+/* ── Footer (black — fulll.fr style) ─────────────────────────────────────── */
+.VPFooter {
+  border-top: none !important;
+  background: #111 !important;
+}
+
+.VPFooter .message,
+.VPFooter .copyright {
+  color: rgba(255, 255, 255, 0.55) !important;
+}
+
+.dark .VPFooter {
+  background: #0f0f0f !important;
 }

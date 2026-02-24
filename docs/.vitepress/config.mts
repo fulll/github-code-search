@@ -51,10 +51,22 @@ export default defineConfig({
   themeConfig: {
     // ── Nav ──────────────────────────────────────────────────────────────────
     nav: [
-      { text: "Getting Started", link: "/getting-started/" },
-      { text: "Usage", link: "/usage/search-syntax" },
-      { text: "Reference", link: "/reference/cli-options" },
-      { text: "Architecture", link: "/architecture/overview" },
+      {
+        text: "Getting Started",
+        link: "/getting-started/",
+        activeMatch: "^/getting-started/",
+      },
+      { text: "Usage", link: "/usage/search-syntax", activeMatch: "^/usage/" },
+      {
+        text: "Reference",
+        link: "/reference/cli-options",
+        activeMatch: "^/reference/",
+      },
+      {
+        text: "Architecture",
+        link: "/architecture/overview",
+        activeMatch: "^/architecture/",
+      },
       // Version dropdown — items are read from docs/public/versions.json.
       // The CI snapshot job prepends a new entry to that file on every major release;
       // the next main deploy re-builds this config and picks up the change automatically.
