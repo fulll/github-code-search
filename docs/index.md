@@ -5,6 +5,9 @@ hero:
   name: "github-code-search"
   text: "Search GitHub code across your org"
   tagline: Per-repository aggregation · Keyboard-driven TUI · Markdown & JSON output
+  image:
+    src: /logo.svg
+    alt: github-code-search
   actions:
     - theme: brand
       text: Get Started
