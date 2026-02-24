@@ -3,6 +3,7 @@ import type { Theme } from "vitepress";
 import DefaultTheme from "vitepress/theme";
 import { useData } from "vitepress";
 import { createMermaidRenderer } from "vitepress-mermaid-renderer";
+import TerminalDemo from "./TerminalDemo.vue";
 import "./custom.css";
 
 export default {
@@ -27,6 +28,11 @@ export default {
       () => initMermaid(),
     );
 
-    return h(DefaultTheme.Layout);
+    return h(DefaultTheme.Layout, null, {
+      // Desktop (≥1280px): image slot → right side of hero
+      "home-hero-image": () => h("div", { class: "td-slot-desktop" }, [h(TerminalDemo)]),
+      // Mobile/tablet (<1280px): after tagline, before action buttons
+      "home-hero-info-after": () => h("div", { class: "td-slot-mobile" }, [h(TerminalDemo)]),
+    });
   },
 } satisfies Theme;
