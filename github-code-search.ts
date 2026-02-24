@@ -14,6 +14,7 @@
 
 import { Command, program } from "commander";
 import { writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 import pc from "picocolors";
 import { aggregate, normaliseExtractRef, normaliseRepo } from "./src/aggregate.ts";
 import { fetchAllResults, fetchRepoTeams } from "./src/api.ts";
@@ -194,7 +195,23 @@ program
   .action(async () => {
     const { performUpgrade } = await import("./src/upgrade.ts");
     const token = process.env.GITHUB_TOKEN;
-    await performUpgrade(VERSION, process.execPath, token);
+    // Fix: in some Bun versions, process.execPath returns the Bun runtime path
+    // (e.g. ~/.bun/bin/bun) or an internal /$bunfs/ path instead of the compiled
+    // binary path — which causes the mv to fail or replace the wrong file.
+    // Prefer process.execPath when it looks like a real on-disk binary path;
+    // fall back to resolving process.argv[0] (the invocation path) otherwise.
+    const selfPath =
+      process.execPath && !process.execPath.startsWith("/$bunfs/")
+        ? process.execPath
+        : resolve(process.argv[0]);
+    try {
+      await performUpgrade(VERSION, selfPath, token);
+    } catch (e: unknown) {
+      // Print upgrade errors to stdout so they are always visible (stderr
+      // is sometimes swallowed by shells or terminal multiplexers).
+      process.stdout.write(`error: ${e instanceof Error ? e.message : String(e)}\n`);
+      process.exit(1);
+    }
     process.exit(0);
   });
 
