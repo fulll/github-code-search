@@ -49,6 +49,7 @@
 
 .VPHero span.name.clip {
   min-width: 100%;
+  line-height: 1.3;
 }
 
 /* ── Top accent bar ──────────────────────────────────────────────────────── */
