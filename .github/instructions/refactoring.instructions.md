@@ -75,4 +75,6 @@ bun run build.ts       # binary compiles without errors
 
 - Branch name: `refactor/<short-description>` (e.g. `refactor/extract-filter-module`).
 - Commit message: imperative mood, e.g. `Extract FilterStats helpers into render/filter.ts`.
+- **All commits must be signed** (GPG or SSH). Configure once with `git config --global commit.gpgsign true`.
+  Commits pushed via the GitHub API (Copilot Coding Agent, MCP tools) are automatically Verified by GitHub.
 - PR description: what was restructured, why, and a note confirming no behaviour change.

@@ -112,6 +112,49 @@ src/
 - When creating a new module that contains pure functions, create a companion `<module>.test.ts`.
 - Tests must be self-contained: no network calls, no filesystem side effects.
 
+## Git conventions
+
+### Signed commits (required)
+
+All commits to this repository **must be cryptographically signed**. Unsigned commits will be rejected by branch protection rules.
+
+**For local commits** — configure GPG or SSH signing once:
+
+```bash
+# Recommended: sign every commit automatically
+git config --global commit.gpgsign true
+
+# Or sign a single commit manually
+git commit -S -m "feat: my change"
+```
+
+Verify your setup:
+
+```bash
+git log --show-signature -1   # should show "Good signature from …"
+```
+
+**For agent-created commits** — ensure the agent runs a local `git commit -S` so the local GPG/SSH key is used and the commit bears the developer's own verified signature. This is the **required approach** in this repository.
+
+> ⚠️ **Do NOT use MCP REST API push tools** (`mcp_github_push_files`, `mcp_github_create_or_update_file`) to create commits in this repo.  
+> Those tools push files via the GitHub REST API and create commits signed by GitHub's own key — not the developer's personal key. While GitHub marks them as "Verified", they do not carry the developer's identity.  
+> **Always commit locally via `git commit -S` (or with `commit.gpgsign = true`)** and push with `git push`.
+
+### Branch & commit conventions
+
+| Branch type   | Pattern                        | Example                             |
+| ------------- | ------------------------------ | ----------------------------------- |
+| Feature       | `feat/<short-description>`     | `feat/json-output-type`             |
+| Bug fix       | `fix/<short-description>`      | `fix/exclude-repos-with-org-prefix` |
+| Refactoring   | `refactor/<short-description>` | `refactor/extract-filter-module`    |
+| Documentation | `docs/<short-description>`     | `docs/25-init-vitepress`            |
+
+Commit messages use **imperative mood**: `Add …`, `Fix …`, `Extract …`, not `Added` or `Fixing`.
+
+For epics spanning multiple PRs, create a long-lived **feature branch** (`feat/<epic-name>`) and merge each sub-issue PR into it. Open a final PR from the feature branch into `main` when the epic is complete.
+
+---
+
 ## Development notes
 
 - **TypeScript throughout** — no `.js` files in `src/`.
