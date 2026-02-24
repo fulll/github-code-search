@@ -97,8 +97,16 @@ async function downloadBinary(url: string, dest: string): Promise<void> {
   if (!res.ok) {
     throw new Error(`Download failed (${res.status}): ${url}`);
   }
+  // Fix: read the body explicitly as an ArrayBuffer rather than passing the
+  // Response object to Bun.write, which avoids edge-case issues with Response
+  // body streaming on certain Bun versions.
+  const buffer = await res.arrayBuffer();
+  if (buffer.byteLength === 0) {
+    throw new Error(`Downloaded empty file from ${url}`);
+  }
   const tmpPath = `${dest}.tmp`;
-  await Bun.write(tmpPath, res);
+  process.stdout.write(`Replacing ${dest}…\n`);
+  await Bun.write(tmpPath, buffer);
   // Make executable and atomically replace the binary
   const chmod = Bun.spawnSync(["chmod", "+x", tmpPath]);
   if (chmod.exitCode !== 0) {

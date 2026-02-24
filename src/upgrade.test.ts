@@ -218,3 +218,76 @@ describe("performUpgrade", () => {
     );
   });
 });
+
+// ─── performUpgrade — download path (covers downloadBinary) ──────────────────
+
+describe("performUpgrade — download path", () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const origBunWrite = (Bun as any).write;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const origBunSpawnSync = (Bun as any).spawnSync;
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (Bun as any).write = origBunWrite;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (Bun as any).spawnSync = origBunSpawnSync;
+  });
+
+  /** Returns a release mock + matching asset name for the current platform. */
+  function mockReleaseAndDownload(downloadResponse: Response): void {
+    const platformMap: Record<string, string> = { darwin: "macos", win32: "windows" };
+    const p = platformMap[process.platform] ?? process.platform;
+    const suffix = p === "windows" ? ".exe" : "";
+    const assetName = `github-code-search-${p}-${process.arch}${suffix}`;
+    let callCount = 0;
+    globalThis.fetch = (async () => {
+      callCount++;
+      if (callCount === 1) {
+        return new Response(
+          JSON.stringify({ tag_name: "v9.9.9", assets: [makeAsset(assetName)] }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        );
+      }
+      return downloadResponse;
+    }) as typeof fetch;
+  }
+
+  it("throws when the binary download returns a non-OK status", async () => {
+    mockReleaseAndDownload(new Response("Bad Gateway", { status: 502 }));
+    await expect(performUpgrade("1.0.0", "/tmp/gcs-test-nonok")).rejects.toThrow(
+      "Download failed (502)",
+    );
+  });
+
+  it("throws when the downloaded binary is empty", async () => {
+    mockReleaseAndDownload(new Response(new ArrayBuffer(0), { status: 200 }));
+    await expect(performUpgrade("1.0.0", "/tmp/gcs-test-empty")).rejects.toThrow("empty file");
+  });
+
+  it("prints Upgrading and Successfully upgraded on a successful full upgrade", async () => {
+    mockReleaseAndDownload(new Response(new Uint8Array([1, 2, 3]).buffer, { status: 200 }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (Bun as any).write = async () => 3;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (Bun as any).spawnSync = () => ({ exitCode: 0, stderr: { toString: () => "" } });
+
+    const stdoutWrites: string[] = [];
+    const origWrite = process.stdout.write.bind(process.stdout);
+    process.stdout.write = ((s: string) => {
+      stdoutWrites.push(s);
+      return true;
+    }) as typeof process.stdout.write;
+
+    await performUpgrade("1.0.0", "/tmp/gcs-test-success");
+    process.stdout.write = origWrite;
+
+    expect(stdoutWrites.some((s) => s.includes("Upgrading"))).toBe(true);
+    expect(stdoutWrites.some((s) => s.includes("Replacing"))).toBe(true);
+    expect(stdoutWrites.some((s) => s.includes("Successfully upgraded"))).toBe(true);
+  });
+});
