@@ -93,6 +93,40 @@ describe("selectAsset", () => {
   it("returns null for empty asset list", () => {
     expect(selectAsset([], "darwin", "arm64")).toBeNull();
   });
+
+  describe("legacy fallback (pre-v1.2.1 asset names)", () => {
+    const legacyAssets: ReleaseAsset[] = [
+      makeAsset("github-code-search-darwin-arm64"),
+      makeAsset("github-code-search-darwin-x64"),
+      makeAsset("github-code-search-linux-x64"),
+      makeAsset("github-code-search-linux-arm64"),
+      makeAsset("github-code-search-win32-x64.exe"),
+    ];
+
+    it("falls back to darwin-arm64 when macos-arm64 is absent", () => {
+      const asset = selectAsset(legacyAssets, "darwin", "arm64");
+      expect(asset?.name).toBe("github-code-search-darwin-arm64");
+    });
+
+    it("falls back to darwin-x64 when macos-x64 is absent", () => {
+      const asset = selectAsset(legacyAssets, "darwin", "x64");
+      expect(asset?.name).toBe("github-code-search-darwin-x64");
+    });
+
+    it("falls back to win32-x64.exe when windows-x64.exe is absent", () => {
+      const asset = selectAsset(legacyAssets, "win32", "x64");
+      expect(asset?.name).toBe("github-code-search-win32-x64.exe");
+    });
+
+    it("prefers canonical macos-arm64 over legacy darwin-arm64 when both present", () => {
+      const mixed = [
+        makeAsset("github-code-search-darwin-arm64"),
+        makeAsset("github-code-search-macos-arm64"),
+      ];
+      const asset = selectAsset(mixed, "darwin", "arm64");
+      expect(asset?.name).toBe("github-code-search-macos-arm64");
+    });
+  });
 });
 
 // ─── fetchLatestRelease ─────────────────────────────────────────────────────

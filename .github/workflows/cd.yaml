@@ -83,6 +83,14 @@ jobs:
           path: dist/
           merge-multiple: true
 
+      - name: Create legacy artifact aliases (backward-compat for upgrade)
+        # Fix: binaries built before v1.2.1 look for darwin-* / win32-* asset names.
+        # Publishing these aliases lets old binaries upgrade themselves — see issue #45.
+        run: |
+          cp dist/github-code-search-macos-arm64 dist/github-code-search-darwin-arm64
+          cp dist/github-code-search-macos-x64 dist/github-code-search-darwin-x64
+          cp dist/github-code-search-windows-x64.exe dist/github-code-search-win32-x64.exe
+
       - name: Create release
         uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
         with:
