@@ -544,12 +544,12 @@ describe("renderGroups", () => {
     expect(stripped).toContain("org/repoA");
   });
 
-  it("shows fold arrow \u25b6 for folded group", () => {
+  it("shows fold arrow \u25b8 for folded group", () => {
     const groups = [makeGroup("org/repoA", ["src/a.ts"], true)];
     const rows = buildRows(groups);
     const out = renderGroups(groups, 0, rows, 40, 0, "q", "org");
     const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
-    expect(stripped).toContain("\u25b6");
+    expect(stripped).toContain("\u25b8");
   });
 
   it("shows file path when group is unfolded", () => {
@@ -560,12 +560,12 @@ describe("renderGroups", () => {
     expect(stripped).toContain("src/a.ts");
   });
 
-  it("shows unfold arrow \u25bc for unfolded group", () => {
+  it("shows unfold arrow \u25be for unfolded group", () => {
     const groups = [makeGroup("org/repoA", ["src/a.ts"], false)];
     const rows = buildRows(groups);
     const out = renderGroups(groups, 0, rows, 40, 0, "q", "org");
     const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
-    expect(stripped).toContain("\u25bc");
+    expect(stripped).toContain("\u25be");
   });
 
   it("shows sticky repo header when extract cursor scrolled past its repo", () => {
@@ -592,6 +592,21 @@ describe("renderGroups", () => {
     // repoB should not appear (overflow prevents rendering it)
     expect(stripped).toContain("org/repoA");
     expect(out).toBeTruthy(); // must not crash
+  });
+
+  it("right-aligns match count to termWidth", () => {
+    // With termWidth=60 the visible width of the repo row should equal 60
+    // (padding fills the gap between repo name and count).
+    const groups = [makeGroup("org/repoA", ["a.ts", "b.ts"], false)];
+    const rows = buildRows(groups);
+    const termWidth = 60;
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", { termWidth });
+    // Extract just the repo row line (first line after the hint bar)
+    const lines = out.split("\n");
+    const repoLine = lines.find((l) => l.replace(/\x1b\[[0-9;]*m/g, "").includes("org/repoA"));
+    expect(repoLine).toBeDefined();
+    const visibleLen = repoLine!.replace(/\x1b\[[0-9;]*m/g, "").length;
+    expect(visibleLen).toBe(termWidth);
   });
 });
 

@@ -42,3 +42,74 @@ features:
     title: Replay command
     details: Every interactive session produces a one-liner you can run in CI to reproduce the exact same selection without the UI.
 ---
+
+## Use cases
+
+**Audit a dependency across the org**
+
+```bash
+github-code-search query "from 'lodash'" --org my-org
+```
+
+See every repo still importing lodash, select the ones to migrate, and get a Markdown checklist to paste in your migration issue.
+
+---
+
+**Hunt down TODOs before a release**
+
+```bash
+github-code-search query "TODO" --org my-org --exclude-repositories sandbox,archived-repo
+```
+
+Surface all in-code TODOs, triage interactively, and output a linked list for your release notes.
+
+---
+
+**Verify a breaking-change rollout**
+
+```bash
+github-code-search query "oldApiClient" --org my-org --output-type repo-only --format json
+```
+
+Use JSON output in a CI script to assert that no repository still references a deprecated client after your migration deadline.
+
+---
+
+**Security sweep — find hardcoded secret patterns**
+
+```bash
+github-code-search query "process.env.SECRET" --org my-org
+```
+
+Cross-repo scan for risky patterns; export results to Markdown to attach to a security audit report.
+
+---
+
+**Onboarding — understand how an internal library is used**
+
+```bash
+github-code-search query "useFeatureFlag" --org my-org --group-by-team-prefix platform/
+```
+
+Get a team-scoped view of every usage site before refactoring a shared hook or utility.
+
+## Why not `gh search code`?
+
+The official [gh CLI](https://cli.github.com/) supports `gh search code`, but returns a **flat paginated list** — one result per line, no grouping, no interactive selection, no structured output.
+
+|                                            | `gh search code` | `github-code-search` |
+| ------------------------------------------ | :--------------: | :------------------: |
+| Results grouped by repo                    |        ✗         |          ✓           |
+| Interactive TUI (navigate, select, filter) |        ✗         |          ✓           |
+| Fine-grained extract selection             |        ✗         |          ✓           |
+| Markdown / JSON output                     |        ✗         |          ✓           |
+| Replay / CI command                        |        ✗         |          ✓           |
+| Team-prefix grouping                       |        ✗         |          ✓           |
+| Syntax highlighting in terminal            |        ✗         |          ✓           |
+| Pagination (up to 1 000 results)           |        ✓         |          ✓           |
+
+`github-code-search` is purpose-built for **org-wide code audits and interactive triage** — not just a search wrapper.
+
+## Used in production?
+
+Using `github-code-search` at your organisation? Share your experience, use cases or feedback in [GitHub Discussions](https://github.com/fulll/github-code-search/discussions) — your input shapes the roadmap.

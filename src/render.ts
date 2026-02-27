@@ -48,6 +48,12 @@ export function renderHelpOverlay(): string {
 const INDENT = "  ";
 const HEADER_LINES = 4; // title + summaryFull + hints + blank
 
+/** Strip ANSI escape sequences to measure the visible character width of a string. */
+function stripAnsi(str: string): string {
+  // eslint-disable-next-line no-control-regex
+  return str.replace(/\x1b\[[\d;]*[mGKHF]/g, "");
+}
+
 /** Options bag for renderGroups — all fields optional. */
 interface RenderOptions {
   /** Currently active file-path filter (empty = no filter). */
@@ -58,6 +64,8 @@ interface RenderOptions {
   filterInput?: string;
   /** Whether to show the help overlay instead of the normal view. */
   showHelp?: boolean;
+  /** Terminal column width used to right-align match counts (default: 80). */
+  termWidth?: number;
 }
 
 export function renderGroups(
@@ -70,7 +78,13 @@ export function renderGroups(
   org: string,
   opts: RenderOptions = {},
 ): string {
-  const { filterPath = "", filterMode = false, filterInput = "", showHelp = false } = opts;
+  const {
+    filterPath = "",
+    filterMode = false,
+    filterInput = "",
+    showHelp = false,
+    termWidth = 80,
+  } = opts;
 
   // ── Help overlay ──────────────────────────────────────────────────────────
   if (showHelp) {
@@ -79,7 +93,9 @@ export function renderGroups(
 
   const lines: string[] = [];
 
-  lines.push(pc.bold(`GitHub Code Search: ${pc.cyan(query)} in ${pc.yellow(org)}`));
+  lines.push(
+    `${pc.bgMagenta(pc.bold(" github-code-search "))} ${pc.bold(pc.cyan(query))} ${pc.dim("in")} ${pc.bold(pc.yellow(org))}`,
+  );
   lines.push(buildSummaryFull(groups));
 
   // ── Filter bar (sticky, shown when active or typing) ──────────────────────
@@ -122,9 +138,9 @@ export function renderGroups(
     );
     if (repoRowIndex >= 0 && repoRowIndex < scrollOffset) {
       const g = groups[cursorRow.repoIndex];
-      const checkbox = g.repoSelected ? pc.green("◉") : pc.dim("○");
+      const checkbox = g.repoSelected ? pc.green("✓") : " ";
       stickyRepoLine = pc.dim(
-        `▲ ${checkbox} ${pc.bold(g.repoFullName)} ${pc.dim(`(${buildMatchCountLabel(g)})`)}`,
+        `▲ ${checkbox} ${pc.bold(g.repoFullName)} ${pc.dim(buildMatchCountLabel(g))}`,
       );
       lines.push(stickyRepoLine);
     }
@@ -139,7 +155,7 @@ export function renderGroups(
 
     // ── Section header row ────────────────────────────────────────────────
     if (row.type === "section") {
-      lines.push(pc.bold(`\n── ${row.sectionLabel} `));
+      lines.push(pc.magenta(pc.bold(`\n── ${row.sectionLabel} `)));
       usedLines += 2; // blank separator line + label line
       if (usedLines >= viewportHeight) break;
       continue;
@@ -153,22 +169,31 @@ export function renderGroups(
     const isCursor = i === cursor;
 
     if (row.type === "repo") {
-      const arrow = group.folded ? pc.dim("▶") : pc.dim("▼");
-      const checkbox = group.repoSelected ? pc.green("◉") : pc.dim("○");
+      const arrow = group.folded ? pc.magenta("▸") : pc.magenta("▾");
+      // ✓ for selected, space for deselected — keeps the line clean while a
+      // green checkmark clearly signals selection. The space preserves column
+      // alignment so the repo name always starts at the same offset.
+      const checkbox = group.repoSelected ? pc.green("✓") : " ";
       const repoName = isCursor
-        ? pc.bgBlue(pc.bold(` ${group.repoFullName} `))
+        ? pc.bgMagenta(pc.bold(pc.white(` ${group.repoFullName} `)))
         : pc.bold(group.repoFullName);
-      const count = pc.dim(`(${buildMatchCountLabel(group)})`);
-      lines.push(`${arrow} ${checkbox} ${repoName} ${count}`);
+      const count = pc.dim(buildMatchCountLabel(group));
+      // Right-align the match count flush to the terminal edge
+      const leftPart = `${arrow} ${checkbox} ${repoName}`;
+      const leftLen = stripAnsi(leftPart).length;
+      const countLen = stripAnsi(count).length;
+      const pad = Math.max(0, termWidth - leftLen - countLen);
+      const line = pad > 0 ? `${leftPart}${" ".repeat(pad)}${count}` : `${leftPart}${count}`;
+      lines.push(line);
     } else {
       const ei = row.extractIndex!;
       const match = group.matches[ei];
       const selected = group.extractSelected[ei];
-      const checkbox = selected ? pc.green("◉") : pc.dim("○");
+      const checkbox = selected ? pc.green("✓") : " ";
       const seg = match.textMatches[0]?.matches[0];
       const locSuffix = seg ? `:${seg.line}:${seg.col}` : "";
       const filePath = isCursor
-        ? pc.bgBlue(pc.bold(` ${match.path}${locSuffix} `))
+        ? pc.bgMagenta(pc.bold(pc.white(` ${match.path}${locSuffix} `)))
         : `${pc.cyan(match.path)}${pc.dim(locSuffix)}`;
       lines.push(`${INDENT}${INDENT}${checkbox} ${filePath}`);
 

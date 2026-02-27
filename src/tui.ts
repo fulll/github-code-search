@@ -61,6 +61,7 @@ export async function runInteractive(
       filterMode,
       filterInput,
       showHelp,
+      termWidth: process.stdout.columns ?? 80,
     });
     process.stdout.write(ANSI_CLEAR);
     process.stdout.write(rendered);

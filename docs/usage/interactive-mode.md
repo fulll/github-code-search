@@ -11,23 +11,25 @@ github-code-search "useFeatureFlag" --org fulll
 ## TUI overview
 
 ```text
-GitHub Code Search: useFeatureFlag in fulll
+ github-code-search  useFeatureFlag in fulll
 3 repos · 4 files
 ← / → fold/unfold  ↑ / ↓ navigate  spc select  a all  n none  f filter  h help  ↵ confirm  q quit
 
-▶ ◉  fulll/billing-api  (3 extracts)
-▼ ◉  fulll/auth-service  (2 extracts)
-      ◉  src/middlewares/featureFlags.ts
+▸   fulll/billing-api                                         3 matches
+▾ ✓ fulll/auth-service                                       2 matches
+      ✓ src/middlewares/featureFlags.ts
             …const flag = useFeatureFlag('new-onboarding'); if (!flag) return next();…
-      ◉  tests/unit/featureFlags.test.ts
+      ✓ tests/unit/featureFlags.test.ts
             …expect(useFeatureFlag('new-onboarding')).toBe(true);…
-▶ ○  fulll/legacy-monolith  (1 extract)
+▸   fulll/legacy-monolith                                     1 match
 ```
 
-- `▶` — folded repo (extracts hidden)
-- `▼` — unfolded repo (extracts visible)
-- `◉` — selected
-- `○` — deselected
+- `▸` — folded repo (extracts hidden)
+- `▾` — unfolded repo (extracts visible)
+- `✓` — selected (green in the terminal)
+- ` ` — deselected (space — keeps columns aligned)
+- Match counts are right-aligned to the terminal width
+- The header badge `github-code-search` is displayed on a violet background
 
 ## Keyboard shortcuts
 

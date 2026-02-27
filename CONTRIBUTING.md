@@ -83,7 +83,8 @@ Compiled binaries require no runtime dependencies and can be distributed as a si
 - TypeScript throughout.
 - Pure functions wherever possible (makes unit testing straightforward).
 - Side-effectful code (CLI parsing, API calls, TTY interaction) is isolated in `github-code-search`, `src/api.ts`, and `src/tui.ts`.
-- No linter is configured yet; keep diffs small and consistent with the surrounding code.
+- Run `bun run lint` (oxlint) — must pass with zero errors before submitting.
+- Run `bun run format:check` (oxfmt) — auto-fix locally with `bun run format`.
 
 ## Submitting a pull request
 
