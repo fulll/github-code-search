@@ -544,12 +544,12 @@ describe("renderGroups", () => {
     expect(stripped).toContain("org/repoA");
   });
 
-  it("shows fold arrow \u25b6 for folded group", () => {
+  it("shows fold arrow \u25b8 for folded group", () => {
     const groups = [makeGroup("org/repoA", ["src/a.ts"], true)];
     const rows = buildRows(groups);
     const out = renderGroups(groups, 0, rows, 40, 0, "q", "org");
     const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
-    expect(stripped).toContain("\u25b6");
+    expect(stripped).toContain("\u25b8");
   });
 
   it("shows file path when group is unfolded", () => {
@@ -560,12 +560,12 @@ describe("renderGroups", () => {
     expect(stripped).toContain("src/a.ts");
   });
 
-  it("shows unfold arrow \u25bc for unfolded group", () => {
+  it("shows unfold arrow \u25be for unfolded group", () => {
     const groups = [makeGroup("org/repoA", ["src/a.ts"], false)];
     const rows = buildRows(groups);
     const out = renderGroups(groups, 0, rows, 40, 0, "q", "org");
     const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
-    expect(stripped).toContain("\u25bc");
+    expect(stripped).toContain("\u25be");
   });
 
   it("shows sticky repo header when extract cursor scrolled past its repo", () => {

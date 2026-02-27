@@ -1,7 +1,25 @@
 {
   "name": "github-code-search",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Interactive GitHub code search with per-repo aggregation",
+  "keywords": [
+    "bun",
+    "cli",
+    "code-search",
+    "developer-tools",
+    "github",
+    "github-api",
+    "interactive",
+    "json",
+    "markdown",
+    "organisation",
+    "organization",
+    "repositories",
+    "search",
+    "terminal",
+    "tui",
+    "typescript"
+  ],
   "license": "MIT",
   "author": "fulll",
   "bin": {
