@@ -99,14 +99,14 @@ The official [`gh` CLI](https://cli.github.com/) supports `gh search code`, but 
 
 |                                            | `gh search code` | `github-code-search` |
 | ------------------------------------------ | :--------------: | :------------------: |
-| Results grouped by repo                    | ✗                | ✓                    |
-| Interactive TUI (navigate, select, filter) | ✗                | ✓                    |
-| Fine-grained extract selection             | ✗                | ✓                    |
-| Markdown / JSON output                     | ✗                | ✓                    |
-| Replay / CI command                        | ✗                | ✓                    |
-| Team-prefix grouping                       | ✗                | ✓                    |
-| Syntax highlighting in terminal            | ✗                | ✓                    |
-| Pagination (up to 1 000 results)           | ✓                | ✓                    |
+| Results grouped by repo                    |        ✗         |          ✓           |
+| Interactive TUI (navigate, select, filter) |        ✗         |          ✓           |
+| Fine-grained extract selection             |        ✗         |          ✓           |
+| Markdown / JSON output                     |        ✗         |          ✓           |
+| Replay / CI command                        |        ✗         |          ✓           |
+| Team-prefix grouping                       |        ✗         |          ✓           |
+| Syntax highlighting in terminal            |        ✗         |          ✓           |
+| Pagination (up to 1 000 results)           |        ✓         |          ✓           |
 
 `github-code-search` is purpose-built for **org-wide code audits and interactive triage** — not just a search wrapper.
 

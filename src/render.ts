@@ -140,7 +140,7 @@ export function renderGroups(
       const g = groups[cursorRow.repoIndex];
       const checkbox = g.repoSelected ? pc.green("✓") : " ";
       stickyRepoLine = pc.dim(
-        `▲ ${checkbox} ${pc.bold(g.repoFullName)} ${pc.dim(`(${buildMatchCountLabel(g)})`)}`,
+        `▲ ${checkbox} ${pc.bold(g.repoFullName)} ${pc.dim(buildMatchCountLabel(g))}`,
       );
       lines.push(stickyRepoLine);
     }
@@ -182,7 +182,7 @@ export function renderGroups(
       const leftPart = `${arrow} ${checkbox} ${repoName}`;
       const leftLen = stripAnsi(leftPart).length;
       const countLen = stripAnsi(count).length;
-      const pad = Math.max(1, termWidth - leftLen - countLen - 1);
+      const pad = Math.max(1, termWidth - leftLen - countLen);
       lines.push(`${leftPart}${" ".repeat(pad)}${count}`);
     } else {
       const ei = row.extractIndex!;

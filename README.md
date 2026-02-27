@@ -22,7 +22,7 @@ github-code-search query "TODO" --org my-org
 
 ## Features
 
-- **Org-wide search** — queries all repositories in a GitHub organisation in one command, with automatic pagination up to 1 000 results
+- **Org-wide search** — queries all repositories in a GitHub organization in one command, with automatic pagination up to 1 000 results
 - **Per-repository aggregation** — results grouped by repo, not as a flat list; fold/unfold each repo to focus on what matters
 - **Keyboard-driven TUI** — navigate with arrow keys, toggle selections, filter by file path, confirm with Enter — without leaving the terminal
 - **Fine-grained selection** — pick exactly the repos and extracts you want; deselected items are recorded as exclusions in the replay command

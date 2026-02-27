@@ -4,7 +4,7 @@ We take the security of our software products and components seriously, which in
 
 If you believe you have found a security vulnerability in any Fulll's repository that meets Wikipedia's definition of a security vulnerability ([English version](<https://en.wikipedia.org/wiki/Vulnerability_(computing)>), [French version](<https://fr.wikipedia.org/wiki/Vuln%C3%A9rabilit%C3%A9_(informatique)>)), please report it to us as described below.
 
-## Reporting security vulnerability Issues
+## Reporting security vulnerabilities
 
 :warning: **Please do not report security vulnerabilities through public GitHub issues.**
 
@@ -14,7 +14,7 @@ You should receive a response as soon as possible. If for some reason you do not
 
 For private repositories, you can also send an email or directly use the dedicated issue template for security vulnerability.
 
-:bulb: In any ways, please include the requested information listed below (**as much as you can provide**) to help us better understand the nature and scope of the possible issue:
+:bulb: In any case, please include the requested information listed below (**as much as you can provide**) to help us better understand the nature and scope of the possible issue:
 
 - Type of issue (e.g. Denial of service, Elevation of privilege, Information disclosure, Remote Code Execution, Security feature bypass, buffer overflow, SQL injection, cross-site scripting, etc.)
 - Full paths of source file(s) related to the manifestation of the issue
