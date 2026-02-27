@@ -9,9 +9,10 @@ Full release notes and changelogs are always available on
 
 ## v1 series
 
-| Release                    | Highlights                                                                             |
-| -------------------------- | -------------------------------------------------------------------------------------- |
-| [v1.0.0](./release-v1-0-0) | Initial public release — interactive TUI, per-repo aggregation, markdown / JSON output |
+| Release                    | Highlights                                                                                          |
+| -------------------------- | --------------------------------------------------------------------------------------------------- |
+| [v1.3.0](./release-v1-3-0) | Richer upgrade output, update-available notice, colorized `--help`, deep doc links, What's New blog |
+| [v1.0.0](./release-v1-0-0) | Initial public release — interactive TUI, per-repo aggregation, markdown / JSON output              |
 
 ---
 
