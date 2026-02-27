@@ -95,7 +95,7 @@ Get a team-scoped view of every usage site before refactoring a shared hook or u
 
 ## Why not `gh search code`?
 
-The official [`gh` CLI](https://cli.github.com/) supports `gh search code`, but returns a **flat paginated list** — one result per line, no grouping, no interactive selection, no structured output.
+The official [gh CLI](https://cli.github.com/) supports `gh search code`, but returns a **flat paginated list** — one result per line, no grouping, no interactive selection, no structured output.
 
 |                                            | `gh search code` | `github-code-search` |
 | ------------------------------------------ | :--------------: | :------------------: |

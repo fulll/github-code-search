@@ -57,7 +57,7 @@ github-code-search query "oldApiClient" --org my-org --output-type repo-only --f
 
 Use JSON output in a CI script to assert that no repository still references the deprecated client after your migration deadline.
 
-**Security sweep — find hardcoded secrets patterns**
+**Security sweep — find hardcoded secret patterns**
 
 ```bash
 github-code-search query "process.env.SECRET" --org my-org
@@ -78,14 +78,14 @@ Get a team-scoped view of every usage site before refactoring a shared hook or u
 The official [`gh` CLI](https://cli.github.com/) does support `gh search code`, but it returns a **flat paginated list** — one result per line, no grouping, no interactive selection, no structured output.
 
 |                                            | `gh search code` | `github-code-search` |
-| ------------------------------------------ | ---------------- | -------------------- |
-| Results grouped by repo                    | ✗                | ✓                    |
-| Interactive TUI (navigate, select, filter) | ✗                | ✓                    |
-| Fine-grained extract selection             | ✗                | ✓                    |
-| Markdown / JSON output                     | ✗                | ✓                    |
-| Replay / CI command                        | ✗                | ✓                    |
-| Team-prefix grouping                       | ✗                | ✓                    |
-| Syntax highlighting in terminal            | ✗                | ✓                    |
-| Pagination (up to 1 000 results)           | ✓                | ✓                    |
+| ------------------------------------------ | :--------------: | :------------------: |
+| Results grouped by repo                    |        ✗         |          ✓           |
+| Interactive TUI (navigate, select, filter) |        ✗         |          ✓           |
+| Fine-grained extract selection             |        ✗         |          ✓           |
+| Markdown / JSON output                     |        ✗         |          ✓           |
+| Replay / CI command                        |        ✗         |          ✓           |
+| Team-prefix grouping                       |        ✗         |          ✓           |
+| Syntax highlighting in terminal            |        ✗         |          ✓           |
+| Pagination (up to 1 000 results)           |        ✓         |          ✓           |
 
 `github-code-search` is purpose-built for **org-wide code audits and interactive triage** — not just a search wrapper.

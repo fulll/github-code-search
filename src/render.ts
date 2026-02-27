@@ -182,8 +182,9 @@ export function renderGroups(
       const leftPart = `${arrow} ${checkbox} ${repoName}`;
       const leftLen = stripAnsi(leftPart).length;
       const countLen = stripAnsi(count).length;
-      const pad = Math.max(1, termWidth - leftLen - countLen);
-      lines.push(`${leftPart}${" ".repeat(pad)}${count}`);
+      const pad = Math.max(0, termWidth - leftLen - countLen);
+      const line = pad > 0 ? `${leftPart}${" ".repeat(pad)}${count}` : `${leftPart}${count}`;
+      lines.push(line);
     } else {
       const ei = row.extractIndex!;
       const match = group.matches[ei];
