@@ -69,6 +69,11 @@ export default defineConfig({
       },
       { text: "Usage", link: "/usage/search-syntax", activeMatch: "^/usage/" },
       {
+        text: "What's New",
+        link: "/blog/",
+        activeMatch: "^/blog/",
+      },
+      {
         text: "Reference",
         link: "/reference/cli-options",
         activeMatch: "^/reference/",
@@ -143,6 +148,15 @@ export default defineConfig({
               link: "/reference/github-api-limits",
             },
             { text: "Environment variables", link: "/reference/environment" },
+          ],
+        },
+      ],
+      "/blog/": [
+        {
+          text: "What's New",
+          items: [
+            { text: "All releases", link: "/blog/" },
+            { text: "v1.0.0", link: "/blog/release-v1-0-0" },
           ],
         },
       ],
