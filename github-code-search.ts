@@ -42,7 +42,74 @@ const TARGET_ARCH =
 /** Full version string shown by `--version`. */
 const VERSION_FULL = `${VERSION} (${COMMIT} · ${TARGET_OS}/${TARGET_ARCH})`;
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Help colorization ───────────────────────────────────────────────────────
+// Only apply colours when stdout is connected to a real terminal.
+// All pipes, CI redirects, and `--no-color` environments stay plain-text.
+const HAS_COLOR = Boolean(process.stdout.isTTY);
+
+/**
+ * Walk through a multi-line option/argument description and:
+ *  • "Docs: <url>"   → dim label + cyan underlined URL
+ *  • "Example: ..." → dim label + italic value
+ *  • indent lines that look like code examples (e.g. / repoA / myorg) → dim
+ */
+function colorDesc(s: string): string {
+  if (!HAS_COLOR) return s;
+  return s
+    .split("\n")
+    .map((line) => {
+      const docsMatch = line.match(/^(\s*Docs:\s*)(https?:\/\/\S+)$/);
+      if (docsMatch) return pc.dim(docsMatch[1]) + pc.cyan(pc.underline(docsMatch[2]));
+      const exampleMatch = line.match(/^(\s*Example:\s*)(.+)$/);
+      if (exampleMatch) return pc.dim(exampleMatch[1]) + pc.italic(exampleMatch[2]);
+      if (/^\s+(e\.g\.|repoA|myorg\/|squad-|chapter-)/.test(line)) return pc.dim(line);
+      return line;
+    })
+    .join("\n");
+}
+
+/** Colored hyperlink (cyan + underline), falls back to plain when not a TTY. */
+function helpLink(url: string): string {
+  return HAS_COLOR ? pc.cyan(pc.underline(url)) : url;
+}
+
+/**
+ * Builds the `addHelpText("after", ...)` footer block with a labelled link.
+ * The label is bold when color is supported.
+ */
+function helpSection(label: string, url: string): string {
+  const t = HAS_COLOR ? pc.bold(label) : label;
+  return `\n${t}\n  ${helpLink(url)}`;
+}
+
+/**
+ * Commander configureHelp options shared by all commands.
+ * Each style hook only applies colour when HAS_COLOR is true.
+ */
+const helpFormatConfig = {
+  // Section headings: "Usage:", "Options:", "Commands:" …
+  styleTitle: (s: string) => (HAS_COLOR ? pc.bold(pc.yellow(s)) : s),
+  // Command name in the usage line
+  styleCommandText: (s: string) => (HAS_COLOR ? pc.bold(s) : s),
+  // Subcommand names in the command listing
+  styleSubcommandText: (s: string) => (HAS_COLOR ? pc.cyan(s) : s),
+  // Argument placeholders (<query>)
+  styleArgumentText: (s: string) => (HAS_COLOR ? pc.yellow(s) : s),
+  // Option flags in the usage line (--org, --format …)
+  styleOptionText: (s: string) => (HAS_COLOR ? pc.green(s) : s),
+  // Option terms in the options table
+  styleOptionTerm: (s: string) => (HAS_COLOR ? pc.green(s) : s),
+  // Subcommand terms in the commands table
+  styleSubcommandTerm: (s: string) => (HAS_COLOR ? pc.cyan(s) : s),
+  // Argument terms in the arguments table
+  styleArgumentTerm: (s: string) => (HAS_COLOR ? pc.yellow(s) : s),
+  // Descriptions — color "Docs:", "Example:" and code-example lines
+  styleOptionDescription: colorDesc,
+  styleSubcommandDescription: colorDesc,
+  styleArgumentDescription: colorDesc,
+  styleCommandDescription: colorDesc,
+  styleDescriptionText: colorDesc,
+};
 
 /** Add the shared search options to a command. */
 function addSearchOptions(cmd: Command): Command {
@@ -223,15 +290,20 @@ program
   .name("github-code-search")
   .version(VERSION_FULL, "-V, --version", "Output version, commit, OS and architecture")
   .description("Interactive GitHub code search with per-repo aggregation")
-  .addHelpText("after", "\nDocumentation:\n  https://fulll.github.io/github-code-search/");
+  .configureHelp(helpFormatConfig)
+  .addHelpText(
+    "after",
+    helpSection("Documentation:", "https://fulll.github.io/github-code-search/"),
+  );
 
 // `upgrade` subcommand — does NOT require GITHUB_TOKEN (uses it only if set)
 program
   .command("upgrade")
   .description("Check for a new release and auto-upgrade the binary")
+  .configureHelp(helpFormatConfig)
   .addHelpText(
     "after",
-    "\nDocumentation:\n  https://fulll.github.io/github-code-search/usage/upgrade",
+    helpSection("Documentation:", "https://fulll.github.io/github-code-search/usage/upgrade"),
   )
   .option("--debug", "Print debug information for troubleshooting")
   .action(async (opts: { debug?: boolean }) => {
@@ -269,9 +341,13 @@ program
 const queryCmd = addSearchOptions(
   new Command("query")
     .description("Search GitHub code (default command when no subcommand given)")
+    .configureHelp(helpFormatConfig)
     .addHelpText(
       "after",
-      "\nDocumentation:\n  https://fulll.github.io/github-code-search/usage/search-syntax",
+      helpSection(
+        "Documentation:",
+        "https://fulll.github.io/github-code-search/usage/search-syntax",
+      ),
     ),
 ).action(async (query: string, opts) => {
   await searchAction(query, opts);
