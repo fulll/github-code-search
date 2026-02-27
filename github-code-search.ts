@@ -192,7 +192,8 @@ program
 program
   .command("upgrade")
   .description("Check for a new release and auto-upgrade the binary")
-  .action(async () => {
+  .option("--debug", "Print debug information for troubleshooting")
+  .action(async (opts: { debug?: boolean }) => {
     const { performUpgrade } = await import("./src/upgrade.ts");
     const token = process.env.GITHUB_TOKEN;
     // Fix: in some Bun versions, process.execPath returns the Bun runtime path
@@ -204,8 +205,16 @@ program
       process.execPath && !process.execPath.startsWith("/$bunfs/")
         ? process.execPath
         : resolve(process.argv[0]);
+    if (opts.debug) {
+      process.stdout.write(`[debug] process.execPath  = ${process.execPath}\n`);
+      process.stdout.write(`[debug] process.argv[0]   = ${process.argv[0]}\n`);
+      process.stdout.write(`[debug] selfPath (dest)    = ${selfPath}\n`);
+      process.stdout.write(`[debug] process.platform   = ${process.platform}\n`);
+      process.stdout.write(`[debug] process.arch       = ${process.arch}\n`);
+      process.stdout.write(`[debug] VERSION            = ${VERSION}\n`);
+    }
     try {
-      await performUpgrade(VERSION, selfPath, token);
+      await performUpgrade(VERSION, selfPath, token, opts.debug);
     } catch (e: unknown) {
       // Print upgrade errors to stdout so they are always visible (stderr
       // is sometimes swallowed by shells or terminal multiplexers).

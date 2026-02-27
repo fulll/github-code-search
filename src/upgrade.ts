@@ -92,8 +92,13 @@ export async function fetchLatestRelease(token?: string): Promise<GithubRelease>
  * Downloads a binary from `url` and atomically replaces `dest`.
  * Uses a ".tmp" sibling file so the replacement is atomic on the same FS.
  */
-async function downloadBinary(url: string, dest: string): Promise<void> {
+async function downloadBinary(url: string, dest: string, debug = false): Promise<void> {
+  if (debug) process.stdout.write(`[debug] downloading from ${url}\n`);
   const res = await fetch(url);
+  if (debug)
+    process.stdout.write(
+      `[debug] fetch response: status=${res.status} ok=${res.ok} url=${res.url}\n`,
+    );
   if (!res.ok) {
     throw new Error(`Download failed (${res.status}): ${url}`);
   }
@@ -101,21 +106,46 @@ async function downloadBinary(url: string, dest: string): Promise<void> {
   // Response object to Bun.write, which avoids edge-case issues with Response
   // body streaming on certain Bun versions.
   const buffer = await res.arrayBuffer();
+  if (debug) process.stdout.write(`[debug] downloaded ${buffer.byteLength} bytes\n`);
   if (buffer.byteLength === 0) {
     throw new Error(`Downloaded empty file from ${url}`);
   }
   const tmpPath = `${dest}.tmp`;
   process.stdout.write(`Replacing ${dest}…\n`);
   await Bun.write(tmpPath, buffer);
+  if (debug) process.stdout.write(`[debug] wrote tmp file ${tmpPath}\n`);
+  // Remove quarantine attribute if present (macOS only) so Gatekeeper
+  // does not block the replaced binary on the next run.
+  if (process.platform === "darwin") {
+    const xattr = Bun.spawnSync(["xattr", "-d", "com.apple.quarantine", tmpPath]);
+    const xattrStderr = xattr.stderr?.toString() ?? "";
+    if (debug) {
+      process.stdout.write(
+        `[debug] xattr exit=${xattr.exitCode} stderr=${JSON.stringify(xattrStderr)}\n`,
+      );
+    }
+    if (xattr.exitCode !== 0) {
+      // macOS xattr uses ENOATTR for "attribute does not exist"; the error
+      // message typically includes "No such xattr" or "No such attribute".
+      const lowerStderr = xattrStderr.toLowerCase();
+      const isNoSuchAttr =
+        lowerStderr.includes("no such xattr") || lowerStderr.includes("no such attribute");
+      if (!isNoSuchAttr) {
+        throw new Error(`xattr failed: ${xattrStderr}`);
+      }
+    }
+  }
   // Make executable and atomically replace the binary
   const chmod = Bun.spawnSync(["chmod", "+x", tmpPath]);
   if (chmod.exitCode !== 0) {
     throw new Error(`chmod failed: ${chmod.stderr.toString()}`);
   }
+  if (debug) process.stdout.write(`[debug] chmod +x done\n`);
   const mv = Bun.spawnSync(["mv", tmpPath, dest]);
   if (mv.exitCode !== 0) {
     throw new Error(`mv failed: ${mv.stderr.toString()}`);
   }
+  if (debug) process.stdout.write(`[debug] mv done → ${dest}\n`);
 }
 
 // ─── Orchestration ────────────────────────────────────────────────────────────
@@ -127,6 +157,7 @@ export async function performUpgrade(
   currentVersion: string,
   execPath: string,
   token?: string,
+  debug = false,
 ): Promise<void> {
   if (currentVersion === "dev") {
     process.stdout.write(
@@ -145,6 +176,12 @@ export async function performUpgrade(
   }
 
   const asset = selectAsset(release.assets, process.platform, process.arch);
+  if (debug) {
+    process.stdout.write(
+      `[debug] available assets: ${release.assets.map((a) => a.name).join(", ")}\n`,
+    );
+    process.stdout.write(`[debug] selected asset: ${asset?.name ?? "(none)"}\n`);
+  }
   if (!asset) {
     throw new Error(
       `No binary found for platform ${process.platform}/${process.arch} in release ${latestVersion}.`,
@@ -152,6 +189,6 @@ export async function performUpgrade(
   }
 
   process.stdout.write(`Upgrading ${currentVersion} → ${latestVersion}…\n`);
-  await downloadBinary(asset.browser_download_url, execPath);
+  await downloadBinary(asset.browser_download_url, execPath, debug);
   process.stdout.write(`Successfully upgraded to ${latestVersion}.\n`);
 }

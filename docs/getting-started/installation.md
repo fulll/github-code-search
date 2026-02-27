@@ -72,6 +72,20 @@ Once installed, you can upgrade to the latest release with a single command:
 github-code-search upgrade
 ```
 
+## macOS Gatekeeper
+
+If you download the binary **directly from the releases page in a browser** (Chrome, Safari…), macOS marks it with a quarantine flag and Gatekeeper will block it on first launch.
+
+Remove the quarantine attribute once after downloading:
+
+```bash
+xattr -d com.apple.quarantine ./github-code-search-darwin-arm64
+```
+
+::: tip
+This is unnecessary when installing via the `curl` script above, or when using the `upgrade` subcommand — both handle it automatically.
+:::
+
 ## Next step
 
 → [Run your first search](/getting-started/first-search)

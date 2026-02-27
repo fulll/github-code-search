@@ -7,13 +7,19 @@ Use this page as a reference for all commands and flags when running the tool fr
 ```bash
 github-code-search <query> --org <org> [options]   # default (backward-compatible)
 github-code-search query <query> --org <org> [options]
-github-code-search upgrade
+github-code-search upgrade [--debug]
 ```
 
 | Command                     | Description                                         |
 | --------------------------- | --------------------------------------------------- |
 | `<query>` / `query <query>` | Search GitHub code (default command)                |
 | `upgrade`                   | Check for a new release and auto-upgrade the binary |
+
+## Upgrade options
+
+| Option    | Type           | Default | Description                                                                                                                                                                                          |
+| --------- | -------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--debug` | boolean (flag) | `false` | Print verbose diagnostics: resolved binary path, available release assets, selected asset, HTTP response status, downloaded byte count, and result of each file operation (write, chmod, mv, xattr). |
 
 ## Search options
 
