@@ -20,6 +20,7 @@ import { aggregate, normaliseExtractRef, normaliseRepo } from "./src/aggregate.t
 import { fetchAllResults, fetchRepoTeams } from "./src/api.ts";
 import { buildOutput } from "./src/output.ts";
 import { groupByTeamPrefix, flattenTeamSections } from "./src/group.ts";
+import { checkForUpdate } from "./src/upgrade.ts";
 import { runInteractive } from "./src/tui.ts";
 import type { OutputFormat, OutputType } from "./src/types.ts";
 
@@ -54,6 +55,7 @@ function addSearchOptions(cmd: Command): Command {
         "Comma-separated list of repositories to exclude.",
         "Short form (without org prefix) or full form accepted:",
         "  repoA,repoB  OR  myorg/repoA,myorg/repoB",
+        "Docs: https://fulll.github.io/github-code-search/usage/filtering",
       ].join("\n"),
       "",
     )
@@ -64,6 +66,7 @@ function addSearchOptions(cmd: Command): Command {
         "Format (shortest): repoName:path:matchIndex",
         "  e.g.  repoA:src/foo.ts:0,repoB:lib/core.ts:2",
         "Full form also accepted: myorg/repoA:src/foo.ts:0",
+        "Docs: https://fulll.github.io/github-code-search/usage/filtering",
       ].join("\n"),
       "",
     )
@@ -71,10 +74,20 @@ function addSearchOptions(cmd: Command): Command {
       "--no-interactive",
       "Disable interactive mode (non-interactive). Also triggered by CI=true env var.",
     )
-    .option("--format <format>", "Output format: markdown (default) or json", "markdown")
+    .option(
+      "--format <format>",
+      [
+        "Output format: markdown (default) or json.",
+        "Docs: https://fulll.github.io/github-code-search/usage/output-formats",
+      ].join("\n"),
+      "markdown",
+    )
     .option(
       "--output-type <type>",
-      "Output type: repo-and-matches (default) or repo-only",
+      [
+        "Output type: repo-and-matches (default) or repo-only.",
+        "Docs: https://fulll.github.io/github-code-search/usage/output-formats",
+      ].join("\n"),
       "repo-and-matches",
     )
     .option(
@@ -89,6 +102,7 @@ function addSearchOptions(cmd: Command): Command {
         "Example: squad-,chapter-",
         "Repos are first grouped by the first prefix (single-team, then multi-team),",
         "then by the next prefix, and so on. Repos matching no prefix go into 'other'.",
+        "Docs: https://fulll.github.io/github-code-search/usage/team-grouping",
       ].join("\n"),
       "",
     )
@@ -166,6 +180,28 @@ async function searchAction(
         groupByTeamPrefix: opts.groupByTeamPrefix,
       }),
     );
+    // Check for a newer version and notify on stderr so it never pollutes piped output.
+    // Race against a 2 s timeout so slow networks never delay the exit.
+    const latestTag = await Promise.race([
+      checkForUpdate(VERSION, GITHUB_TOKEN),
+      new Promise<null>((res) => setTimeout(() => res(null), 2000)),
+    ]);
+    if (latestTag) {
+      const w = 55;
+      const bar = "─".repeat(w);
+      const pad = (s: string) => s + " ".repeat(Math.max(0, w - s.length));
+      process.stderr.write(
+        pc.yellow(
+          [
+            `╭─ Update available ${"─".repeat(w - 18)}╮`,
+            `│ ${pad(`github-code-search ${VERSION} → ${latestTag}`)} │`,
+            `│ ${pad("Run: github-code-search upgrade")} │`,
+            `╰${bar}╯`,
+            "",
+          ].join("\n"),
+        ),
+      );
+    }
   } else {
     await runInteractive(
       groups,
@@ -186,12 +222,17 @@ async function searchAction(
 program
   .name("github-code-search")
   .version(VERSION_FULL, "-V, --version", "Output version, commit, OS and architecture")
-  .description("Interactive GitHub code search with per-repo aggregation");
+  .description("Interactive GitHub code search with per-repo aggregation")
+  .addHelpText("after", "\nDocumentation:\n  https://fulll.github.io/github-code-search/");
 
 // `upgrade` subcommand — does NOT require GITHUB_TOKEN (uses it only if set)
 program
   .command("upgrade")
   .description("Check for a new release and auto-upgrade the binary")
+  .addHelpText(
+    "after",
+    "\nDocumentation:\n  https://fulll.github.io/github-code-search/usage/upgrade",
+  )
   .option("--debug", "Print debug information for troubleshooting")
   .action(async (opts: { debug?: boolean }) => {
     const { performUpgrade } = await import("./src/upgrade.ts");
@@ -226,7 +267,12 @@ program
 
 // `query` subcommand — the default (backward-compat: `gcs <query> --org <org>`)
 const queryCmd = addSearchOptions(
-  new Command("query").description("Search GitHub code (default command when no subcommand given)"),
+  new Command("query")
+    .description("Search GitHub code (default command when no subcommand given)")
+    .addHelpText(
+      "after",
+      "\nDocumentation:\n  https://fulll.github.io/github-code-search/usage/search-syntax",
+    ),
 ).action(async (query: string, opts) => {
   await searchAction(query, opts);
 });

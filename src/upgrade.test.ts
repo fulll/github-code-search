@@ -161,22 +161,38 @@ describe("fetchLatestRelease", () => {
 
   it("returns release data from the GitHub API", async () => {
     globalThis.fetch = (async () =>
-      new Response(JSON.stringify({ tag_name: "v1.2.0", html_url: "https://github.com/fulll/github-code-search/releases/tag/v1.2.0", assets: [] }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      })) as typeof fetch;
+      new Response(
+        JSON.stringify({
+          tag_name: "v1.2.0",
+          html_url: "https://github.com/fulll/github-code-search/releases/tag/v1.2.0",
+          assets: [],
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      )) as typeof fetch;
     const release = await fetchLatestRelease("faketoken");
     expect(release.tag_name).toBe("v1.2.0");
-    expect(release.html_url).toBe("https://github.com/fulll/github-code-search/releases/tag/v1.2.0");
+    expect(release.html_url).toBe(
+      "https://github.com/fulll/github-code-search/releases/tag/v1.2.0",
+    );
     expect(release.assets).toHaveLength(0);
   });
 
   it("works without a token", async () => {
     globalThis.fetch = (async () =>
-      new Response(JSON.stringify({ tag_name: "v2.0.0", html_url: "https://github.com/fulll/github-code-search/releases/tag/v2.0.0", assets: [] }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      })) as typeof fetch;
+      new Response(
+        JSON.stringify({
+          tag_name: "v2.0.0",
+          html_url: "https://github.com/fulll/github-code-search/releases/tag/v2.0.0",
+          assets: [],
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      )) as typeof fetch;
     const release = await fetchLatestRelease();
     expect(release.tag_name).toBe("v2.0.0");
   });
@@ -210,10 +226,17 @@ describe("performUpgrade", () => {
 
   it("prints 'up to date' when no newer version", async () => {
     globalThis.fetch = (async () =>
-      new Response(JSON.stringify({ tag_name: "v1.0.0", html_url: "https://github.com/fulll/github-code-search/releases/tag/v1.0.0", assets: [] }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      })) as typeof fetch;
+      new Response(
+        JSON.stringify({
+          tag_name: "v1.0.0",
+          html_url: "https://github.com/fulll/github-code-search/releases/tag/v1.0.0",
+          assets: [],
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      )) as typeof fetch;
 
     const writes: string[] = [];
     const origWrite = process.stdout.write.bind(process.stdout);
@@ -233,10 +256,17 @@ describe("performUpgrade", () => {
 
   it("throws when no matching binary asset found in the release", async () => {
     globalThis.fetch = (async () =>
-      new Response(JSON.stringify({ tag_name: "v9.9.9", html_url: "https://github.com/fulll/github-code-search/releases/tag/v9.9.9", assets: [] }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      })) as typeof fetch;
+      new Response(
+        JSON.stringify({
+          tag_name: "v9.9.9",
+          html_url: "https://github.com/fulll/github-code-search/releases/tag/v9.9.9",
+          assets: [],
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      )) as typeof fetch;
 
     await expect(performUpgrade("1.0.0", "/tmp/test-binary-noasset")).rejects.toThrow(
       "No binary found",
@@ -254,7 +284,11 @@ describe("checkForUpdate", () => {
   it("returns the latest version tag when a newer version exists", async () => {
     globalThis.fetch = (async () =>
       new Response(
-        JSON.stringify({ tag_name: "v2.0.0", html_url: "https://github.com/fulll/github-code-search/releases/tag/v2.0.0", assets: [] }),
+        JSON.stringify({
+          tag_name: "v2.0.0",
+          html_url: "https://github.com/fulll/github-code-search/releases/tag/v2.0.0",
+          assets: [],
+        }),
         { status: 200, headers: { "content-type": "application/json" } },
       )) as typeof fetch;
     const result = await checkForUpdate("1.0.0");
@@ -264,7 +298,11 @@ describe("checkForUpdate", () => {
   it("returns null when already on the latest version", async () => {
     globalThis.fetch = (async () =>
       new Response(
-        JSON.stringify({ tag_name: "v1.0.0", html_url: "https://github.com/fulll/github-code-search/releases/tag/v1.0.0", assets: [] }),
+        JSON.stringify({
+          tag_name: "v1.0.0",
+          html_url: "https://github.com/fulll/github-code-search/releases/tag/v1.0.0",
+          assets: [],
+        }),
         { status: 200, headers: { "content-type": "application/json" } },
       )) as typeof fetch;
     const result = await checkForUpdate("1.0.0");
@@ -316,7 +354,11 @@ describe("performUpgrade — download path", () => {
       callCount++;
       if (callCount === 1) {
         return new Response(
-          JSON.stringify({ tag_name: "v9.9.9", html_url: "https://github.com/fulll/github-code-search/releases/tag/v9.9.9", assets: [makeAsset(assetName)] }),
+          JSON.stringify({
+            tag_name: "v9.9.9",
+            html_url: "https://github.com/fulll/github-code-search/releases/tag/v9.9.9",
+            assets: [makeAsset(assetName)],
+          }),
           {
             status: 200,
             headers: { "content-type": "application/json" },

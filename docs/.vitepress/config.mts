@@ -12,8 +12,8 @@ function buildBlogSidebarItems(): { text: string; link: string }[] {
   try {
     files = readdirSync(blogDir)
       .filter((f) => f.endsWith(".md") && f !== "index.md")
-      .sort()
-      .reverse();
+      .toSorted()
+      .toReversed();
   } catch {
     // blog dir may not exist during the very first build
   }
@@ -178,10 +178,7 @@ export default defineConfig({
       "/blog/": [
         {
           text: "What's New",
-          items: [
-            { text: "All releases", link: "/blog/" },
-            ...buildBlogSidebarItems(),
-          ],
+          items: [{ text: "All releases", link: "/blog/" }, ...buildBlogSidebarItems()],
         },
       ],
       "/architecture/": [
