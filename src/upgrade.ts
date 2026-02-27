@@ -118,7 +118,22 @@ async function downloadBinary(url: string, dest: string, debug = false): Promise
   // does not block the replaced binary on the next run.
   if (process.platform === "darwin") {
     const xattr = Bun.spawnSync(["xattr", "-d", "com.apple.quarantine", tmpPath]);
-    if (debug) process.stdout.write(`[debug] xattr exit=${xattr.exitCode} (ignore ENOATTR)\n`);
+    const xattrStderr = xattr.stderr?.toString() ?? "";
+    if (debug) {
+      process.stdout.write(
+        `[debug] xattr exit=${xattr.exitCode} stderr=${JSON.stringify(xattrStderr)}\n`,
+      );
+    }
+    if (xattr.exitCode !== 0) {
+      // macOS xattr uses ENOATTR for "attribute does not exist"; the error
+      // message typically includes "No such xattr" or "No such attribute".
+      const lowerStderr = xattrStderr.toLowerCase();
+      const isNoSuchAttr =
+        lowerStderr.includes("no such xattr") || lowerStderr.includes("no such attribute");
+      if (!isNoSuchAttr) {
+        throw new Error(`xattr failed: ${xattrStderr}`);
+      }
+    }
   }
   // Make executable and atomically replace the binary
   const chmod = Bun.spawnSync(["chmod", "+x", tmpPath]);
