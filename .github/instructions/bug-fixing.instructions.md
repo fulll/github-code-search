@@ -82,3 +82,19 @@ Add a one-line comment above the fix if the root cause is non-obvious:
   - Steps to reproduce (before the fix).
   - Steps to verify (after the fix).
   - Reference to the issue number.
+
+## 8. Release after merge
+
+Once the PR is merged into `main`, publish a **patch** release:
+
+```bash
+bun pm version patch          # bumps package.json: 1.2.4 → 1.2.5
+git checkout -b release/$(jq -r .version package.json)
+git add package.json
+git commit -S -m "v$(jq -r .version package.json)"
+git tag v$(jq -r .version package.json)
+git push origin release/$(jq -r .version package.json) --tags
+```
+
+The tag push triggers `cd.yaml` which builds all-platform binaries and creates the GitHub Release automatically.
+See the full release guide in `AGENTS.md § Release process`.
