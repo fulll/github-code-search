@@ -1,7 +1,28 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { fetchLatestRelease, isNewerVersion, performUpgrade, selectAsset } from "./upgrade.ts";
+import {
+  blogPostUrl,
+  checkForUpdate,
+  fetchLatestRelease,
+  isNewerVersion,
+  performUpgrade,
+  selectAsset,
+} from "./upgrade.ts";
 import type { ReleaseAsset } from "./upgrade.ts";
+// ─── blogPostUrl ─────────────────────────────────────────────────────────────────
 
+describe("blogPostUrl", () => {
+  it("converts a semver tag to the expected blog URL", () => {
+    expect(blogPostUrl("v1.2.3")).toBe(
+      "https://fulll.github.io/github-code-search/blog/release-v1-2-3",
+    );
+  });
+
+  it("handles a major-only release tag", () => {
+    expect(blogPostUrl("v2.0.0")).toBe(
+      "https://fulll.github.io/github-code-search/blog/release-v2-0-0",
+    );
+  });
+});
 // ─── isNewerVersion ───────────────────────────────────────────────────────────
 
 describe("isNewerVersion", () => {
@@ -140,18 +161,19 @@ describe("fetchLatestRelease", () => {
 
   it("returns release data from the GitHub API", async () => {
     globalThis.fetch = (async () =>
-      new Response(JSON.stringify({ tag_name: "v1.2.0", assets: [] }), {
+      new Response(JSON.stringify({ tag_name: "v1.2.0", html_url: "https://github.com/fulll/github-code-search/releases/tag/v1.2.0", assets: [] }), {
         status: 200,
         headers: { "content-type": "application/json" },
       })) as typeof fetch;
     const release = await fetchLatestRelease("faketoken");
     expect(release.tag_name).toBe("v1.2.0");
+    expect(release.html_url).toBe("https://github.com/fulll/github-code-search/releases/tag/v1.2.0");
     expect(release.assets).toHaveLength(0);
   });
 
   it("works without a token", async () => {
     globalThis.fetch = (async () =>
-      new Response(JSON.stringify({ tag_name: "v2.0.0", assets: [] }), {
+      new Response(JSON.stringify({ tag_name: "v2.0.0", html_url: "https://github.com/fulll/github-code-search/releases/tag/v2.0.0", assets: [] }), {
         status: 200,
         headers: { "content-type": "application/json" },
       })) as typeof fetch;
@@ -188,7 +210,7 @@ describe("performUpgrade", () => {
 
   it("prints 'up to date' when no newer version", async () => {
     globalThis.fetch = (async () =>
-      new Response(JSON.stringify({ tag_name: "v1.0.0", assets: [] }), {
+      new Response(JSON.stringify({ tag_name: "v1.0.0", html_url: "https://github.com/fulll/github-code-search/releases/tag/v1.0.0", assets: [] }), {
         status: 200,
         headers: { "content-type": "application/json" },
       })) as typeof fetch;
@@ -203,12 +225,15 @@ describe("performUpgrade", () => {
     await performUpgrade("1.0.0", "/tmp/test-binary-uptodate");
     process.stdout.write = origWrite;
 
-    expect(writes.some((s) => s.includes("up to date"))).toBe(true);
+    const output = writes.join("");
+    expect(output).toInclude("Congrats");
+    expect(output).toInclude("latest version");
+    expect(output).toInclude("v1.0.0");
   });
 
   it("throws when no matching binary asset found in the release", async () => {
     globalThis.fetch = (async () =>
-      new Response(JSON.stringify({ tag_name: "v9.9.9", assets: [] }), {
+      new Response(JSON.stringify({ tag_name: "v9.9.9", html_url: "https://github.com/fulll/github-code-search/releases/tag/v9.9.9", assets: [] }), {
         status: 200,
         headers: { "content-type": "application/json" },
       })) as typeof fetch;
@@ -216,6 +241,51 @@ describe("performUpgrade", () => {
     await expect(performUpgrade("1.0.0", "/tmp/test-binary-noasset")).rejects.toThrow(
       "No binary found",
     );
+  });
+});
+
+// ─── checkForUpdate ───────────────────────────────────────────────────────────────
+
+describe("checkForUpdate", () => {
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it("returns the latest version tag when a newer version exists", async () => {
+    globalThis.fetch = (async () =>
+      new Response(
+        JSON.stringify({ tag_name: "v2.0.0", html_url: "https://github.com/fulll/github-code-search/releases/tag/v2.0.0", assets: [] }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      )) as typeof fetch;
+    const result = await checkForUpdate("1.0.0");
+    expect(result).toBe("v2.0.0");
+  });
+
+  it("returns null when already on the latest version", async () => {
+    globalThis.fetch = (async () =>
+      new Response(
+        JSON.stringify({ tag_name: "v1.0.0", html_url: "https://github.com/fulll/github-code-search/releases/tag/v1.0.0", assets: [] }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      )) as typeof fetch;
+    const result = await checkForUpdate("1.0.0");
+    expect(result).toBeNull();
+  });
+
+  it("returns null for dev version", async () => {
+    const result = await checkForUpdate("dev");
+    expect(result).toBeNull();
+  });
+
+  it("returns null silently on network error", async () => {
+    globalThis.fetch = (() => Promise.reject(new Error("network failure"))) as typeof fetch;
+    const result = await checkForUpdate("1.0.0");
+    expect(result).toBeNull();
+  });
+
+  it("returns null on non-OK API response", async () => {
+    globalThis.fetch = (async () => new Response("Not Found", { status: 404 })) as typeof fetch;
+    const result = await checkForUpdate("1.0.0");
+    expect(result).toBeNull();
   });
 });
 
@@ -246,7 +316,7 @@ describe("performUpgrade — download path", () => {
       callCount++;
       if (callCount === 1) {
         return new Response(
-          JSON.stringify({ tag_name: "v9.9.9", assets: [makeAsset(assetName)] }),
+          JSON.stringify({ tag_name: "v9.9.9", html_url: "https://github.com/fulll/github-code-search/releases/tag/v9.9.9", assets: [makeAsset(assetName)] }),
           {
             status: 200,
             headers: { "content-type": "application/json" },
@@ -288,6 +358,10 @@ describe("performUpgrade — download path", () => {
 
     expect(stdoutWrites.some((s) => s.includes("Upgrading"))).toBe(true);
     expect(stdoutWrites.some((s) => s.includes("Replacing"))).toBe(true);
-    expect(stdoutWrites.some((s) => s.includes("Successfully upgraded"))).toBe(true);
+    expect(stdoutWrites.some((s) => s.includes("Welcome to github-code-search"))).toBe(true);
+    expect(stdoutWrites.some((s) => s.includes("What's new"))).toBe(true);
+    expect(stdoutWrites.some((s) => s.includes("blog/release-v9-9-9"))).toBe(true);
+    expect(stdoutWrites.some((s) => s.includes("Commit log"))).toBe(true);
+    expect(stdoutWrites.some((s) => s.includes("Report a bug"))).toBe(true);
   });
 });
