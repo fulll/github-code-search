@@ -1,5 +1,29 @@
 import { defineConfig } from "vitepress";
+import { readdirSync } from "node:fs";
+import { resolve } from "node:path";
 import versionsData from "../public/versions.json";
+
+// ── Blog sidebar — built dynamically from docs/blog/*.md files ────────────────
+// Files are sorted newest-first (reverse lexicographic on the slug).
+// The index.md is excluded from the per-post list since it is the section root.
+function buildBlogSidebarItems(): { text: string; link: string }[] {
+  const blogDir = resolve(__dirname, "../blog");
+  let files: string[] = [];
+  try {
+    files = readdirSync(blogDir)
+      .filter((f) => f.endsWith(".md") && f !== "index.md")
+      .sort()
+      .reverse();
+  } catch {
+    // blog dir may not exist during the very first build
+  }
+  return files.map((f) => {
+    const slug = f.replace(/\.md$/, "");
+    // slug: release-v1-0-0 → display: v1.0.0
+    const label = slug.replace(/^release-/, "").replace(/-/g, ".");
+    return { text: label, link: `/blog/${slug}` };
+  });
+}
 
 // ── Versioning convention ────────────────────────────────────────────────────
 // • main branch  → always publishes the "latest" docs at /github-code-search/
@@ -156,7 +180,7 @@ export default defineConfig({
           text: "What's New",
           items: [
             { text: "All releases", link: "/blog/" },
-            { text: "v1.0.0", link: "/blog/release-v1-0-0" },
+            ...buildBlogSidebarItems(),
           ],
         },
       ],
