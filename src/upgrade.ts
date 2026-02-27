@@ -7,6 +7,7 @@ export interface ReleaseAsset {
 
 interface GithubRelease {
   tag_name: string;
+  html_url: string;
   assets: ReleaseAsset[];
 }
 
@@ -67,9 +68,25 @@ export function selectAsset(
   return assets.find((a) => a.name === name) ?? assets.find((a) => a.name === legacyName) ?? null;
 }
 
+// ─── Blog URL helper ───────────────────────────────────────────────────────────
+
+/**
+ * Derives the VitePress blog post URL for a given release tag.
+ * Convention: vX.Y.Z → https://fulll.github.io/github-code-search/blog/release-vX-Y-Z
+ */
+export function blogPostUrl(tag: string): string {
+  // Fix: normalize to always have a v-prefix (handles both "v1.2.3" and "1.2.3")
+  const normalized = `v${tag.replace(/^v/, "")}`;
+  const slug = normalized.replace(/\./g, "-"); // v1.2.3 → v1-2-3
+  return `https://fulll.github.io/github-code-search/blog/release-${slug}`;
+}
+
 // ─── GitHub API ───────────────────────────────────────────────────────────────
 
-export async function fetchLatestRelease(token?: string): Promise<GithubRelease> {
+export async function fetchLatestRelease(
+  token?: string,
+  signal?: AbortSignal,
+): Promise<GithubRelease> {
   const headers: Record<string, string> = {
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
@@ -78,6 +95,7 @@ export async function fetchLatestRelease(token?: string): Promise<GithubRelease>
 
   const res = await fetch("https://api.github.com/repos/fulll/github-code-search/releases/latest", {
     headers,
+    signal,
   });
   if (!res.ok) {
     const body = await res.text();
@@ -171,7 +189,9 @@ export async function performUpgrade(
   const latestVersion = release.tag_name;
 
   if (!isNewerVersion(currentVersion, latestVersion)) {
-    process.stdout.write(`Already up to date (${currentVersion}).\n`);
+    process.stdout.write(
+      `Congrats! You're already on the latest version of github-code-search (${latestVersion}).\n`,
+    );
     return;
   }
 
@@ -190,5 +210,45 @@ export async function performUpgrade(
 
   process.stdout.write(`Upgrading ${currentVersion} → ${latestVersion}…\n`);
   await downloadBinary(asset.browser_download_url, execPath, debug);
-  process.stdout.write(`Successfully upgraded to ${latestVersion}.\n`);
+  process.stdout.write(
+    [
+      ``,
+      `Welcome to github-code-search ${latestVersion}!`,
+      ``,
+      `What's new in ${latestVersion}:`,
+      `  ${blogPostUrl(latestVersion)}`,
+      ``,
+      `Release notes:`,
+      `  ${release.html_url}`,
+      ``,
+      `Commit log:`,
+      `  https://github.com/fulll/github-code-search/compare/${currentVersion.startsWith("v") ? currentVersion : `v${currentVersion}`}...${latestVersion}`,
+      ``,
+      `Report a bug:`,
+      `  https://github.com/fulll/github-code-search/issues/new`,
+      ``,
+      `Run \`github-code-search --help\` to explore all options.`,
+      ``,
+    ].join("\n"),
+  );
+}
+
+// ─── Silent update check ──────────────────────────────────────────────────────
+
+/**
+ * Returns the latest version tag if it is strictly newer than `currentVersion`, or null.
+ * Silently swallows any network / API error so it never breaks the main search flow.
+ */
+export async function checkForUpdate(
+  currentVersion: string,
+  token?: string,
+  signal?: AbortSignal,
+): Promise<string | null> {
+  if (currentVersion === "dev") return null;
+  try {
+    const release = await fetchLatestRelease(token, signal);
+    return isNewerVersion(currentVersion, release.tag_name) ? release.tag_name : null;
+  } catch {
+    return null;
+  }
 }

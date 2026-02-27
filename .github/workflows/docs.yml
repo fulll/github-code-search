@@ -194,11 +194,74 @@ jobs:
             docs/public/versions.json > /tmp/versions_new.json
           mv /tmp/versions_new.json docs/public/versions.json
 
-      - name: Commit versions.json to main
-        uses: stefanzweifel/git-auto-commit-action@v5.0.1
+      - name: Generate blog post stub for new major version
+        run: |
+          set -euo pipefail
+          # Convert vX.0.0 → v<maj>-0-0 for the file name (e.g. v3.0.0 → v3-0-0)
+          TAG="$GITHUB_REF_NAME"
+          SLUG="${TAG//./-}"          # v3.0.0 → v3-0-0
+          BLOG_FILE="docs/blog/release-${SLUG}.md"
+          RELEASE_DATE="$(date -u +%Y-%m-%d)"
+          # Idempotent — skip creation if the file already exists (manually authored).
+          if [ -f "$BLOG_FILE" ]; then
+            echo "Blog post $BLOG_FILE already exists — skipping stub generation."
+          else
+            # Fix: use Python to write the file so heredoc indentation never
+            # leaks into the generated Markdown (which would break frontmatter).
+            python3 - <<PY
+          import pathlib
+          tag = "$TAG"
+          release_date = "$RELEASE_DATE"
+          blog_file = "$BLOG_FILE"
+          content = (
+              f'---\ntitle: "What\'s new in {tag}"\n'
+              f'description: "Highlights of github-code-search {tag}"\n'
+              f'date: {release_date}\n---\n\n'
+              f'# What\'s new in github-code-search {tag}\n\n'
+              f'> Full release notes: <https://github.com/fulll/github-code-search/releases/tag/{tag}>\n\n'
+              '<!-- TODO: fill in feature highlights, usage examples and screenshots. -->\n'
+          )
+          pathlib.Path(blog_file).write_text(content, encoding="utf-8")
+          print(f"Created blog stub: {blog_file}")
+          PY
+          fi
+
+      - name: Update blog/index.md table with new major version
+        run: |
+          set -euo pipefail
+          TAG="$GITHUB_REF_NAME"
+          SLUG="${TAG//./-}"
+          # Add a row to the blog index table only if the version isn't already listed.
+          if grep -qF "release-${SLUG}" docs/blog/index.md; then
+            echo "Blog index already contains ${TAG} — skipping."
+          else
+            python3 - <<PY
+          import re, pathlib
+
+          path = pathlib.Path("docs/blog/index.md")
+          content = path.read_text()
+          tag = "$TAG"
+          slug = "$SLUG"
+          new_row = f"| [{tag}](./release-{slug}) | <!-- TODO: add summary --> |"
+          # Insert the new row after the last markdown table row (line ending with |).
+          updated = re.sub(
+              r"(\|[^\n]+\|)(\s*\Z)",
+              lambda m: m.group(1) + "\n" + new_row + m.group(2),
+              content,
+              count=1,
+              flags=re.DOTALL,
+          )
+          path.write_text(updated)
+          print(f"Inserted row for {tag} into blog/index.md")
+          PY
+          fi
+
+      - name: Commit blog stub and versions.json to main
+        # Pin to exact commit SHA to prevent supply-chain attacks.
+        uses: stefanzweifel/git-auto-commit-action@8621497c8c39c72f3e2a999a26b4ca1b5058a842 # v5.0.1
         with:
           # No [skip ci] — the push to main matches paths: docs/** and re-triggers
           # the deploy job, which merges the new snapshot into the Pages artifact.
-          commit_message: "docs: add ${{ steps.ver.outputs.major }} to versions.json"
-          file_pattern: docs/public/versions.json
+          commit_message: "docs: add ${{ steps.ver.outputs.major }} to versions.json and blog"
+          file_pattern: docs/public/versions.json docs/blog/
           branch: main

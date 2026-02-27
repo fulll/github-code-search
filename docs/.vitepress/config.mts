@@ -1,5 +1,48 @@
 import { defineConfig } from "vitepress";
+import { readdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import versionsData from "../public/versions.json";
+
+// ─── Semantic version helpers for blog sidebar sort ───────────────────────────
+function parseBlogVersion(filename: string): number[] {
+  // "release-v1-2-3.md" → [1, 2, 3]
+  return filename
+    .replace(/^release-v/, "")
+    .replace(/\.md$/, "")
+    .split("-")
+    .map(Number);
+}
+
+function compareVersionArrays(a: number[], b: number[]): number {
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const diff = (b[i] ?? 0) - (a[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+// ── Blog sidebar — built dynamically from docs/blog/*.md files ────────────────
+// Files are sorted newest-first using semantic version comparison so that
+// multi-digit components (e.g. v1.10.0) sort correctly before v1.9.0.
+// The index.md is excluded from the per-post list since it is the section root.
+function buildBlogSidebarItems(): { text: string; link: string }[] {
+  // Fix: use import.meta.url instead of __dirname which may be undefined in ESM
+  const blogDir = fileURLToPath(new URL("../blog", import.meta.url));
+  let files: string[] = [];
+  try {
+    files = readdirSync(blogDir)
+      .filter((f) => f.endsWith(".md") && f !== "index.md")
+      .toSorted((a, b) => compareVersionArrays(parseBlogVersion(a), parseBlogVersion(b)));
+  } catch {
+    // blog dir may not exist during the very first build
+  }
+  return files.map((f) => {
+    const slug = f.replace(/\.md$/, "");
+    // slug: release-v1-0-0 → display: v1.0.0
+    const label = slug.replace(/^release-/, "").replace(/-/g, ".");
+    return { text: label, link: `/blog/${slug}` };
+  });
+}
 
 // ── Versioning convention ────────────────────────────────────────────────────
 // • main branch  → always publishes the "latest" docs at /github-code-search/
@@ -68,6 +111,11 @@ export default defineConfig({
         activeMatch: "^/getting-started/",
       },
       { text: "Usage", link: "/usage/search-syntax", activeMatch: "^/usage/" },
+      {
+        text: "What's New",
+        link: "/blog/",
+        activeMatch: "^/blog/",
+      },
       {
         text: "Reference",
         link: "/reference/cli-options",
@@ -144,6 +192,12 @@ export default defineConfig({
             },
             { text: "Environment variables", link: "/reference/environment" },
           ],
+        },
+      ],
+      "/blog/": [
+        {
+          text: "What's New",
+          items: [{ text: "All releases", link: "/blog/" }, ...buildBlogSidebarItems()],
         },
       ],
       "/architecture/": [

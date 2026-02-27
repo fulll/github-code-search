@@ -155,6 +155,73 @@ For epics spanning multiple PRs, create a long-lived **feature branch** (`feat/<
 
 ---
 
+## Release process
+
+### Deciding the version bump
+
+This project follows [Semantic Versioning](https://semver.org/):
+
+| Change type                                | Bump    | Example       |
+| ------------------------------------------ | ------- | ------------- |
+| Bug fix (no new behaviour, no API change)  | `patch` | 1.2.4 → 1.2.5 |
+| New feature, backward-compatible           | `minor` | 1.2.4 → 1.3.0 |
+| Breaking change (CLI flag removed/renamed) | `major` | 1.2.4 → 2.0.0 |
+
+### Step-by-step
+
+```bash
+# 1. Bump the version in package.json (pick one)
+bun pm version patch   # bug fix
+bun pm version minor   # new feature
+bun pm version major   # breaking change
+
+# 2. Create the release branch and commit
+git checkout -b release/$(jq -r .version package.json)
+git add package.json
+git commit -S -m "v$(jq -r .version package.json)"
+
+# 3. Write (or update) the blog post for the release
+#    • Required for minor and major releases.
+#    • Patch releases: optional — a brief note in the GitHub Release is sufficient.
+#    File: docs/blog/release-v<X-Y-Z>.md  (e.g. docs/blog/release-v1-3-0.md)
+#    Update docs/blog/index.md table too.
+
+# 4. Tag and push — this triggers the CD pipeline
+git tag v$(jq -r .version package.json)
+git push origin release/$(jq -r .version package.json) --tags
+```
+
+### What the CI does automatically
+
+Pushing a tag `vX.Y.Z` triggers **`cd.yaml`**:
+
+1. Compiles the binary for all six targets (linux-x64, linux-arm64, linux-x64-baseline, darwin-x64, darwin-arm64, windows-x64).
+2. Creates a **GitHub Release** with all binaries attached.
+   `generate_release_notes: true` — GitHub auto-populates the release body from merged PR titles and commit messages since the previous tag.
+3. Legacy platform aliases are also published for backward-compat with pre-v1.2.1 binaries.
+
+Pushing a **major** tag (`vX.0.0`) additionally triggers **`docs.yml` → snapshot job**:
+
+1. Builds a versioned docs snapshot at `/github-code-search/vX/`.
+2. Auto-generates `docs/blog/release-vX-0-0.md` stub if it does not exist yet.
+3. Prepends the new entry to `docs/public/versions.json` and commits back to `main`.
+
+### Blog post requirement
+
+| Release type | Blog post                                                   | Location                          |
+| ------------ | ----------------------------------------------------------- | --------------------------------- |
+| **Major**    | Required (written by hand — CI stub automates the skeleton) | `docs/blog/release-vX-0-0.md`     |
+| **Minor**    | Required                                                    | `docs/blog/release-vX-Y-0.md`     |
+| **Patch**    | Optional                                                    | GitHub Release body is sufficient |
+
+For minor/major releases update `docs/blog/index.md` to add a row in the version table:
+
+```markdown
+| [vX.Y.Z](./release-vX-Y-Z) | One-line highlights |
+```
+
+---
+
 ## Development notes
 
 - **TypeScript throughout** — no `.js` files in `src/`.

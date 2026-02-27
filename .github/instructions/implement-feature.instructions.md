@@ -69,3 +69,28 @@ bun run build.ts       # binary compiles without errors
 - **All commits must be signed** (GPG or SSH). Configure once with `git config --global commit.gpgsign true`.
   Commits pushed via the GitHub API (Copilot Coding Agent, MCP tools) are automatically Verified by GitHub.
 - PR description: motivation, what changed, how to test manually.
+
+## 8. Release after merge
+
+Once the PR is merged into `main`, publish a **minor** (new feature) or **major** (breaking change) release:
+
+```bash
+bun pm version minor           # new feature:   1.2.4 → 1.3.0
+# or
+bun pm version major           # breaking change: 1.2.4 → 2.0.0
+
+git checkout -b release/$(jq -r .version package.json)
+git add package.json
+git commit -S -m "v$(jq -r .version package.json)"
+git tag v$(jq -r .version package.json)
+git push origin release/$(jq -r .version package.json) --tags
+```
+
+The tag push triggers `cd.yaml` which builds all-platform binaries and creates the GitHub Release automatically.
+
+For **minor and major releases**, also write the blog post **before pushing the tag**:
+
+- Create `docs/blog/release-v<X-Y-Z>.md` with feature highlights
+- Add a row in `docs/blog/index.md`
+
+See the full release guide in `AGENTS.md § Release process`.

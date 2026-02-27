@@ -20,6 +20,7 @@ import { aggregate, normaliseExtractRef, normaliseRepo } from "./src/aggregate.t
 import { fetchAllResults, fetchRepoTeams } from "./src/api.ts";
 import { buildOutput } from "./src/output.ts";
 import { groupByTeamPrefix, flattenTeamSections } from "./src/group.ts";
+import { checkForUpdate } from "./src/upgrade.ts";
 import { runInteractive } from "./src/tui.ts";
 import type { OutputFormat, OutputType } from "./src/types.ts";
 
@@ -41,7 +42,74 @@ const TARGET_ARCH =
 /** Full version string shown by `--version`. */
 const VERSION_FULL = `${VERSION} (${COMMIT} · ${TARGET_OS}/${TARGET_ARCH})`;
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Help colorization ───────────────────────────────────────────────────────
+// Only apply colours when stdout is connected to a real terminal.
+// All pipes, CI redirects, and `--no-color` environments stay plain-text.
+const HAS_COLOR = Boolean(process.stdout.isTTY);
+
+/**
+ * Walk through a multi-line option/argument description and:
+ *  • "Docs: <url>"   → dim label + cyan underlined URL
+ *  • "Example: ..." → dim label + italic value
+ *  • indent lines that look like code examples (e.g. / repoA / myorg) → dim
+ */
+function colorDesc(s: string): string {
+  if (!HAS_COLOR) return s;
+  return s
+    .split("\n")
+    .map((line) => {
+      const docsMatch = line.match(/^(\s*Docs:\s*)(https?:\/\/\S+)$/);
+      if (docsMatch) return pc.dim(docsMatch[1]) + pc.cyan(pc.underline(docsMatch[2]));
+      const exampleMatch = line.match(/^(\s*Example:\s*)(.+)$/);
+      if (exampleMatch) return pc.dim(exampleMatch[1]) + pc.italic(exampleMatch[2]);
+      if (/^\s+(e\.g\.|repoA|myorg\/|squad-|chapter-)/.test(line)) return pc.dim(line);
+      return line;
+    })
+    .join("\n");
+}
+
+/** Colored hyperlink (cyan + underline), falls back to plain when not a TTY. */
+function helpLink(url: string): string {
+  return HAS_COLOR ? pc.cyan(pc.underline(url)) : url;
+}
+
+/**
+ * Builds the `addHelpText("after", ...)` footer block with a labelled link.
+ * The label is bold when color is supported.
+ */
+function helpSection(label: string, url: string): string {
+  const t = HAS_COLOR ? pc.bold(label) : label;
+  return `\n${t}\n  ${helpLink(url)}`;
+}
+
+/**
+ * Commander configureHelp options shared by all commands.
+ * Each style hook only applies colour when HAS_COLOR is true.
+ */
+const helpFormatConfig = {
+  // Section headings: "Usage:", "Options:", "Commands:" …
+  styleTitle: (s: string) => (HAS_COLOR ? pc.bold(pc.yellow(s)) : s),
+  // Command name in the usage line
+  styleCommandText: (s: string) => (HAS_COLOR ? pc.bold(s) : s),
+  // Subcommand names in the command listing
+  styleSubcommandText: (s: string) => (HAS_COLOR ? pc.cyan(s) : s),
+  // Argument placeholders (<query>)
+  styleArgumentText: (s: string) => (HAS_COLOR ? pc.yellow(s) : s),
+  // Option flags in the usage line (--org, --format …)
+  styleOptionText: (s: string) => (HAS_COLOR ? pc.green(s) : s),
+  // Option terms in the options table
+  styleOptionTerm: (s: string) => (HAS_COLOR ? pc.green(s) : s),
+  // Subcommand terms in the commands table
+  styleSubcommandTerm: (s: string) => (HAS_COLOR ? pc.cyan(s) : s),
+  // Argument terms in the arguments table
+  styleArgumentTerm: (s: string) => (HAS_COLOR ? pc.yellow(s) : s),
+  // Descriptions — color "Docs:", "Example:" and code-example lines
+  styleOptionDescription: colorDesc,
+  styleSubcommandDescription: colorDesc,
+  styleArgumentDescription: colorDesc,
+  styleCommandDescription: colorDesc,
+  styleDescriptionText: colorDesc,
+};
 
 /** Add the shared search options to a command. */
 function addSearchOptions(cmd: Command): Command {
@@ -54,6 +122,7 @@ function addSearchOptions(cmd: Command): Command {
         "Comma-separated list of repositories to exclude.",
         "Short form (without org prefix) or full form accepted:",
         "  repoA,repoB  OR  myorg/repoA,myorg/repoB",
+        "Docs: https://fulll.github.io/github-code-search/usage/filtering",
       ].join("\n"),
       "",
     )
@@ -64,6 +133,7 @@ function addSearchOptions(cmd: Command): Command {
         "Format (shortest): repoName:path:matchIndex",
         "  e.g.  repoA:src/foo.ts:0,repoB:lib/core.ts:2",
         "Full form also accepted: myorg/repoA:src/foo.ts:0",
+        "Docs: https://fulll.github.io/github-code-search/usage/filtering",
       ].join("\n"),
       "",
     )
@@ -71,10 +141,20 @@ function addSearchOptions(cmd: Command): Command {
       "--no-interactive",
       "Disable interactive mode (non-interactive). Also triggered by CI=true env var.",
     )
-    .option("--format <format>", "Output format: markdown (default) or json", "markdown")
+    .option(
+      "--format <format>",
+      [
+        "Output format: markdown (default) or json.",
+        "Docs: https://fulll.github.io/github-code-search/usage/output-formats",
+      ].join("\n"),
+      "markdown",
+    )
     .option(
       "--output-type <type>",
-      "Output type: repo-and-matches (default) or repo-only",
+      [
+        "Output type: repo-and-matches (default) or repo-only.",
+        "Docs: https://fulll.github.io/github-code-search/usage/output-formats",
+      ].join("\n"),
       "repo-and-matches",
     )
     .option(
@@ -89,6 +169,7 @@ function addSearchOptions(cmd: Command): Command {
         "Example: squad-,chapter-",
         "Repos are first grouped by the first prefix (single-team, then multi-team),",
         "then by the next prefix, and so on. Repos matching no prefix go into 'other'.",
+        "Docs: https://fulll.github.io/github-code-search/usage/team-grouping",
       ].join("\n"),
       "",
     )
@@ -166,6 +247,43 @@ async function searchAction(
         groupByTeamPrefix: opts.groupByTeamPrefix,
       }),
     );
+    // Check for a newer version and notify on stderr so it never pollutes piped output.
+    // Race against a 2 s timeout so slow networks never delay the exit.
+    // Fix: use AbortController so the in-flight fetch is actually cancelled on timeout.
+    const updateAbortController = new AbortController();
+    const latestTag = await Promise.race([
+      checkForUpdate(VERSION, GITHUB_TOKEN, updateAbortController.signal),
+      new Promise<null>((res) =>
+        setTimeout(() => {
+          updateAbortController.abort();
+          res(null);
+        }, 2000),
+      ),
+    ]).catch(() => null);
+    if (latestTag) {
+      const w = 55;
+      // Fix: compute all widths from totalWidth so corners always align.
+      // totalWidth = w + 4 ("│ " + w content chars + " │")
+      const totalWidth = w + 4;
+      const headerPrefix = "╭─";
+      const headerLabel = " Update available ";
+      const headerDashes = "─".repeat(
+        Math.max(0, totalWidth - headerPrefix.length - headerLabel.length - 1),
+      );
+      const bottomBar = "─".repeat(totalWidth - 2);
+      const pad = (s: string) => s + " ".repeat(Math.max(0, w - s.length));
+      process.stderr.write(
+        pc.yellow(
+          [
+            `${headerPrefix}${headerLabel}${headerDashes}╮`,
+            `│ ${pad(`github-code-search ${VERSION} → ${latestTag}`)} │`,
+            `│ ${pad("Run: github-code-search upgrade")} │`,
+            `╰${bottomBar}╯`,
+            "",
+          ].join("\n"),
+        ),
+      );
+    }
   } else {
     await runInteractive(
       groups,
@@ -186,12 +304,22 @@ async function searchAction(
 program
   .name("github-code-search")
   .version(VERSION_FULL, "-V, --version", "Output version, commit, OS and architecture")
-  .description("Interactive GitHub code search with per-repo aggregation");
+  .description("Interactive GitHub code search with per-repo aggregation")
+  .configureHelp(helpFormatConfig)
+  .addHelpText(
+    "after",
+    helpSection("Documentation:", "https://fulll.github.io/github-code-search/"),
+  );
 
 // `upgrade` subcommand — does NOT require GITHUB_TOKEN (uses it only if set)
 program
   .command("upgrade")
   .description("Check for a new release and auto-upgrade the binary")
+  .configureHelp(helpFormatConfig)
+  .addHelpText(
+    "after",
+    helpSection("Documentation:", "https://fulll.github.io/github-code-search/usage/upgrade"),
+  )
   .option("--debug", "Print debug information for troubleshooting")
   .action(async (opts: { debug?: boolean }) => {
     const { performUpgrade } = await import("./src/upgrade.ts");
@@ -226,7 +354,16 @@ program
 
 // `query` subcommand — the default (backward-compat: `gcs <query> --org <org>`)
 const queryCmd = addSearchOptions(
-  new Command("query").description("Search GitHub code (default command when no subcommand given)"),
+  new Command("query")
+    .description("Search GitHub code (default command when no subcommand given)")
+    .configureHelp(helpFormatConfig)
+    .addHelpText(
+      "after",
+      helpSection(
+        "Documentation:",
+        "https://fulll.github.io/github-code-search/usage/search-syntax",
+      ),
+    ),
 ).action(async (query: string, opts) => {
   await searchAction(query, opts);
 });
