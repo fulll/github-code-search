@@ -10,7 +10,7 @@ date: 2025-01-01
 
 ## The beginning
 
-`github-code-search` is an interactive CLI for searching GitHub code across an entire organization.
+`github-code-search` is an interactive CLI for searching GitHub code across an entire organisation.
 It wraps the [GitHub Code Search API](https://docs.github.com/en/rest/search/search#search-code)
 and adds a keyboard-driven TUI on top, so you can browse results, fold/unfold extracts, and select
 the ones you care about before printing structured output.

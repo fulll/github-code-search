@@ -262,15 +262,23 @@ async function searchAction(
     ]).catch(() => null);
     if (latestTag) {
       const w = 55;
-      const bar = "─".repeat(w);
+      // Fix: compute all widths from totalWidth so corners always align.
+      // totalWidth = w + 4 ("│ " + w content chars + " │")
+      const totalWidth = w + 4;
+      const headerPrefix = "╭─";
+      const headerLabel = " Update available ";
+      const headerDashes = "─".repeat(
+        Math.max(0, totalWidth - headerPrefix.length - headerLabel.length - 1),
+      );
+      const bottomBar = "─".repeat(totalWidth - 2);
       const pad = (s: string) => s + " ".repeat(Math.max(0, w - s.length));
       process.stderr.write(
         pc.yellow(
           [
-            `╭─ Update available ${"─".repeat(w - 18)}╮`,
+            `${headerPrefix}${headerLabel}${headerDashes}╮`,
             `│ ${pad(`github-code-search ${VERSION} → ${latestTag}`)} │`,
             `│ ${pad("Run: github-code-search upgrade")} │`,
-            `╰${bar}╯`,
+            `╰${bottomBar}╯`,
             "",
           ].join("\n"),
         ),

@@ -332,6 +332,18 @@ describe("checkForUpdate", () => {
     const result = await checkForUpdate("1.0.0");
     expect(result).toBeNull();
   });
+
+  it("returns null when given an already-aborted signal", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    // fetch will throw an AbortError; checkForUpdate must catch it and return null.
+    globalThis.fetch = (async (_url: string, opts?: RequestInit) => {
+      if (opts?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+      throw new Error("fetch should not succeed with an aborted signal");
+    }) as typeof fetch;
+    const result = await checkForUpdate("1.0.0", undefined, controller.signal);
+    expect(result).toBeNull();
+  });
 });
 
 // ─── performUpgrade — download path (covers downloadBinary) ──────────────────

@@ -206,20 +206,24 @@ jobs:
           if [ -f "$BLOG_FILE" ]; then
             echo "Blog post $BLOG_FILE already exists — skipping stub generation."
           else
-            cat > "$BLOG_FILE" <<EOF
-          ---
-          title: "What's new in ${TAG}"
-          description: "Highlights of github-code-search ${TAG}"
-          date: ${RELEASE_DATE}
-          ---
-
-          # What's new in github-code-search ${TAG}
-
-          > Full release notes: <https://github.com/fulll/github-code-search/releases/tag/${TAG}>
-
-          <!-- TODO: fill in feature highlights, usage examples and screenshots. -->
-          EOF
-            echo "Created blog stub: $BLOG_FILE"
+            # Fix: use Python to write the file so heredoc indentation never
+            # leaks into the generated Markdown (which would break frontmatter).
+            python3 - <<PY
+          import pathlib
+          tag = "$TAG"
+          release_date = "$RELEASE_DATE"
+          blog_file = "$BLOG_FILE"
+          content = (
+              f'---\ntitle: "What\'s new in {tag}"\n'
+              f'description: "Highlights of github-code-search {tag}"\n'
+              f'date: {release_date}\n---\n\n'
+              f'# What\'s new in github-code-search {tag}\n\n'
+              f'> Full release notes: <https://github.com/fulll/github-code-search/releases/tag/{tag}>\n\n'
+              '<!-- TODO: fill in feature highlights, usage examples and screenshots. -->\n'
+          )
+          pathlib.Path(blog_file).write_text(content, encoding="utf-8")
+          print(f"Created blog stub: {blog_file}")
+          PY
           fi
 
       - name: Update blog/index.md table with new major version
