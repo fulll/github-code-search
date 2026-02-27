@@ -231,13 +231,30 @@ jobs:
           if grep -qF "release-${SLUG}" docs/blog/index.md; then
             echo "Blog index already contains ${TAG} — skipping."
           else
-            # Insert a new row after the last existing table row (line ending with |).
-            sed -i "s|^\(| \[v1\.0\.0\].*\)$|\1\n| [${TAG}](./release-${SLUG}) | <!-- TODO: add summary --> |" \
-              docs/blog/index.md || true
+            python3 - <<PY
+          import re, pathlib
+
+          path = pathlib.Path("docs/blog/index.md")
+          content = path.read_text()
+          tag = "$TAG"
+          slug = "$SLUG"
+          new_row = f"| [{tag}](./release-{slug}) | <!-- TODO: add summary --> |"
+          # Insert the new row after the last markdown table row (line ending with |).
+          updated = re.sub(
+              r"(\|[^\n]+\|)(\s*\Z)",
+              lambda m: m.group(1) + "\n" + new_row + m.group(2),
+              content,
+              count=1,
+              flags=re.DOTALL,
+          )
+          path.write_text(updated)
+          print(f"Inserted row for {tag} into blog/index.md")
+          PY
           fi
 
       - name: Commit blog stub and versions.json to main
-        uses: stefanzweifel/git-auto-commit-action@v5.0.1
+        # Pin to exact commit SHA to prevent supply-chain attacks.
+        uses: stefanzweifel/git-auto-commit-action@8621497c8c39c72f3e2a999a26b4ca1b5058a842 # v5.0.1
         with:
           # No [skip ci] — the push to main matches paths: docs/** and re-triggers
           # the deploy job, which merges the new snapshot into the Pages artifact.

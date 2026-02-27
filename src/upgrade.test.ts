@@ -22,6 +22,13 @@ describe("blogPostUrl", () => {
       "https://fulll.github.io/github-code-search/blog/release-v2-0-0",
     );
   });
+
+  it("normalizes a tag without v-prefix", () => {
+    // Fix: previously `replace(/^v/, "v")` was a no-op for tags like "1.2.3"
+    expect(blogPostUrl("1.2.3")).toBe(
+      "https://fulll.github.io/github-code-search/blog/release-v1-2-3",
+    );
+  });
 });
 // ─── isNewerVersion ───────────────────────────────────────────────────────────
 

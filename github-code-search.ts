@@ -249,10 +249,17 @@ async function searchAction(
     );
     // Check for a newer version and notify on stderr so it never pollutes piped output.
     // Race against a 2 s timeout so slow networks never delay the exit.
+    // Fix: use AbortController so the in-flight fetch is actually cancelled on timeout.
+    const updateAbortController = new AbortController();
     const latestTag = await Promise.race([
-      checkForUpdate(VERSION, GITHUB_TOKEN),
-      new Promise<null>((res) => setTimeout(() => res(null), 2000)),
-    ]);
+      checkForUpdate(VERSION, GITHUB_TOKEN, updateAbortController.signal),
+      new Promise<null>((res) =>
+        setTimeout(() => {
+          updateAbortController.abort();
+          res(null);
+        }, 2000),
+      ),
+    ]).catch(() => null);
     if (latestTag) {
       const w = 55;
       const bar = "─".repeat(w);

@@ -75,13 +75,18 @@ export function selectAsset(
  * Convention: vX.Y.Z → https://fulll.github.io/github-code-search/blog/release-vX-Y-Z
  */
 export function blogPostUrl(tag: string): string {
-  const slug = tag.replace(/^v/, "v").replace(/\./g, "-"); // v1.2.3 → v1-2-3
+  // Fix: normalize to always have a v-prefix (handles both "v1.2.3" and "1.2.3")
+  const normalized = `v${tag.replace(/^v/, "")}`;
+  const slug = normalized.replace(/\./g, "-"); // v1.2.3 → v1-2-3
   return `https://fulll.github.io/github-code-search/blog/release-${slug}`;
 }
 
 // ─── GitHub API ───────────────────────────────────────────────────────────────
 
-export async function fetchLatestRelease(token?: string): Promise<GithubRelease> {
+export async function fetchLatestRelease(
+  token?: string,
+  signal?: AbortSignal,
+): Promise<GithubRelease> {
   const headers: Record<string, string> = {
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
@@ -90,6 +95,7 @@ export async function fetchLatestRelease(token?: string): Promise<GithubRelease>
 
   const res = await fetch("https://api.github.com/repos/fulll/github-code-search/releases/latest", {
     headers,
+    signal,
   });
   if (!res.ok) {
     const body = await res.text();
@@ -236,10 +242,11 @@ export async function performUpgrade(
 export async function checkForUpdate(
   currentVersion: string,
   token?: string,
+  signal?: AbortSignal,
 ): Promise<string | null> {
   if (currentVersion === "dev") return null;
   try {
-    const release = await fetchLatestRelease(token);
+    const release = await fetchLatestRelease(token, signal);
     return isNewerVersion(currentVersion, release.tag_name) ? release.tag_name : null;
   } catch {
     return null;
