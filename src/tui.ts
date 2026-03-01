@@ -3,12 +3,14 @@ import * as readline from "readline";
 import {
   applySelectAll,
   applySelectNone,
+  buildFilterStats,
   buildRows,
   isCursorVisible,
   renderGroups,
+  type FilterStats,
 } from "./render.ts";
 import { buildOutput } from "./output.ts";
-import type { OutputFormat, OutputType, RepoGroup } from "./types.ts";
+import type { FilterTarget, OutputFormat, OutputType, RepoGroup } from "./types.ts";
 
 // ─── Key binding constants ────────────────────────────────────────────────────
 
@@ -20,6 +22,42 @@ const ANSI_ARROW_RIGHT = "\x1b[C";
 const KEY_CTRL_C = "\u0003";
 const KEY_ENTER_CR = "\r";
 const KEY_ENTER_LF = "\n";
+// Cursor / word navigation (filter mode)
+const KEY_TAB = "\t";
+const KEY_HOME = "\x1b[H";
+const KEY_END = "\x1b[F";
+const KEY_CTRL_A = "\x01";
+const KEY_CTRL_E = "\x05";
+const KEY_CTRL_W = "\x17";
+const KEY_ALT_BACKSPACE = "\x1b\x7f";
+const KEY_CTRL_ARROW_LEFT = "\x1b[1;5D";
+const KEY_CTRL_ARROW_RIGHT = "\x1b[1;5C";
+const KEY_ALT_B = "\x1bb";
+const KEY_ALT_F = "\x1bf";
+const KEY_DELETE = "\x1b[3~";
+
+// ─── Word-boundary helpers ────────────────────────────────────────────────────
+
+/** Returns the start of the word immediately before position `pos`. */
+function prevWordBoundary(s: string, pos: number): number {
+  let i = pos;
+  // skip trailing spaces
+  while (i > 0 && s[i - 1] === " ") i--;
+  // skip word chars
+  while (i > 0 && s[i - 1] !== " ") i--;
+  return i;
+}
+
+/** Returns the start of the next word after position `pos`. */
+function nextWordBoundary(s: string, pos: number): number {
+  let i = pos;
+  const len = s.length;
+  // skip current word
+  while (i < len && s[i] !== " ") i++;
+  // skip spaces
+  while (i < len && s[i] === " ") i++;
+  return i;
+}
 
 // ─── Interactive TUI ─────────────────────────────────────────────────────────
 
@@ -45,23 +83,45 @@ export async function runInteractive(
   let cursor = 0;
   let scrollOffset = 0;
   const termHeight = process.stdout.rows ?? 40;
-  const viewportHeight = termHeight - 5;
+  // HEADER_LINES (4: title + summary + hints + blank) + position indicator (2: blank + line)
+  // must equal the constant subtracted in renderGroups: termHeight - HEADER_LINES - 2.
+  const viewportHeight = termHeight - 6;
 
   // ─── Filter + help state ─────────────────────────────────────────────────
   let filterPath = "";
   let filterMode = false;
   let filterInput = "";
+  let filterCursor = 0;
+  let filterTarget: FilterTarget = "path";
+  let filterRegex = false;
+  let filterLiveStats: FilterStats | null = null;
+  let statsDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   let showHelp = false;
+
+  /** Schedule a debounced stats recompute (while typing in filter bar). */
+  const scheduleStatsUpdate = () => {
+    if (statsDebounceTimer !== null) clearTimeout(statsDebounceTimer);
+    filterLiveStats = null; // show "…" while typing fast
+    statsDebounceTimer = setTimeout(() => {
+      filterLiveStats = buildFilterStats(groups, filterInput, filterTarget, filterRegex);
+      statsDebounceTimer = null;
+      redraw();
+    }, 150);
+  };
 
   const redraw = () => {
     const activeFilter = filterMode ? filterInput : filterPath;
-    const rows = buildRows(groups, activeFilter);
+    const rows = buildRows(groups, activeFilter, filterTarget, filterRegex);
     const rendered = renderGroups(groups, cursor, rows, termHeight, scrollOffset, query, org, {
       filterPath,
       filterMode,
       filterInput,
+      filterCursor,
+      filterLiveStats,
       showHelp,
       termWidth: process.stdout.columns ?? 80,
+      filterTarget,
+      filterRegex,
     });
     process.stdout.write(ANSI_CLEAR);
     process.stdout.write(rendered);
@@ -79,35 +139,98 @@ export async function runInteractive(
         process.stdout.write(ANSI_CLEAR);
         process.stdin.setRawMode(false);
         process.exit(0);
-      } else if (key === "\x1b") {
-        // ESC — cancel filter input
+      } else if (key === "\x1b" && !key.startsWith("\x1b[") && !key.startsWith("\x1b\x1b")) {
+        // ESC (bare) — cancel filter input
         filterMode = false;
         filterInput = "";
+        filterCursor = 0;
+        if (statsDebounceTimer !== null) {
+          clearTimeout(statsDebounceTimer);
+          statsDebounceTimer = null;
+        }
+        filterLiveStats = null;
       } else if (key === KEY_ENTER_CR || key === KEY_ENTER_LF) {
         // Enter — confirm filter
         filterPath = filterInput;
         filterMode = false;
+        if (statsDebounceTimer !== null) {
+          clearTimeout(statsDebounceTimer);
+          statsDebounceTimer = null;
+        }
+        filterLiveStats = null;
         // Clamp cursor to new row list
-        const newRows = buildRows(groups, filterPath);
+        const newRows = buildRows(groups, filterPath, filterTarget, filterRegex);
         cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
         scrollOffset = Math.min(scrollOffset, cursor);
-      } else if (key === "\x7f" || key === "\b") {
-        // Backspace — trim and clamp cursor to new live-filtered row list
-        filterInput = filterInput.slice(0, -1);
-        const newRows = buildRows(groups, filterInput);
+      } else if (key === KEY_TAB) {
+        // Tab — toggle regex mode
+        filterRegex = !filterRegex;
+        scheduleStatsUpdate();
+      } else if (key === ANSI_ARROW_LEFT) {
+        // ← — move cursor left
+        filterCursor = Math.max(0, filterCursor - 1);
+      } else if (key === ANSI_ARROW_RIGHT) {
+        // → — move cursor right
+        filterCursor = Math.min(filterInput.length, filterCursor + 1);
+      } else if (key === KEY_HOME || key === KEY_CTRL_A) {
+        // Home / Ctrl+A — jump to start
+        filterCursor = 0;
+      } else if (key === KEY_END || key === KEY_CTRL_E) {
+        // End / Ctrl+E — jump to end
+        filterCursor = filterInput.length;
+      } else if (key === KEY_CTRL_ARROW_LEFT || key === KEY_ALT_B) {
+        // Ctrl+← / Alt+b — word left
+        filterCursor = prevWordBoundary(filterInput, filterCursor);
+      } else if (key === KEY_CTRL_ARROW_RIGHT || key === KEY_ALT_F) {
+        // Ctrl+→ / Alt+f — word right
+        filterCursor = nextWordBoundary(filterInput, filterCursor);
+      } else if (key === KEY_CTRL_W || key === KEY_ALT_BACKSPACE) {
+        // Ctrl+W / Alt+Backspace — delete word before cursor
+        const newPos = prevWordBoundary(filterInput, filterCursor);
+        filterInput = filterInput.slice(0, newPos) + filterInput.slice(filterCursor);
+        filterCursor = newPos;
+        const newRows = buildRows(groups, filterInput, filterTarget, filterRegex);
         cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
-      } else if (key.length === 1 && key >= " ") {
-        // Printable character — clamp cursor to new live-filtered row list
-        filterInput += key;
-        const newRows = buildRows(groups, filterInput);
+        scheduleStatsUpdate();
+      } else if ((key === "\x7f" || key === "\b") && filterCursor > 0) {
+        // Backspace — delete char before cursor
+        filterInput = filterInput.slice(0, filterCursor - 1) + filterInput.slice(filterCursor);
+        filterCursor--;
+        const newRows = buildRows(groups, filterInput, filterTarget, filterRegex);
         cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
+        scheduleStatsUpdate();
+      } else if (key === KEY_DELETE && filterCursor < filterInput.length) {
+        // Del — delete char at cursor
+        filterInput = filterInput.slice(0, filterCursor) + filterInput.slice(filterCursor + 1);
+        const newRows = buildRows(groups, filterInput, filterTarget, filterRegex);
+        cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
+        scheduleStatsUpdate();
+      } else if (!key.startsWith("\x1b")) {
+        // Printable character(s) — insert at cursor.
+        // Handles both single keystrokes and paste (multi-char chunk).
+        // Discard control chars (code < 32 or DEL 127) without using a regex
+        // literal so as not to trigger the no-control-regex lint rule.
+        const printable = Array.from(key)
+          .filter((c) => {
+            const code = c.charCodeAt(0);
+            return code >= 32 && code !== 127;
+          })
+          .join("");
+        if (printable.length > 0) {
+          filterInput =
+            filterInput.slice(0, filterCursor) + printable + filterInput.slice(filterCursor);
+          filterCursor += printable.length;
+          const newRows = buildRows(groups, filterInput, filterTarget, filterRegex);
+          cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
+          scheduleStatsUpdate();
+        }
       }
       redraw();
       continue;
     }
 
     // ── Normal mode ─────────────────────────────────────────────────────────
-    const rows = buildRows(groups, filterPath);
+    const rows = buildRows(groups, filterPath, filterTarget, filterRegex);
     const row = rows[cursor];
 
     if (key === KEY_CTRL_C || key === "q") {
@@ -145,6 +268,27 @@ export async function runInteractive(
     if (key === "f") {
       filterMode = true;
       filterInput = filterPath; // pre-fill with current filter
+      filterCursor = filterInput.length; // cursor at end
+      // Show current stats immediately if there's already a filter
+      if (filterInput) {
+        filterLiveStats = buildFilterStats(groups, filterInput, filterTarget, filterRegex);
+      } else {
+        filterLiveStats = null;
+      }
+      redraw();
+      continue;
+    }
+
+    // `t` — cycle filter target: path → content → repo → path
+    if (key === "t") {
+      filterTarget =
+        filterTarget === "path" ? "content" : filterTarget === "content" ? "repo" : "path";
+      if (filterPath) {
+        // Rebuild rows with new target
+        const newRows = buildRows(groups, filterPath, filterTarget, filterRegex);
+        cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
+        scrollOffset = Math.min(scrollOffset, cursor);
+      }
       redraw();
       continue;
     }
@@ -153,8 +297,14 @@ export async function runInteractive(
     if (key === "r") {
       filterPath = "";
       filterInput = "";
+      filterCursor = 0;
       filterMode = false;
-      const newRows = buildRows(groups, "");
+      if (statsDebounceTimer !== null) {
+        clearTimeout(statsDebounceTimer);
+        statsDebounceTimer = null;
+      }
+      filterLiveStats = null;
+      const newRows = buildRows(groups, "", filterTarget, filterRegex);
       cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
       scrollOffset = Math.min(scrollOffset, cursor);
       redraw();
@@ -222,12 +372,12 @@ export async function runInteractive(
 
     // `a` — select all (respects active filter)
     if (key === "a" && row && row.type !== "section") {
-      applySelectAll(groups, row, filterPath);
+      applySelectAll(groups, row, filterPath, filterTarget, filterRegex);
     }
 
     // `n` — select none (respects active filter)
     if (key === "n" && row && row.type !== "section") {
-      applySelectNone(groups, row, filterPath);
+      applySelectNone(groups, row, filterPath, filterTarget, filterRegex);
     }
 
     redraw();

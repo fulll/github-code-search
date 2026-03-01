@@ -75,8 +75,28 @@ github-code-search "useFeatureFlag" --org fulll \
   --exclude-extracts billing-api:src/flags.ts:0
 ```
 
-## In-TUI filtering (file path filter)
+## In-TUI filtering
 
-In addition to pre-query exclusions, the [interactive mode](/usage/interactive-mode) offers a live **path filter** (press `f`) to narrow the displayed extracts by file path substring without permanently excluding anything.
+In addition to pre-query exclusions, the [interactive mode](/usage/interactive-mode) offers a live **filter bar** (press `f`) to narrow the displayed results without permanently excluding anything.
 
-Use the path filter for **exploration** (no side effects), and `--exclude-extracts` / `--exclude-repositories` for **reproducible** exclusions in replay commands.
+### Three filter targets
+
+Press `t` to cycle between matching modes:
+
+| Target    | Filters on                                                 | Unit visible/hidden |
+| --------- | ---------------------------------------------------------- | ------------------- |
+| `path`    | File path substring (default, case-insensitive)            | Individual file     |
+| `content` | Code fragment returned by GitHub Search (case-insensitive) | Individual file     |
+| `repo`    | Full repository name `org/repo` (case-insensitive)         | Entire repo         |
+
+With `repo` mode the matching portion of the repository name is highlighted in yellow in the result list.
+
+### Regex mode
+
+Press `Tab` inside the filter bar to enable regex matching. The badge updates to `[path·regex]` (or `[content·regex]`, etc.). Invalid expressions are silently ignored.
+
+### Filter vs. exclusions: when to use which
+
+Use the **TUI filter** for **exploration** — it has no side effects and can be reset instantly with `r`.
+
+Use `--exclude-repositories` / `--exclude-extracts` for **reproducible** exclusions that should be encoded in the replay command (e.g. for CI pipelines).
