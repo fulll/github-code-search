@@ -41,14 +41,12 @@ Down
 Sleep 300ms
 Down
 Sleep 300ms
-Down
-Sleep 300ms
 
 # ── Toggle selection off on current extract ───────────────────────────────────
 Space
 Sleep 400ms
 
-# ── Enter filter mode to exclude .ts files ────────────────────────────────────
+# ── Filter by file path (default target) ──────────────────────────────────────
 Type "f"
 Sleep 300ms
 Type ".yml"
@@ -64,7 +62,28 @@ Sleep 500ms
 Type "r"
 Sleep 600ms
 
-# ── Confirm and print output ──────────────────────────────────────────────────
+# ── Switch to repo filter mode and filter by repo name ────────────────────────
+# Press t twice: path → content → repo
+Type "t"
+Sleep 300ms
+Type "t"
+Sleep 400ms
+
+# Enter filter mode and type a repo name fragment
+Type "f"
+Sleep 300ms
+Type "toolkit"
+Sleep 700ms
+Enter
+Sleep 500ms
+
+# Select all repos matching the filter
+Type "a"
+Sleep 500ms
+
+# ── Reset and confirm ─────────────────────────────────────────────────────────
+Type "r"
+Sleep 600ms
 Enter
 
 Sleep 2s

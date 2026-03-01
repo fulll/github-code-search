@@ -21,8 +21,13 @@ bun install
 github-code-search.ts    # CLI entry point (Commander subcommands: query, upgrade)
 build.ts                 # Build script (compiles the standalone binary)
 src/
-  types.ts               # Shared TypeScript types
-  api.ts                 # GitHub REST API client
+  types.ts               # Shared TypeScript types (TextMatchSegment, CodeMatch, RepoGroup, Row, FilterTarget, …)
+  api.ts                 # GitHub REST API client (search, team listing)
+  api-utils.ts           # Shared retry (fetchWithRetry) and pagination (paginatedFetch) helpers
+  api-utils.test.ts      # Unit tests for api-utils.ts
+  api.test.ts            # Unit tests for api.ts
+  cache.ts               # Disk cache for the team list (24 h TTL)
+  cache.test.ts          # Unit tests for cache.ts
   aggregate.ts           # Result grouping and filtering logic
   aggregate.test.ts      # Unit tests for aggregate.ts
   render.ts              # Façade: re-exports sub-modules + TUI renderGroups/renderHelpOverlay
@@ -30,8 +35,10 @@ src/
   render/
     highlight.ts         # Syntax highlighting (language detection, token rules, highlightFragment)
     highlight.test.ts    # Unit tests for highlight.ts (per-language tokenizer coverage)
-    filter.ts            # Filter helpers (FilterStats, buildFilterStats)
-    rows.ts              # Row navigation (buildRows, rowTerminalLines, isCursorVisible)
+    filter.ts            # Filter stats (FilterStats, buildFilterStats)
+    filter-match.ts      # Pure pattern matchers (makeExtractMatcher, makeRepoMatcher)
+    filter-match.test.ts # Unit tests for filter-match.ts
+    rows.ts              # Row builder (buildRows, rowTerminalLines, isCursorVisible)
     summary.ts           # Stats labels (buildSummary, buildSummaryFull, buildSelectionSummary)
     selection.ts         # Selection mutations (applySelectAll, applySelectNone)
   output.ts              # Text (markdown) and JSON output formatters

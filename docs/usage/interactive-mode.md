@@ -41,7 +41,8 @@ github-code-search "useFeatureFlag" --org fulll
 | `Space`        | Select / deselect the current repo or extract                                                                                     |
 | `a`            | Select **all** — on a repo row: all repos and extracts; on an extract row: all extracts in that repo. Respects any active filter. |
 | `n`            | Select **none** — same context rules as `a`. Respects any active filter.                                                          |
-| `f`            | Open the **filter bar** — type a path substring to narrow visible files                                                           |
+| `f`            | Open the **filter bar** — type to narrow visible repos or files                                                                   |
+| `t`            | Cycle the **filter target**: `path` → `content` → `repo` → `path`                                                                 |
 | `r`            | **Reset** the active filter and show all repos / extracts                                                                         |
 | `h` / `?`      | Toggle the **help overlay**                                                                                                       |
 | `Enter`        | Confirm and print selected results (also closes the help overlay)                                                                 |
@@ -56,28 +57,45 @@ github-code-search "useFeatureFlag" --org fulll
 
 ## Filter mode
 
-Press `f` to enter filter mode. A prompt appears at the top of the results:
+Press `f` to enter filter mode. A two-line bar appears at the top of the results:
 
 ```text
-🔍 Filter: src/  ▌  Enter confirm · Esc cancel
+🔍 [path]  src/▌                            3 repos · 5 files
+          ←→ move  ·  ⌥←→ word  ·  ⌥⌫ del word  ·  Tab regex  ·  Shift+Tab target  ·  ↵ OK  ·  Esc cancel
 ```
 
-Type any path substring (case-insensitive). The view updates live as you type. Press:
+- **Line 1**: the filter input field with a text cursor (`▌`), plus live stats on the right (how many repos and files are currently visible).
+- **Line 2**: available shortcuts, indented to align with the input text.
 
-- **Enter** — confirm the filter
-- **Esc** — cancel without applying
+### Filter targets
 
-When a filter is active, the prompt is replaced by a stats line:
+Press `t` (outside filter mode) or `Shift+Tab` (inside filter mode) to cycle through three matching modes:
+
+| Badge       | Target    | What is matched                                     | Unit shown/hidden |
+| ----------- | --------- | --------------------------------------------------- | ----------------- |
+| `[path]`    | `path`    | File path — default, case-insensitive substring     | Individual file   |
+| `[content]` | `content` | Code fragment text returned by GitHub Search        | Individual file   |
+| `[repo]`    | `repo`    | Full repository name (`org/repo`), case-insensitive | Entire repo       |
+
+The matching part is highlighted in **yellow** in the result list so you can instantly see why a row is visible.
+
+### Regex mode
+
+Press `Tab` in filter mode to toggle regular-expression matching. The badge updates to `[path·regex]` (or `[content·regex]`, etc.) while regex is active. If the expression is invalid, it matches nothing (no results are shown until you correct the pattern).
+
+### Confirmed filter
+
+After pressing `Enter` the filter is locked and the bar shows a compact summary:
 
 ```text
-🔍 filter: src/  3 matches in 2 repos shown · 4 hidden in 1 repo  r to reset
+🔍 [repo]  billing  3 matches in 1 repo shown · 2 hidden in 2 repos  r to reset
 ```
-
-::: info
-`a` (select all) and `n` (select none) always operate only on the **currently visible** repos and extracts when a filter is active.
-:::
 
 Press `r` at any time to clear the filter and show all results again.
+
+::: info
+`a` (select all) and `n` (select none) always operate only on the **currently visible** repos and extracts when a filter is active. The filter target is taken into account: with `filterTarget=repo` only repos whose name matches are affected.
+:::
 
 ## Full workflow example
 

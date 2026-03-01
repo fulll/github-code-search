@@ -55,3 +55,11 @@ export interface TeamSection {
 export type OutputFormat = "markdown" | "json";
 
 export type OutputType = "repo-only" | "repo-and-matches";
+
+/**
+ * Which field the TUI filter bar matches against.
+ * - "path"    — file path of the extract (default)
+ * - "content" — code fragment text (`TextMatch.fragment`)
+ * - "repo"    — repository full name (`RepoGroup.repoFullName`)
+ */
+export type FilterTarget = "path" | "content" | "repo";

@@ -402,10 +402,43 @@ describe("isCursorVisible", () => {
     expect(isCursorVisible(rows, groups, 3, 0, 4)).toBe(false);
   });
 
+  it("returns false when cursor row h does not fit in remaining space", () => {
+    // Regression: isCursorVisible must mirror renderGroups break condition.
+    // viewportHeight=2, row 0 (repo h=1) consumes 1 line, cursor row 1
+    // (extract with fragment h=2) would need 1+2=3 > 2 → must NOT be visible.
+    // Before the fix this returned true, causing scroll to stop 1 step early
+    // which meant the last unfolded extract was never rendered.
+    const groups = [makeGroup("org/repo", ["a.ts"], false, true)];
+    const rows = buildRows(groups);
+    // rows: [repo(0), extract(0,0)]  extract has fragment → h=2
+    expect(isCursorVisible(rows, groups, 1, 0, 2)).toBe(false);
+    // but first row (repo) is always "visible" even as sole row
+    expect(isCursorVisible(rows, groups, 0, 0, 2)).toBe(true);
+  });
+
   it("returns true when cursor is exactly at the start of the viewport", () => {
     const groups = [makeGroup("org/repo", ["a.ts"], false, false)];
     const rows = buildRows(groups);
     expect(isCursorVisible(rows, groups, 0, 0, 10)).toBe(true);
+  });
+
+  it("returns false when scrollOffset is stale (greater than cursor after filter shrinks rows)", () => {
+    // Regression guard for Bug 2: in filter-mode edit handlers (Backspace, Del,
+    // word-delete, paste) tui.ts clamps `cursor` to the new rows length but does
+    // NOT clamp `scrollOffset`. When the filter reduces rows, cursor is clamped
+    // down but scrollOffset can remain larger than cursor, causing the cursor to
+    // appear "above the viewport" — isCursorVisible returns false and the while
+    // loop `while (scrollOffset < cursor ...)` never runs (already false), so the
+    // tui gets stuck showing an empty groups area.
+    //
+    // Scenario: 4 rows, user was at cursor=3, scrollOffset=2. Filter reduces rows
+    // to 2. Cursor clamped to 1. scrollOffset NOT clamped → still 2 > cursor=1.
+    const groups = [makeGroup("org/repo", ["a.ts", "b.ts", "c.ts"], false)];
+    const rows = buildRows(groups); // [repo, ext0, ext1, ext2]
+    // cursor=1 but scrollOffset=2: cursor is *above* the viewport window
+    expect(isCursorVisible(rows, groups, 1, 2, 10)).toBe(false);
+    // The fix: clamp scrollOffset = Math.min(scrollOffset, cursor) = Math.min(2,1) = 1
+    expect(isCursorVisible(rows, groups, 1, 1, 10)).toBe(true);
   });
 });
 
@@ -579,6 +612,27 @@ describe("renderGroups", () => {
     expect(stripped).toContain("org/repoA"); // repo name shown in sticky line
   });
 
+  it("does NOT show sticky repo header when cursor is on a repo row (even with scrollOffset > 0)", () => {
+    // Regression guard for Bug 1: getViewportHeight() in tui.ts used to subtract
+    // a sticky-header line whenever scrollOffset > 0, but renderGroups only shows
+    // the sticky header when the cursor is on an *extract* row whose repo header
+    // has scrolled above the viewport. When cursor is on a repo row, no sticky
+    // header is emitted and the subtracted line makes isCursorVisible() return
+    // false prematurely (the cursor appears invisible one step too early).
+    //
+    // rows: [repo(0), ext(0,0), repo(1), ext(1,0)]
+    // cursor=2 (repo1), scrollOffset=1 → repo(0) < scrollOffset, but cursor is on
+    // repo(1), not an extract → sticky header must NOT be shown.
+    const groups = [
+      makeGroup("org/repoA", ["a.ts"], false),
+      makeGroup("org/repoB", ["b.ts"], false),
+    ];
+    const rows = buildRows(groups);
+    const out = renderGroups(groups, 2, rows, 40, 1, "q", "org");
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).not.toContain("▲");
+  });
+
   it("stops rendering rows when viewport is filled (overflow break)", () => {
     // Extract rows with fragments have h=2; with termHeight=9 viewportHeight=2
     // row0(repo,h=1): fits. row1(ext,h=2): 1+2=3 > 2 AND usedLines=1>0 → break
@@ -749,6 +803,87 @@ describe("applySelectNone with filterPath", () => {
   });
 });
 
+// ─── applySelectAll / applySelectNone with filterTarget="repo" ───────────────
+
+describe("applySelectAll with filterTarget=repo", () => {
+  it("selects all groups whose repoFullName matches (repo row context)", () => {
+    const groups = [
+      makeGroup("org/alpha", ["a.ts"], false, false),
+      makeGroup("org/beta", ["b.ts"], false, false),
+    ];
+    // start unselected so we can verify what applySelectAll selects
+    groups[0].repoSelected = false;
+    groups[0].extractSelected = [false];
+    groups[1].repoSelected = false;
+    groups[1].extractSelected = [false];
+    const row: Row = { type: "repo", repoIndex: 0 };
+    applySelectAll(groups, row, "alpha", "repo");
+    expect(groups[0].repoSelected).toBe(true);
+    expect(groups[0].extractSelected[0]).toBe(true);
+    expect(groups[1].repoSelected).toBe(false); // "beta" unaffected
+    expect(groups[1].extractSelected[0]).toBe(false);
+  });
+
+  it("selects the current repo when its name matches (extract row context)", () => {
+    const groups = [
+      makeGroup("org/alpha", ["a.ts", "b.ts"], false, false),
+      makeGroup("org/beta", ["c.ts"], false, false),
+    ];
+    groups[0].repoSelected = false;
+    groups[0].extractSelected = [false, false];
+    groups[1].repoSelected = false;
+    groups[1].extractSelected = [false];
+    const row: Row = { type: "extract", repoIndex: 0, extractIndex: 0 };
+    applySelectAll(groups, row, "alpha", "repo");
+    expect(groups[0].repoSelected).toBe(true);
+    expect(groups[0].extractSelected[0]).toBe(true);
+    expect(groups[0].extractSelected[1]).toBe(true);
+    // repo 1 must be untouched (extract-row scope)
+    expect(groups[1].repoSelected).toBe(false);
+  });
+
+  it("does not select the current repo when its name does not match (extract row context)", () => {
+    const groups = [makeGroup("org/beta", ["b.ts"], false, false)];
+    groups[0].repoSelected = false;
+    groups[0].extractSelected = [false];
+    const row: Row = { type: "extract", repoIndex: 0, extractIndex: 0 };
+    applySelectAll(groups, row, "alpha", "repo");
+    expect(groups[0].repoSelected).toBe(false);
+    expect(groups[0].extractSelected[0]).toBe(false);
+  });
+});
+
+describe("applySelectNone with filterTarget=repo", () => {
+  it("deselects all groups whose repoFullName matches (repo row context)", () => {
+    const groups = [makeGroup("org/alpha", ["a.ts"]), makeGroup("org/beta", ["b.ts"])];
+    const row: Row = { type: "repo", repoIndex: 0 };
+    applySelectNone(groups, row, "alpha", "repo");
+    expect(groups[0].repoSelected).toBe(false);
+    expect(groups[0].extractSelected[0]).toBe(false);
+    expect(groups[1].repoSelected).toBe(true); // "beta" not matched — untouched
+    expect(groups[1].extractSelected[0]).toBe(true);
+  });
+
+  it("deselects the current repo when its name matches (extract row context)", () => {
+    const groups = [makeGroup("org/alpha", ["a.ts", "b.ts"]), makeGroup("org/beta", ["c.ts"])];
+    const row: Row = { type: "extract", repoIndex: 0, extractIndex: 0 };
+    applySelectNone(groups, row, "alpha", "repo");
+    expect(groups[0].repoSelected).toBe(false);
+    expect(groups[0].extractSelected[0]).toBe(false);
+    expect(groups[0].extractSelected[1]).toBe(false);
+    // repo 1 must be untouched (extract-row scope)
+    expect(groups[1].repoSelected).toBe(true);
+  });
+
+  it("does not deselect the current repo when its name does not match (extract row context)", () => {
+    const groups = [makeGroup("org/beta", ["b.ts"])];
+    const row: Row = { type: "extract", repoIndex: 0, extractIndex: 0 };
+    applySelectNone(groups, row, "alpha", "repo");
+    expect(groups[0].repoSelected).toBe(true); // unaffected — no match
+    expect(groups[0].extractSelected[0]).toBe(true);
+  });
+});
+
 // ─── renderHelpOverlay ────────────────────────────────────────────────────────
 
 describe("renderHelpOverlay", () => {
@@ -791,9 +926,9 @@ describe("renderGroups filter opts", () => {
       filterInput: "src",
     });
     const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
-    expect(stripped).toContain("Filter:");
-    expect(stripped).toContain("src");
-    expect(stripped).toContain("Enter confirm");
+    expect(stripped).toContain("src"); // typed text visible in input field
+    expect(stripped).toContain("↵ OK"); // line-2 hints
+    expect(stripped).toContain("Esc cancel"); // line-2 hints
   });
 
   it("live-filters rows by filterInput when filterMode=true", () => {
@@ -831,5 +966,195 @@ describe("renderGroups filter opts", () => {
     const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
     expect(stripped).not.toContain("filter:");
     expect(stripped).not.toContain("Filter:");
+  });
+
+  it("shows mode badge [content] when filterTarget=content", () => {
+    const groups = [makeGroup("org/repo", ["a.ts"], false, true)];
+    const rows = buildRows(groups, "code", "content");
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", {
+      filterPath: "code",
+      filterTarget: "content",
+    });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).toContain("[content]");
+  });
+
+  it("shows mode badge [repo] when filterTarget=repo", () => {
+    const groups = [makeGroup("org/service", ["a.ts"])];
+    const rows = buildRows(groups, "service", "repo");
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", {
+      filterPath: "service",
+      filterTarget: "repo",
+    });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).toContain("[repo]");
+  });
+
+  it("shows mode badge [path·regex] when filterTarget=path and filterRegex=true", () => {
+    const groups = [makeGroup("org/repo", ["src/a.ts"])];
+    const rows = buildRows(groups, "src", "path", true);
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", {
+      filterPath: "src",
+      filterTarget: "path",
+      filterRegex: true,
+    });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).toContain("[path");
+    expect(stripped).toContain("regex]");
+  });
+
+  it("always shows mode badge [path] when filterTarget=path and filterRegex=false", () => {
+    const groups = [makeGroup("org/repo", ["a.ts"])];
+    const rows = buildRows(groups, "a");
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", {
+      filterPath: "a",
+    });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).toContain("[path]");
+    expect(stripped).not.toContain("[content]");
+    expect(stripped).not.toContain("[repo]");
+  });
+
+  it("renders inline cursor (inverse block) in filter mode", () => {
+    const groups = [makeGroup("org/repo", ["a.ts"])];
+    const rows = buildRows(groups, "src");
+    // filterCursor=2 means caret is at position 2 in "src"
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", {
+      filterMode: true,
+      filterInput: "src",
+      filterCursor: 2,
+    });
+    // The character at cursor position should be wrapped in an inverse ANSI sequence (\x1b[7m)
+    expect(out).toMatch(/\x1b\[7m/);
+  });
+
+  it("shows '…' live stats placeholder while debounce pending (filterLiveStats=null, filterInput set)", () => {
+    const groups = [makeGroup("org/repo", ["a.ts"])];
+    const rows = buildRows(groups, "a");
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", {
+      filterMode: true,
+      filterInput: "a",
+      filterLiveStats: null,
+    });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).toContain("…");
+  });
+
+  it("shows live stats counts when filterLiveStats is provided", () => {
+    const groups = [makeGroup("org/repo", ["a.ts", "b.ts"], false)];
+    const rows = buildRows(groups, "a");
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", {
+      filterMode: true,
+      filterInput: "a",
+      filterLiveStats: {
+        visibleMatches: 1,
+        visibleRepos: 1,
+        hiddenMatches: 1,
+        hiddenRepos: 0,
+        visibleFiles: 1,
+      },
+    });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).toContain("1 repo · 1 file");
+  });
+});
+
+// ─── buildRows — filterTarget + filterRegex ───────────────────────────────────
+
+describe("buildRows (filterTarget + filterRegex)", () => {
+  it("filters by content when filterTarget=content", () => {
+    const groups = [makeGroup("org/repo", ["a.ts", "b.ts"], false, true)];
+    // makeGroup with withFragments=true generates fragment: "some code with <path>"
+    const rows = buildRows(groups, "a.ts", "content");
+    const paths = rows
+      .filter((r) => r.type === "extract")
+      .map((r) => groups[r.repoIndex].matches[r.extractIndex!].path);
+    expect(paths).toContain("a.ts");
+    expect(paths).not.toContain("b.ts");
+  });
+
+  it("filters by repo name when filterTarget=repo", () => {
+    const g1 = makeGroup("org/service-auth", ["a.ts"]);
+    const g2 = makeGroup("org/service-payments", ["b.ts"]);
+    g1.folded = false;
+    g2.folded = false;
+    const rows = buildRows([g1, g2], "auth", "repo");
+    const extractRows = rows.filter((r) => r.type === "extract");
+    const repoNames = extractRows.map((r) => [g1, g2][r.repoIndex].repoFullName);
+    expect(repoNames.some((n) => n.includes("auth"))).toBe(true);
+    expect(repoNames.some((n) => n.includes("payments"))).toBe(false);
+  });
+
+  it("uses regex when filterRegex=true", () => {
+    const groups = [makeGroup("org/repo", ["src/foo.ts", "lib/bar.ts"], false)];
+    const rows = buildRows(groups, "^src/", "path", true);
+    const paths = rows
+      .filter((r) => r.type === "extract")
+      .map((r) => groups[r.repoIndex].matches[r.extractIndex!].path);
+    expect(paths).toContain("src/foo.ts");
+    expect(paths).not.toContain("lib/bar.ts");
+  });
+
+  it("shows no extracts for invalid regex (no crash)", () => {
+    const groups = [makeGroup("org/repo", ["src/foo.ts"], false)];
+    const rows = buildRows(groups, "[broken", "path", true);
+    const extracts = rows.filter((r) => r.type === "extract");
+    expect(extracts.length).toBe(0);
+  });
+
+  it("toggling regex to invalid pattern collapses rows to 0 — cursor must be clamped (regression guard for Bug 3)", () => {
+    // Regression guard for Bug 3: the Tab key in tui.ts toggles filterRegex but
+    // did not rebuild rows or clamp cursor/scrollOffset afterward. When the new
+    // regex is invalid (or simply more restrictive), the row list shrinks. If
+    // cursor was pointing at a now-removed row, isCursorVisible returns false yet
+    // the scroll-adjust while-loop doesn't fire (cursor is already 0 or the
+    // condition `scrollOffset < cursor` is already false), leaving cursor
+    // pointing at an invalid index — renderGroups skips the cursor highlight.
+    //
+    // The fix: after `filterRegex = !filterRegex`, rebuild rows and clamp:
+    //   const newRows = buildRows(groups, filterInput, filterTarget, filterRegex);
+    //   cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
+    //   scrollOffset = Math.min(scrollOffset, cursor);
+    const groups = [makeGroup("org/repo", ["src/foo.ts", "src/bar.ts"], false)];
+    // Before toggle: regex=false, pattern="src" → 2 extract rows visible
+    const rowsBefore = buildRows(groups, "src", "path", false);
+    expect(rowsBefore.filter((r) => r.type === "extract")).toHaveLength(2);
+    let cursor = 2; // cursor on second extract
+    // After toggle to regex=true with an invalid pattern:
+    const rowsAfter = buildRows(groups, "[invalid", "path", true);
+    expect(rowsAfter).toHaveLength(0); // invalid regex → no matches, no rows
+    // isCursorVisible with stale cursor (still 2, rows=[]) must return false
+    expect(isCursorVisible(rowsAfter, groups, cursor, 0, 10)).toBe(false);
+    // The required clamp:
+    cursor = Math.min(cursor, Math.max(0, rowsAfter.length - 1));
+    expect(cursor).toBe(0);
+  });
+});
+
+// ─── buildFilterStats — filterTarget + filterRegex ───────────────────────────
+
+describe("buildFilterStats (filterTarget + filterRegex)", () => {
+  it("counts visible/hidden by content filter", () => {
+    const groups = [makeGroup("org/repo", ["a.ts", "b.ts"], false, true)];
+    const stats = buildFilterStats(groups, "a.ts", "content");
+    expect(stats.visibleMatches).toBe(1);
+    expect(stats.hiddenMatches).toBe(1);
+  });
+
+  it("counts by repo filter", () => {
+    const g1 = makeGroup("org/service-auth", ["a.ts"]);
+    const g2 = makeGroup("org/service-payments", ["b.ts"]);
+    g1.folded = false;
+    g2.folded = false;
+    const stats = buildFilterStats([g1, g2], "auth", "repo");
+    expect(stats.visibleRepos).toBe(1);
+    expect(stats.hiddenRepos).toBe(1);
+  });
+
+  it("counts with regex filter", () => {
+    const groups = [makeGroup("org/repo", ["src/foo.ts", "lib/bar.ts"], false)];
+    const stats = buildFilterStats(groups, "^src/", "path", true);
+    expect(stats.visibleMatches).toBe(1);
+    expect(stats.hiddenMatches).toBe(1);
   });
 });
