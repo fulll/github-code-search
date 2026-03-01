@@ -36,7 +36,7 @@ src/
     highlight.ts         # Syntax highlighting (language detection, token rules, highlightFragment)
     highlight.test.ts    # Unit tests for highlight.ts (per-language tokenizer coverage)
     filter.ts            # Filter stats (FilterStats, buildFilterStats)
-    filter-match.ts      # Pure pattern matchers (makePatternTest, makeExtractMatcher, makeRepoMatcher)
+    filter-match.ts      # Pure pattern matchers (makeExtractMatcher, makeRepoMatcher)
     filter-match.test.ts # Unit tests for filter-match.ts
     rows.ts              # Row builder (buildRows, rowTerminalLines, isCursorVisible)
     summary.ts           # Stats labels (buildSummary, buildSummaryFull, buildSelectionSummary)

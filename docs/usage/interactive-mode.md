@@ -60,8 +60,8 @@ github-code-search "useFeatureFlag" --org fulll
 Press `f` to enter filter mode. A two-line bar appears at the top of the results:
 
 ```text
-🔍  src/▌                                 3 repos · 5 files
-           ←→ move  ·  ⌥←→ word  ·  ⌥⌫ del word  ·  Tab regex  ·  ↵ OK  ·  Esc cancel
+🔍 [path]  src/▌                            3 repos · 5 files
+          ←→ move  ·  ⌥←→ word  ·  ⌥⌫ del word  ·  Tab regex  ·  Shift+Tab target  ·  ↵ OK  ·  Esc cancel
 ```
 
 - **Line 1**: the filter input field with a text cursor (`▌`), plus live stats on the right (how many repos and files are currently visible).
@@ -69,11 +69,11 @@ Press `f` to enter filter mode. A two-line bar appears at the top of the results
 
 ### Filter targets
 
-Press `t` (outside or inside filter mode) to cycle through three matching modes:
+Press `t` (outside filter mode) or `Shift+Tab` (inside filter mode) to cycle through three matching modes:
 
 | Badge       | Target    | What is matched                                     | Unit shown/hidden |
 | ----------- | --------- | --------------------------------------------------- | ----------------- |
-| _(none)_    | `path`    | File path — default, case-insensitive substring     | Individual file   |
+| `[path]`    | `path`    | File path — default, case-insensitive substring     | Individual file   |
 | `[content]` | `content` | Code fragment text returned by GitHub Search        | Individual file   |
 | `[repo]`    | `repo`    | Full repository name (`org/repo`), case-insensitive | Entire repo       |
 

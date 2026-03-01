@@ -963,14 +963,14 @@ describe("renderGroups filter opts", () => {
     expect(stripped).toContain("regex]");
   });
 
-  it("does not show mode badge when filterTarget=path and filterRegex=false", () => {
+  it("always shows mode badge [path] when filterTarget=path and filterRegex=false", () => {
     const groups = [makeGroup("org/repo", ["a.ts"])];
     const rows = buildRows(groups, "a");
     const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", {
       filterPath: "a",
     });
     const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
-    expect(stripped).not.toContain("[path]");
+    expect(stripped).toContain("[path]");
     expect(stripped).not.toContain("[content]");
     expect(stripped).not.toContain("[repo]");
   });

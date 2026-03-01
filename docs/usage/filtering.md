@@ -81,7 +81,7 @@ In addition to pre-query exclusions, the [interactive mode](/usage/interactive-m
 
 ### Three filter targets
 
-Press `t` to cycle between matching modes:
+Press `t` (outside filter mode) or `Shift+Tab` (inside filter mode) to cycle between matching modes:
 
 | Target    | Filters on                                                 | Unit visible/hidden |
 | --------- | ---------------------------------------------------------- | ------------------- |

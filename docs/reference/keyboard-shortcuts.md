@@ -23,11 +23,11 @@ Section header rows (shown when `--group-by-team-prefix` is active) are skipped 
 
 ## Filtering
 
-| Key | Action                                                                                                   |
-| --- | -------------------------------------------------------------------------------------------------------- |
-| `f` | Open the filter bar and enter filter mode                                                                |
-| `t` | Cycle the **filter target**: `path` → `content` → `repo` → `path`. Works outside and inside filter mode. |
-| `r` | Reset the active filter and return to showing all repos / extracts                                       |
+| Key | Action                                                                                                 |
+| --- | ------------------------------------------------------------------------------------------------------ |
+| `f` | Open the filter bar and enter filter mode                                                              |
+| `t` | Cycle the **filter target**: `path` → `content` → `repo` → `path`. Only works **outside** filter mode. |
+| `r` | Reset the active filter and return to showing all repos / extracts                                     |
 
 ### Filter targets
 
@@ -37,22 +37,23 @@ Section header rows (shown when `--group-by-team-prefix` is active) are skipped 
 | `content` | Code fragment text (the snippet returned by GitHub Search). Case-insensitive. | Individual extracts    |
 | `repo`    | Repository full name (`org/repo`). Case-insensitive.                          | Entire repo + extracts |
 
-The active target is always shown in the filter bar badge, e.g. `[content]` or `[repo]`.
+The active target is always shown in the filter bar badge: `[path]`, `[content]`, or `[repo]` (with `·regex` appended when regex mode is on).
 
 ### Filter mode bindings
 
 When the filter bar is open (after pressing `f`):
 
-| Key                                     | Action                                                  |
-| --------------------------------------- | ------------------------------------------------------- |
-| Printable characters / paste            | Insert character(s) at the cursor position              |
-| `←` / `→`                               | Move the text cursor one character left / right         |
-| `⌥←` / `⌥→` (macOS) · `Alt+←` / `Alt+→` | Jump one word left / right                              |
-| `Backspace`                             | Delete the character before the cursor                  |
-| `⌥⌫` (macOS) · `Ctrl+W`                 | Delete the word before the cursor                       |
-| `Tab`                                   | Toggle **regex** mode (badge shows `[…·regex]` when on) |
-| `Enter`                                 | Confirm the filter and apply it                         |
-| `Esc`                                   | Cancel without applying the filter                      |
+| Key                                     | Action                                                             |
+| --------------------------------------- | ------------------------------------------------------------------ |
+| Printable characters / paste            | Insert character(s) at the cursor position                         |
+| `←` / `→`                               | Move the text cursor one character left / right                    |
+| `⌥←` / `⌥→` (macOS) · `Alt+←` / `Alt+→` | Jump one word left / right                                         |
+| `Backspace`                             | Delete the character before the cursor                             |
+| `⌥⌫` (macOS) · `Ctrl+W`                 | Delete the word before the cursor                                  |
+| `Tab`                                   | Toggle **regex** mode (badge shows `[…·regex]` when on)            |
+| `Shift+Tab`                             | Cycle the **filter target** (`path` → `content` → `repo` → `path`) |
+| `Enter`                                 | Confirm the filter and apply it                                    |
+| `Esc`                                   | Cancel without applying the filter                                 |
 
 ::: tip
 Invalid regex patterns do not crash the TUI but are treated as matching nothing (zero visible rows). The badge is always yellow when regex mode is active, regardless of whether the pattern is valid.

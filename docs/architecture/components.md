@@ -62,7 +62,7 @@ C4Component
     Component(selection, "Selection helpers", "src/render/selection.ts", "applySelectAll()<br/>applySelectNone()")
     Component(highlight, "Syntax highlighter", "src/render/highlight.ts", "highlightFragment()<br/>ANSI token colouring")
     Component(outputFn, "Output formatter", "src/output.ts", "buildOutput()<br/>markdown or JSON")
-    Component(filterMatch, "Pattern matchers", "src/render/filter-match.ts", "makePatternTest()<br/>makeExtractMatcher()<br/>makeRepoMatcher()")
+    Component(filterMatch, "Pattern matchers", "src/render/filter-match.ts", "makeExtractMatcher()<br/>makeRepoMatcher()")
   }
 
   Rel(tui, rows, "Build terminal<br/>rows")
@@ -104,17 +104,17 @@ C4Component
 
 ## Component descriptions
 
-| Component                | Source file                  | Key exports                                                                                                                                                                                              |
-| ------------------------ | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Filter & aggregation** | `src/aggregate.ts`           | `aggregate()` — filters `CodeMatch[]` by repository and extract exclusion lists; normalises both `repoName` and `org/repoName` forms.                                                                    |
-| **Team grouping**        | `src/group.ts`               | `groupByTeamPrefix()` — groups `RepoGroup[]` into `TeamSection[]` keyed by team slug; `flattenTeamSections()` — converts back to a flat list for the TUI row builder.                                    |
-| **Row builder**          | `src/render/rows.ts`         | `buildRows()` — converts `RepoGroup[]` into `Row[]` filtered by the active target (path / content / repo); `rowTerminalLines()` — measures wrapped height; `isCursorVisible()` — viewport clipping.      |
-| **Summary builder**      | `src/render/summary.ts`      | `buildSummary()` — compact header line; `buildSummaryFull()` — detailed counts; `buildSelectionSummary()` — "N files selected" footer.                                                                   |
-| **Filter stats**         | `src/render/filter.ts`       | `buildFilterStats()` — produces the `FilterStats` object (visible repos, files, matches) used by the TUI filter bar live counter.                                                                        |
-| **Pattern matchers**     | `src/render/filter-match.ts` | `makePatternTest()` — builds a case-insensitive substring or RegExp test function; `makeExtractMatcher()` — wraps it for path or content targets; `makeRepoMatcher()` — wraps it for repo-name matching. |
-| **Selection helpers**    | `src/render/selection.ts`    | `applySelectAll()` — marks all visible rows as selected (respects filter target); `applySelectNone()` — deselects all visible rows.                                                                      |
-| **Syntax highlighter**   | `src/render/highlight.ts`    | `highlightFragment()` — maps file extension to a language token ruleset and applies ANSI escape sequences. Falls back to plain text for unknown extensions.                                              |
-| **Output formatter**     | `src/output.ts`              | `buildOutput()` — entry point for both `--format markdown` and `--format json` serialisation of the confirmed selection.                                                                                 |
+| Component                | Source file                  | Key exports                                                                                                                                                                                         |
+| ------------------------ | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Filter & aggregation** | `src/aggregate.ts`           | `aggregate()` — filters `CodeMatch[]` by repository and extract exclusion lists; normalises both `repoName` and `org/repoName` forms.                                                               |
+| **Team grouping**        | `src/group.ts`               | `groupByTeamPrefix()` — groups `RepoGroup[]` into `TeamSection[]` keyed by team slug; `flattenTeamSections()` — converts back to a flat list for the TUI row builder.                               |
+| **Row builder**          | `src/render/rows.ts`         | `buildRows()` — converts `RepoGroup[]` into `Row[]` filtered by the active target (path / content / repo); `rowTerminalLines()` — measures wrapped height; `isCursorVisible()` — viewport clipping. |
+| **Summary builder**      | `src/render/summary.ts`      | `buildSummary()` — compact header line; `buildSummaryFull()` — detailed counts; `buildSelectionSummary()` — "N files selected" footer.                                                              |
+| **Filter stats**         | `src/render/filter.ts`       | `buildFilterStats()` — produces the `FilterStats` object (visible repos, files, matches) used by the TUI filter bar live counter.                                                                   |
+| **Pattern matchers**     | `src/render/filter-match.ts` | `makeExtractMatcher()` — builds a case-insensitive substring or RegExp test function for path or content targets; `makeRepoMatcher()` — wraps the same logic for repo-name matching.                |
+| **Selection helpers**    | `src/render/selection.ts`    | `applySelectAll()` — marks all visible rows as selected (respects filter target); `applySelectNone()` — deselects all visible rows.                                                                 |
+| **Syntax highlighter**   | `src/render/highlight.ts`    | `highlightFragment()` — maps file extension to a language token ruleset and applies ANSI escape sequences. Falls back to plain text for unknown extensions.                                         |
+| **Output formatter**     | `src/output.ts`              | `buildOutput()` — entry point for both `--format markdown` and `--format json` serialisation of the confirmed selection.                                                                            |
 
 ## Design principles
 

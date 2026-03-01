@@ -42,7 +42,7 @@ export function renderHelpOverlay(): string {
     bar,
     `  ${pc.dim("Filter mode:")}`,
     `    type to filter  ·  ${pc.yellow("←→")} cursor  ·  ${pc.yellow(`${optStr}←→`)} word jump  ·  ${pc.yellow(optBs)} del word`,
-    `    ${pc.yellow("Tab")} toggle regex  ·  ${pc.yellow("↵")} confirm  ·  ${pc.yellow("Esc")} cancel`,
+    `    ${pc.yellow("Tab")} regex  ·  ${pc.yellow("Shift+Tab")} target  ·  ${pc.yellow("↵")} confirm  ·  ${pc.yellow("Esc")} cancel`,
     bar,
     pc.dim(`  press ${pc.yellow("h")} or ${pc.yellow("?")} to close`),
   ];
@@ -192,13 +192,9 @@ export function renderGroups(
   const optStr = IS_MAC ? "⌥" : "Alt+";
   const optBs = IS_MAC ? "⌥⌫" : "Ctrl+W";
 
-  // Mode badge: [content], [repo], [path·regex] — hidden for default plain path
-  const targetBadge =
-    filterTarget !== "path" || filterRegex
-      ? ` ${pc.dim("[")}${pc.yellow(filterTarget)}${
-          filterRegex ? pc.dim("·") + pc.yellow("regex") : ""
-        }${pc.dim("]")} `
-      : " ";
+  // Mode badge: always shown so the active target is always explicit — [path], [content], [repo],
+  // [path·regex], [content·regex], [repo·regex].
+  const targetBadge = ` ${pc.dim("[")}${pc.yellow(filterTarget)}${filterRegex ? pc.dim("·") + pc.yellow("regex") : ""}${pc.dim("]")} `;
 
   let filterBarLines = 0;
   if (filterMode) {
@@ -253,6 +249,7 @@ export function renderGroups(
       `${pc.yellow(`${optStr}←→`)} word`,
       `${pc.yellow(optBs)} del word`,
       `${pc.yellow("Tab")} regex${filterRegex ? pc.green(" ✓") : ""}`,
+      `${pc.yellow("Shift+Tab")} target`,
       `${pc.yellow("↵")} OK`,
       `${pc.yellow("Esc")} cancel`,
     ].join("  ·  ");

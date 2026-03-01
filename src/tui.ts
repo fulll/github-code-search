@@ -35,6 +35,7 @@ const KEY_CTRL_ARROW_RIGHT = "\x1b[1;5C";
 const KEY_ALT_B = "\x1bb";
 const KEY_ALT_F = "\x1bf";
 const KEY_DELETE = "\x1b[3~";
+const KEY_SHIFT_TAB = "\x1b[Z"; // Shift+Tab — cycle filter target in filter mode
 
 // ─── Word-boundary helpers ────────────────────────────────────────────────────
 
@@ -204,6 +205,15 @@ export async function runInteractive(
         filterInput = filterInput.slice(0, filterCursor) + filterInput.slice(filterCursor + 1);
         const newRows = buildRows(groups, filterInput, filterTarget, filterRegex);
         cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
+        scheduleStatsUpdate();
+      } else if (key === KEY_SHIFT_TAB) {
+        // Shift+Tab — cycle filter target (path → content → repo → path)
+        // Uses Shift+Tab instead of 't' so the letter t can still be typed in the filter.
+        filterTarget =
+          filterTarget === "path" ? "content" : filterTarget === "content" ? "repo" : "path";
+        const newRows = buildRows(groups, filterInput, filterTarget, filterRegex);
+        cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
+        scrollOffset = Math.min(scrollOffset, cursor);
         scheduleStatsUpdate();
       } else if (!key.startsWith("\x1b")) {
         // Printable character(s) — insert at cursor.
