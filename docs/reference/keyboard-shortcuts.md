@@ -1,6 +1,6 @@
 # Keyboard shortcuts
 
-All shortcuts are active in the interactive TUI. Keys are **case-sensitive** and must be typed in lowercase.
+All shortcuts are active in the interactive TUI. Keys are **case-sensitive** — most use lowercase letters, but a few bindings (such as `Z` and `G`) require an uppercase letter.
 
 ## Navigation
 
