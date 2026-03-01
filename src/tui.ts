@@ -182,10 +182,11 @@ export async function runInteractive(
   for await (const chunk of process.stdin) {
     const key = chunk.toString();
 
-    // Reset the gg pending state on every key that isn’t g itself.
-    // This lets `gg` work as two consecutive g presses without interfering
-    // with any other shortcut.
-    if (key !== "g") pendingFirstG = false;
+    // Reset the gg pending state on every key that isn't a sequence of one
+    // or more plain "g" characters. This allows terminals that batch key
+    // repeats (e.g. delivering "gg" in a single chunk) to still participate
+    // in the gg shortcut without interfering with any other shortcut.
+    if (!/^g+$/.test(key)) pendingFirstG = false;
 
     // ── Filter input mode ────────────────────────────────────────────────────
     if (filterMode) {
@@ -452,10 +453,12 @@ export async function runInteractive(
       }
     }
 
-    // `g` — first g of gg sequence (jump to top on second g)
-    if (key === "g") {
-      if (pendingFirstG) {
-        // Second consecutive g — jump to the first non-section row
+    // `gg` — jump to top (first non-section row).
+    // Handles both two consecutive single-g chunks and a single "gg" chunk
+    // (terminals that batch repeated keypresses into one read() call).
+    if (/^g+$/.test(key)) {
+      if (pendingFirstG || key.length >= 2) {
+        // Second g (or a multi-g chunk) — jump to the first non-section row
         cursor = 0;
         while (cursor < rows.length - 1 && rows[cursor]?.type === "section") cursor++;
         scrollOffset = 0;
@@ -469,6 +472,11 @@ export async function runInteractive(
 
     // `G` — jump to last row (bottom)
     if (key === "G") {
+      if (rows.length === 0) {
+        // No rows to jump to; avoid putting cursor into an invalid state
+        pendingFirstG = false;
+        continue;
+      }
       cursor = rows.length - 1;
       while (cursor > 0 && rows[cursor]?.type === "section") cursor--;
       while (
@@ -484,6 +492,11 @@ export async function runInteractive(
       const pageSize = Math.max(1, getViewportHeight());
       cursor = Math.max(0, cursor - pageSize);
       while (cursor > 0 && rows[cursor]?.type === "section") cursor--;
+      // If we've paged up to the top and the first row is a section,
+      // advance to the first non-section row (mirror `gg` behavior).
+      if (cursor === 0 && rows[0]?.type === "section") {
+        while (cursor < rows.length - 1 && rows[cursor]?.type === "section") cursor++;
+      }
       if (cursor < scrollOffset) scrollOffset = cursor;
     }
 
