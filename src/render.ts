@@ -41,7 +41,7 @@ export function renderHelpOverlay(): string {
     `  ${pc.yellow("h")} / ${pc.yellow("?")}       toggle this help       ${pc.yellow("q")} / Ctrl+C  quit`,
     bar,
     `  ${pc.dim("Filter mode:")}`,
-    `    type to filter  ·  ${pc.yellow("←→")} cursor  ·  ${pc.yellow(`${optStr}←→`)} word jump  ·  ${pc.yellow(optBs)} del word`,
+    `    type to filter  ·  ${pc.yellow("←→")} cursor  ·  ${pc.yellow(`${optStr}←→ / Ctrl+←→`)} word jump  ·  ${pc.yellow(optBs)} del word`,
     `    ${pc.yellow("Tab")} regex  ·  ${pc.yellow("Shift+Tab")} target  ·  ${pc.yellow("↵")} confirm  ·  ${pc.yellow("Esc")} cancel`,
     bar,
     pc.dim(`  press ${pc.yellow("h")} or ${pc.yellow("?")} to close`),
@@ -357,7 +357,9 @@ export function renderGroups(
       const seg = match.textMatches[0]?.matches[0];
       const locSuffix = seg ? `:${seg.line}:${seg.col}` : "";
       const filePath = isCursor
-        ? pc.bgMagenta(pc.bold(pc.white(` ${match.path}${locSuffix} `)))
+        ? pc.bgMagenta(
+            ` ${highlightText(match.path, "path", (s) => pc.bold(pc.white(s)))}${pc.dim(locSuffix)} `,
+          )
         : `${highlightText(match.path, "path", pc.cyan)}${pc.dim(locSuffix)}`;
       lines.push(`${INDENT}${INDENT}${checkbox} ${filePath}`);
 

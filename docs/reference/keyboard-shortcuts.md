@@ -43,17 +43,17 @@ The active target is always shown in the filter bar badge: `[path]`, `[content]`
 
 When the filter bar is open (after pressing `f`):
 
-| Key                                     | Action                                                             |
-| --------------------------------------- | ------------------------------------------------------------------ |
-| Printable characters / paste            | Insert character(s) at the cursor position                         |
-| `←` / `→`                               | Move the text cursor one character left / right                    |
-| `⌥←` / `⌥→` (macOS) · `Alt+←` / `Alt+→` | Jump one word left / right                                         |
-| `Backspace`                             | Delete the character before the cursor                             |
-| `⌥⌫` (macOS) · `Ctrl+W`                 | Delete the word before the cursor                                  |
-| `Tab`                                   | Toggle **regex** mode (badge shows `[…·regex]` when on)            |
-| `Shift+Tab`                             | Cycle the **filter target** (`path` → `content` → `repo` → `path`) |
-| `Enter`                                 | Confirm the filter and apply it                                    |
-| `Esc`                                   | Cancel without applying the filter                                 |
+| Key                                                           | Action                                                             |
+| ------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Printable characters / paste                                  | Insert character(s) at the cursor position                         |
+| `←` / `→`                                                     | Move the text cursor one character left / right                    |
+| `⌥←` / `⌥→` (macOS) · `Ctrl+←` / `Ctrl+→` · `Alt+b` / `Alt+f` | Jump one word left / right                                         |
+| `Backspace`                                                   | Delete the character before the cursor                             |
+| `⌥⌫` (macOS) · `Ctrl+W`                                       | Delete the word before the cursor                                  |
+| `Tab`                                                         | Toggle **regex** mode (badge shows `[…·regex]` when on)            |
+| `Shift+Tab`                                                   | Cycle the **filter target** (`path` → `content` → `repo` → `path`) |
+| `Enter`                                                       | Confirm the filter and apply it                                    |
+| `Esc`                                                         | Cancel without applying the filter                                 |
 
 ::: tip
 Invalid regex patterns do not crash the TUI but are treated as matching nothing (zero visible rows). The badge is always yellow when regex mode is active, regardless of whether the pattern is valid.

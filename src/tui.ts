@@ -32,6 +32,8 @@ const KEY_CTRL_W = "\x17";
 const KEY_ALT_BACKSPACE = "\x1b\x7f";
 const KEY_CTRL_ARROW_LEFT = "\x1b[1;5D";
 const KEY_CTRL_ARROW_RIGHT = "\x1b[1;5C";
+const KEY_ALT_ARROW_LEFT = "\x1b[1;3D"; // Alt/Option+← (xterm, iTerm2 with Use Option as Meta key)
+const KEY_ALT_ARROW_RIGHT = "\x1b[1;3C"; // Alt/Option+→
 const KEY_ALT_B = "\x1bb";
 const KEY_ALT_F = "\x1bf";
 const KEY_DELETE = "\x1b[3~";
@@ -84,9 +86,15 @@ export async function runInteractive(
   let cursor = 0;
   let scrollOffset = 0;
   const termHeight = process.stdout.rows ?? 40;
-  // HEADER_LINES (4: title + summary + hints + blank) + position indicator (2: blank + line)
-  // must equal the constant subtracted in renderGroups: termHeight - HEADER_LINES - 2.
-  const viewportHeight = termHeight - 6;
+  // HEADER_LINES (4) + position indicator (2) = 6 fixed lines consumed by renderGroups.
+  // filterBarLines (0–2) and the sticky repo line (0–1) are added dynamically below.
+  // Use getViewportHeight() for scroll decisions so they match what renderGroups actually renders.
+  const getViewportHeight = () => {
+    let barLines = 0;
+    if (filterMode) barLines = 2;
+    else if (filterPath || filterTarget !== "path" || filterRegex) barLines = 1;
+    return termHeight - 6 - barLines;
+  };
 
   // ─── Filter + help state ─────────────────────────────────────────────────
   let filterPath = "";
@@ -179,11 +187,11 @@ export async function runInteractive(
       } else if (key === KEY_END || key === KEY_CTRL_E) {
         // End / Ctrl+E — jump to end
         filterCursor = filterInput.length;
-      } else if (key === KEY_CTRL_ARROW_LEFT || key === KEY_ALT_B) {
-        // Ctrl+← / Alt+b — word left
+      } else if (key === KEY_CTRL_ARROW_LEFT || key === KEY_ALT_ARROW_LEFT || key === KEY_ALT_B) {
+        // Ctrl+← / Alt+← / Alt+b — word left
         filterCursor = prevWordBoundary(filterInput, filterCursor);
-      } else if (key === KEY_CTRL_ARROW_RIGHT || key === KEY_ALT_F) {
-        // Ctrl+→ / Alt+f — word right
+      } else if (key === KEY_CTRL_ARROW_RIGHT || key === KEY_ALT_ARROW_RIGHT || key === KEY_ALT_F) {
+        // Ctrl+→ / Alt+→ / Alt+f — word right
         filterCursor = nextWordBoundary(filterInput, filterCursor);
       } else if (key === KEY_CTRL_W || key === KEY_ALT_BACKSPACE) {
         // Ctrl+W / Alt+Backspace — delete word before cursor
@@ -342,7 +350,7 @@ export async function runInteractive(
       cursor = next;
       while (
         scrollOffset < cursor &&
-        !isCursorVisible(rows, groups, cursor, scrollOffset, viewportHeight)
+        !isCursorVisible(rows, groups, cursor, scrollOffset, getViewportHeight())
       ) {
         scrollOffset++;
       }

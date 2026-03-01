@@ -94,9 +94,9 @@ C4Component
 
   UpdateElementStyle(tui, $bgColor="#FFCC33", $borderColor="#0000CC", $fontColor="#000000")
   UpdateElementStyle(rows, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
+  UpdateElementStyle(filterMatch, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
   UpdateElementStyle(summary, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
   UpdateElementStyle(filter, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
-  UpdateElementStyle(filterMatch, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
   UpdateElementStyle(selection, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
   UpdateElementStyle(highlight, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
   UpdateElementStyle(outputFn, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
