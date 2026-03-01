@@ -62,6 +62,35 @@ function nextWordBoundary(s: string, pos: number): number {
   return i;
 }
 
+// ─── Browser helper ──────────────────────────────────────────────────────────
+
+/**
+ * Open a URL in the system default browser.
+ * macOS: `open`, Linux: `xdg-open`, Windows: `cmd /c start "" <url>`.
+ * Fire-and-forget with all stdio set to null so the TUI remains fully responsive.
+ */
+function openInBrowser(url: string): void {
+  let command: string;
+  let args: string[];
+
+  if (process.platform === "darwin") {
+    command = "open";
+    args = [url];
+  } else if (process.platform === "win32") {
+    // `start` is a cmd.exe built-in, not a standalone executable.
+    // The empty string is the mandatory window-title argument; without it,
+    // `start` mis-parses the URL as the title and may fail to open it.
+    command = "cmd";
+    args = ["/c", "start", "", url];
+  } else {
+    command = "xdg-open";
+    args = [url];
+  }
+
+  // Fire-and-forget: do not await, and set all stdio to null so the TUI stays responsive.
+  Bun.spawn([command, ...args], { stdout: null, stderr: null, stdin: null });
+}
+
 // ─── Interactive TUI ─────────────────────────────────────────────────────────
 
 export async function runInteractive(
@@ -433,6 +462,19 @@ export async function runInteractive(
     // `n` — select none (respects active filter)
     if (key === "n" && row && row.type !== "section") {
       applySelectNone(groups, row, filterPath, filterTarget, filterRegex);
+    }
+
+    // `o` — open focused result (or repo) in the default browser
+    if (key === "o" && row && row.type !== "section") {
+      let url: string;
+      if (row.type === "repo") {
+        // Open the repository page on GitHub
+        url = `https://github.com/${groups[row.repoIndex].repoFullName}`;
+      } else {
+        // Open the specific file at the matching line
+        url = groups[row.repoIndex].matches[row.extractIndex!].htmlUrl;
+      }
+      openInBrowser(url);
     }
 
     redraw();

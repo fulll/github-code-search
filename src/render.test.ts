@@ -909,6 +909,12 @@ describe("renderHelpOverlay", () => {
     expect(stripped).toContain("fold / unfold all repos");
   });
 
+  it("documents the o open-in-browser shortcut", () => {
+    const out = renderHelpOverlay();
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).toContain("open in browser");
+  });
+
   it("is returned by renderGroups when showHelp=true", () => {
     const groups = [makeGroup("org/repo", ["a.ts"])];
     const rows = buildRows(groups);
@@ -975,12 +981,13 @@ describe("renderGroups filter opts", () => {
     expect(stripped).not.toContain("Filter:");
   });
 
-  it("status bar hint line includes Z fold-all shortcut", () => {
+  it("status bar hint line includes Z fold-all and o open shortcuts", () => {
     const groups = [makeGroup("org/repo", ["a.ts"])];
     const rows = buildRows(groups);
     const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", {});
     const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
     expect(stripped).toContain("Z fold-all");
+    expect(stripped).toContain("o open");
   });
 
   it("shows mode badge [content] when filterTarget=content", () => {
