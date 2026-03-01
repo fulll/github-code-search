@@ -4,13 +4,17 @@ All shortcuts are active in the interactive TUI. Keys are **case-sensitive** —
 
 ## Navigation
 
-| Key       | Action                                                                                     |
-| --------- | ------------------------------------------------------------------------------------------ |
-| `↑` / `k` | Move cursor up (repos and extracts)                                                        |
-| `↓` / `j` | Move cursor down (repos and extracts)                                                      |
-| `←`       | Fold the repo under the cursor                                                             |
-| `→`       | Unfold the repo under the cursor                                                           |
-| `Z`       | **Global fold / unfold** — fold all repos if any is unfolded; unfold all if all are folded |
+| Key                    | Action                                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------------------ |
+| `↑` / `k`              | Move cursor up (repos and extracts)                                                        |
+| `↓` / `j`              | Move cursor down (repos and extracts)                                                      |
+| `←`                    | Fold the repo under the cursor                                                             |
+| `→`                    | Unfold the repo under the cursor                                                           |
+| `Z`                    | **Global fold / unfold** — fold all repos if any is unfolded; unfold all if all are folded |
+| `gg`                   | Jump to the **top** (first result)                                                         |
+| `G`                    | Jump to the **bottom** (last result)                                                       |
+| `Page Up` / `Ctrl+U`   | Scroll up one full page                                                                    |
+| `Page Down` / `Ctrl+D` | Scroll down one full page                                                                  |
 
 Section header rows (shown when `--group-by-team-prefix` is active) are skipped automatically during navigation.
 

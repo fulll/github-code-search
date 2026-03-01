@@ -915,6 +915,24 @@ describe("renderHelpOverlay", () => {
     expect(stripped).toContain("open in browser");
   });
 
+  it("documents gg/G fast navigation shortcuts", () => {
+    const out = renderHelpOverlay();
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).toContain("gg");
+    expect(stripped).toContain("jump to top");
+    expect(stripped).toContain("G");
+    expect(stripped).toContain("jump to bottom");
+  });
+
+  it("documents Page Up/Down fast navigation shortcuts", () => {
+    const out = renderHelpOverlay();
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).toContain("PgUp");
+    expect(stripped).toContain("PgDn");
+    expect(stripped).toContain("page up");
+    expect(stripped).toContain("page down");
+  });
+
   it("is returned by renderGroups when showHelp=true", () => {
     const groups = [makeGroup("org/repo", ["a.ts"])];
     const rows = buildRows(groups);
@@ -981,13 +999,15 @@ describe("renderGroups filter opts", () => {
     expect(stripped).not.toContain("Filter:");
   });
 
-  it("status bar hint line includes Z fold-all and o open shortcuts", () => {
+  it("status bar hint line includes all navigation hint shortcuts", () => {
     const groups = [makeGroup("org/repo", ["a.ts"])];
     const rows = buildRows(groups);
     const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", {});
     const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
     expect(stripped).toContain("Z fold-all");
     expect(stripped).toContain("o open");
+    expect(stripped).toContain("gg/G top/bot");
+    expect(stripped).toContain("PgUp/Dn page");
   });
 
   it("shows mode badge [content] when filterTarget=content", () => {
