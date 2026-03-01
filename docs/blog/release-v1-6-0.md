@@ -45,10 +45,10 @@ Page size is computed from the actual terminal height, so the jump covers exactl
 
 Press **`o`** on any focused row to open the corresponding page directly in your default browser — no copy-paste required.
 
-| Row type    | Opens                             |
-| ----------- | --------------------------------- |
-| Repo row    | The GitHub repository page        |
-| Extract row | The exact file in the repository  |
+| Row type    | Opens                            |
+| ----------- | -------------------------------- |
+| Repo row    | The GitHub repository page       |
+| Extract row | The exact file in the repository |
 
 Works on macOS (`open`), Linux (`xdg-open`), and Windows (`cmd /c start`).
 
