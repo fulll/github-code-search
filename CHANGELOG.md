@@ -4,8 +4,9 @@ Release notes and changelogs are published on the **[project blog](https://fulll
 
 Each release entry covers the motivation, new features, breaking changes (if any), and upgrade notes.
 
-| Version                                                                  | Blog post                                                  |
-| ------------------------------------------------------------------------ | ---------------------------------------------------------- |
+| Version                                                                  | Blog post                                                                              |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| [v1.6.0](https://fulll.github.io/github-code-search/blog/release-v1-6-0) | Power navigation: global fold/unfold, gg/G top/bottom, paged scroll, open-in-browser  |
 | [v1.5.0](https://fulll.github.io/github-code-search/blog/release-v1-5-0) | Advanced filter targets, regex mode, word-jump, scroll fix |
 | [v1.4.0](https://fulll.github.io/github-code-search/blog/release-v1-4-0) | TUI visual overhaul, community files, demo animation       |
 | [v1.3.0](https://fulll.github.io/github-code-search/blog/release-v1-3-0) | Team-prefix grouping, replay command, JSON output          |
