@@ -389,6 +389,20 @@ export async function runInteractive(
       }
     }
 
+    // `Z` — global fold / unfold: fold all if any repo is unfolded, else unfold all
+    if (key === "Z") {
+      const anyUnfolded = groups.some((g) => !g.folded);
+      for (const g of groups) {
+        g.folded = anyUnfolded;
+      }
+      // Adjust scroll so cursor stays visible after bulk fold
+      if (anyUnfolded) {
+        const newRows = buildRows(groups, filterPath, filterTarget, filterRegex);
+        cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
+        scrollOffset = Math.min(scrollOffset, cursor);
+      }
+    }
+
     if (key === " " && row && row.type !== "section") {
       if (row.type === "repo") {
         const group = groups[row.repoIndex];

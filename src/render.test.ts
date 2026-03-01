@@ -902,6 +902,13 @@ describe("renderHelpOverlay", () => {
     expect(stripped).toContain("Filter mode:");
   });
 
+  it("documents the Z global fold/unfold shortcut", () => {
+    const out = renderHelpOverlay();
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).toContain("Z");
+    expect(stripped).toContain("fold / unfold all repos");
+  });
+
   it("is returned by renderGroups when showHelp=true", () => {
     const groups = [makeGroup("org/repo", ["a.ts"])];
     const rows = buildRows(groups);
@@ -966,6 +973,14 @@ describe("renderGroups filter opts", () => {
     const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
     expect(stripped).not.toContain("filter:");
     expect(stripped).not.toContain("Filter:");
+  });
+
+  it("status bar hint line includes Z fold-all shortcut", () => {
+    const groups = [makeGroup("org/repo", ["a.ts"])];
+    const rows = buildRows(groups);
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", {});
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).toContain("Z fold-all");
   });
 
   it("shows mode badge [content] when filterTarget=content", () => {

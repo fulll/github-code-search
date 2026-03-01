@@ -33,6 +33,7 @@ export function renderHelpOverlay(): string {
     bar,
     `  ${pc.yellow("↑")} / ${pc.yellow("k")}       navigate up            ${pc.yellow("↓")} / ${pc.yellow("j")}       navigate down`,
     `  ${pc.yellow("←")}           fold repo              ${pc.yellow("→")}           unfold repo`,
+    `  ${pc.yellow("Z")}           fold / unfold all repos`,
     `  ${pc.yellow("Space")}       toggle selection       ${pc.yellow("Enter")}       confirm & output`,
     `  ${pc.yellow("a")}           select all             ${pc.yellow("n")}           select none`,
     `                 ${pc.dim("(respects active filter)")}`,
@@ -297,7 +298,7 @@ export function renderGroups(
 
   lines.push(
     pc.dim(
-      "← / → fold/unfold  ↑ / ↓ navigate  spc select  a all  n none  f filter  t target  h help  ↵ confirm  q quit\n",
+      "← / → fold/unfold  Z fold-all  ↑ / ↓ navigate  spc select  a all  n none  f filter  t target  h help  ↵ confirm  q quit\n",
     ),
   );
 
