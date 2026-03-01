@@ -62,6 +62,20 @@ function nextWordBoundary(s: string, pos: number): number {
   return i;
 }
 
+// ─── Browser helper ──────────────────────────────────────────────────────────
+
+/**
+ * Open a URL in the system default browser.
+ * macOS: `open`, Linux: `xdg-open`, Windows: `start`.
+ * Uses Bun.spawn detached so the TUI remains fully responsive.
+ */
+function openInBrowser(url: string): void {
+  const cmd =
+    process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
+  // Spawn detached: fire-and-forget, do not await or pipe stdio.
+  Bun.spawn([cmd, url], { stdout: null, stderr: null, stdin: null });
+}
+
 // ─── Interactive TUI ─────────────────────────────────────────────────────────
 
 export async function runInteractive(
@@ -433,6 +447,19 @@ export async function runInteractive(
     // `n` — select none (respects active filter)
     if (key === "n" && row && row.type !== "section") {
       applySelectNone(groups, row, filterPath, filterTarget, filterRegex);
+    }
+
+    // `o` — open focused result (or repo) in the default browser
+    if (key === "o" && row && row.type !== "section") {
+      let url: string;
+      if (row.type === "repo") {
+        // Open the repository page on GitHub
+        url = `https://github.com/${groups[row.repoIndex].repoFullName}`;
+      } else {
+        // Open the specific file at the matching line
+        url = groups[row.repoIndex].matches[row.extractIndex!].htmlUrl;
+      }
+      openInBrowser(url);
     }
 
     redraw();

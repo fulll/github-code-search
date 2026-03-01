@@ -21,6 +21,7 @@ Section header rows (shown when `--group-by-team-prefix` is active) are skipped 
 | `Space` | Toggle selection on the current repo or extract. On a repo row: cascades to all its extracts.                                                              |
 | `a`     | Select **all**. On a repo row: selects all repos and their extracts. On an extract row: selects all extracts in the current repo. Respects active filters. |
 | `n`     | Select **none**. Same context rules as `a`. Respects active filters.                                                                                       |
+| `o`     | **Open in browser** — opens the focused item in the default browser. On a repo row: opens the repository page. On an extract row: opens the file directly. |
 
 ## Filtering
 

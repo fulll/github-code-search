@@ -37,6 +37,7 @@ export function renderHelpOverlay(): string {
     `  ${pc.yellow("Space")}       toggle selection       ${pc.yellow("Enter")}       confirm & output`,
     `  ${pc.yellow("a")}           select all             ${pc.yellow("n")}           select none`,
     `                 ${pc.dim("(respects active filter)")}`,
+    `  ${pc.yellow("o")}           open in browser        ${pc.dim("(repo row → repo page, extract row → file)")}`,
     `  ${pc.yellow("f")}           enter filter mode      ${pc.yellow("r")}           reset filter`,
     `  ${pc.yellow("t")}           cycle filter target    ${pc.dim("(path → content → repo)")}`,
     `  ${pc.yellow("h")} / ${pc.yellow("?")}       toggle this help       ${pc.yellow("q")} / Ctrl+C  quit`,
@@ -298,7 +299,7 @@ export function renderGroups(
 
   lines.push(
     pc.dim(
-      "← / → fold/unfold  Z fold-all  ↑ / ↓ navigate  spc select  a all  n none  f filter  t target  h help  ↵ confirm  q quit\n",
+      "← / → fold/unfold  Z fold-all  ↑ / ↓ navigate  spc select  a all  n none  o open  f filter  t target  h help  ↵ confirm  q quit\n",
     ),
   );
 
