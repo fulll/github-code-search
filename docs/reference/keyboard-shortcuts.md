@@ -1,15 +1,16 @@
 # Keyboard shortcuts
 
-All shortcuts are active in the interactive TUI. Keys are **case-sensitive** and must be typed in lowercase.
+All shortcuts are active in the interactive TUI. Keys are **case-sensitive** — most use lowercase letters, but a few bindings (such as `Z` and `G`) require an uppercase letter.
 
 ## Navigation
 
-| Key       | Action                                |
-| --------- | ------------------------------------- |
-| `↑` / `k` | Move cursor up (repos and extracts)   |
-| `↓` / `j` | Move cursor down (repos and extracts) |
-| `←`       | Fold the repo under the cursor        |
-| `→`       | Unfold the repo under the cursor      |
+| Key       | Action                                                                                     |
+| --------- | ------------------------------------------------------------------------------------------ |
+| `↑` / `k` | Move cursor up (repos and extracts)                                                        |
+| `↓` / `j` | Move cursor down (repos and extracts)                                                      |
+| `←`       | Fold the repo under the cursor                                                             |
+| `→`       | Unfold the repo under the cursor                                                           |
+| `Z`       | **Global fold / unfold** — fold all repos if any is unfolded; unfold all if all are folded |
 
 Section header rows (shown when `--group-by-team-prefix` is active) are skipped automatically during navigation.
 

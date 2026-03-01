@@ -389,6 +389,29 @@ export async function runInteractive(
       }
     }
 
+    // `Z` — global fold / unfold: fold all if any repo is unfolded, else unfold all
+    if (key === "Z") {
+      const anyUnfolded = groups.some((g) => !g.folded);
+      for (const g of groups) {
+        g.folded = anyUnfolded;
+      }
+      // Adjust scroll so cursor stays aligned with the same repo after bulk fold.
+      // When folding, extract rows disappear: map the current row's repoIndex to
+      // its repo header row so the cursor does not jump to a different repository.
+      if (anyUnfolded) {
+        const newRows = buildRows(groups, filterPath, filterTarget, filterRegex);
+        if (row && (row.type === "repo" || row.type === "extract")) {
+          const headerIdx = newRows.findIndex(
+            (r) => r.type === "repo" && r.repoIndex === row.repoIndex,
+          );
+          cursor = headerIdx !== -1 ? headerIdx : Math.min(cursor, Math.max(0, newRows.length - 1));
+        } else {
+          cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
+        }
+        scrollOffset = Math.min(scrollOffset, cursor);
+      }
+    }
+
     if (key === " " && row && row.type !== "section") {
       if (row.type === "repo") {
         const group = groups[row.repoIndex];
