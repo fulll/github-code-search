@@ -36,17 +36,15 @@ Enter
 # Wait for results to load (API call + TUI render)
 Sleep 4s
 
-# ── Navigate down a few rows ──────────────────────────────────────────────────
-Down
-Sleep 300ms
-Down
-Sleep 300ms
+# ── Fold all repos — Z gives a compact bird's-eye view ────────────────────────
+Type "Z"
+Sleep 800ms
 
-# ── Toggle selection off on current extract ───────────────────────────────────
-Space
-Sleep 400ms
+# ── Unfold all repos — Z again expands everything ─────────────────────────────
+Type "Z"
+Sleep 800ms
 
-# ── Filter by file path (default target) ──────────────────────────────────────
+# ── Filter by file path to focus on YAML files ────────────────────────────────
 Type "f"
 Sleep 300ms
 Type ".yml"
@@ -54,34 +52,25 @@ Sleep 600ms
 Enter
 Sleep 500ms
 
-# ── Select all visible (filtered) rows ────────────────────────────────────────
+# ── Jump to top with gg ───────────────────────────────────────────────────────
+Type "g"
+Sleep 150ms
+Type "g"
+Sleep 500ms
+
+# ── Select all visible (filtered) results ─────────────────────────────────────
 Type "a"
 Sleep 500ms
 
-# ── Reset filter ──────────────────────────────────────────────────────────────
-Type "r"
+# ── Jump to bottom with G to inspect the last match ───────────────────────────
+Type "G"
 Sleep 600ms
 
-# ── Switch to repo filter mode and filter by repo name ────────────────────────
-# Press t twice: path → content → repo
-Type "t"
-Sleep 300ms
-Type "t"
-Sleep 400ms
+# ── Open the focused file directly in the browser ─────────────────────────────
+Type "o"
+Sleep 600ms
 
-# Enter filter mode and type a repo name fragment
-Type "f"
-Sleep 300ms
-Type "toolkit"
-Sleep 700ms
-Enter
-Sleep 500ms
-
-# Select all repos matching the filter
-Type "a"
-Sleep 500ms
-
-# ── Reset and confirm ─────────────────────────────────────────────────────────
+# ── Reset filter and confirm selection ────────────────────────────────────────
 Type "r"
 Sleep 600ms
 Enter

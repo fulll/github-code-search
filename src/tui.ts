@@ -38,6 +38,10 @@ const KEY_ALT_B = "\x1bb";
 const KEY_ALT_F = "\x1bf";
 const KEY_DELETE = "\x1b[3~";
 const KEY_SHIFT_TAB = "\x1b[Z"; // Shift+Tab — cycle filter target in filter mode
+const KEY_PAGE_UP = "\x1b[5~"; // Page Up — scroll up one page
+const KEY_PAGE_DOWN = "\x1b[6~"; // Page Down — scroll down one page
+const KEY_CTRL_U = "\x15"; // Ctrl+U — page up (Vim-style)
+const KEY_CTRL_D = "\x04"; // Ctrl+D — page down (Vim-style)
 
 // ─── Word-boundary helpers ────────────────────────────────────────────────────
 
@@ -60,6 +64,35 @@ function nextWordBoundary(s: string, pos: number): number {
   // skip spaces
   while (i < len && s[i] === " ") i++;
   return i;
+}
+
+// ─── Browser helper ──────────────────────────────────────────────────────────
+
+/**
+ * Open a URL in the system default browser.
+ * macOS: `open`, Linux: `xdg-open`, Windows: `cmd /c start "" <url>`.
+ * Fire-and-forget with all stdio set to null so the TUI remains fully responsive.
+ */
+function openInBrowser(url: string): void {
+  let command: string;
+  let args: string[];
+
+  if (process.platform === "darwin") {
+    command = "open";
+    args = [url];
+  } else if (process.platform === "win32") {
+    // `start` is a cmd.exe built-in, not a standalone executable.
+    // The empty string is the mandatory window-title argument; without it,
+    // `start` mis-parses the URL as the title and may fail to open it.
+    command = "cmd";
+    args = ["/c", "start", "", url];
+  } else {
+    command = "xdg-open";
+    args = [url];
+  }
+
+  // Fire-and-forget: do not await, and set all stdio to null so the TUI stays responsive.
+  Bun.spawn([command, ...args], { stdout: null, stderr: null, stdin: null });
 }
 
 // ─── Interactive TUI ─────────────────────────────────────────────────────────
@@ -112,6 +145,8 @@ export async function runInteractive(
   let filterLiveStats: FilterStats | null = null;
   let statsDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   let showHelp = false;
+  // Track first 'g' keypress so that a second consecutive 'g' jumps to the top.
+  let pendingFirstG = false;
 
   /** Schedule a debounced stats recompute (while typing in filter bar). */
   const scheduleStatsUpdate = () => {
@@ -146,6 +181,12 @@ export async function runInteractive(
 
   for await (const chunk of process.stdin) {
     const key = chunk.toString();
+
+    // Reset the gg pending state on every key that isn't a sequence of one
+    // or more plain "g" characters. This allows terminals that batch key
+    // repeats (e.g. delivering "gg" in a single chunk) to still participate
+    // in the gg shortcut without interfering with any other shortcut.
+    if (!/^g+$/.test(key)) pendingFirstG = false;
 
     // ── Filter input mode ────────────────────────────────────────────────────
     if (filterMode) {
@@ -389,6 +430,89 @@ export async function runInteractive(
       }
     }
 
+    // `Z` — global fold / unfold: fold all if any repo is unfolded, else unfold all
+    if (key === "Z") {
+      const anyUnfolded = groups.some((g) => !g.folded);
+      for (const g of groups) {
+        g.folded = anyUnfolded;
+      }
+      // Adjust scroll so cursor stays aligned with the same repo after bulk fold.
+      // When folding, extract rows disappear: map the current row's repoIndex to
+      // its repo header row so the cursor does not jump to a different repository.
+      if (anyUnfolded) {
+        const newRows = buildRows(groups, filterPath, filterTarget, filterRegex);
+        if (row && (row.type === "repo" || row.type === "extract")) {
+          const headerIdx = newRows.findIndex(
+            (r) => r.type === "repo" && r.repoIndex === row.repoIndex,
+          );
+          cursor = headerIdx !== -1 ? headerIdx : Math.min(cursor, Math.max(0, newRows.length - 1));
+        } else {
+          cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
+        }
+        scrollOffset = Math.min(scrollOffset, cursor);
+      }
+    }
+
+    // `gg` — jump to top (first non-section row).
+    // Handles both two consecutive single-g chunks and a single "gg" chunk
+    // (terminals that batch repeated keypresses into one read() call).
+    if (/^g+$/.test(key)) {
+      if (pendingFirstG || key.length >= 2) {
+        // Second g (or a multi-g chunk) — jump to the first non-section row
+        cursor = 0;
+        while (cursor < rows.length - 1 && rows[cursor]?.type === "section") cursor++;
+        scrollOffset = 0;
+        pendingFirstG = false;
+      } else {
+        pendingFirstG = true;
+      }
+      redraw();
+      continue;
+    }
+
+    // `G` — jump to last row (bottom)
+    if (key === "G") {
+      if (rows.length === 0) {
+        // No rows to jump to; avoid putting cursor into an invalid state
+        pendingFirstG = false;
+        continue;
+      }
+      cursor = rows.length - 1;
+      while (cursor > 0 && rows[cursor]?.type === "section") cursor--;
+      while (
+        scrollOffset < cursor &&
+        !isCursorVisible(rows, groups, cursor, scrollOffset, getViewportHeight())
+      ) {
+        scrollOffset++;
+      }
+    }
+
+    // Page Up / Ctrl+U — scroll up by a full page
+    if (key === KEY_PAGE_UP || key === KEY_CTRL_U) {
+      const pageSize = Math.max(1, getViewportHeight());
+      cursor = Math.max(0, cursor - pageSize);
+      while (cursor > 0 && rows[cursor]?.type === "section") cursor--;
+      // If we've paged up to the top and the first row is a section,
+      // advance to the first non-section row (mirror `gg` behavior).
+      if (cursor === 0 && rows[0]?.type === "section") {
+        while (cursor < rows.length - 1 && rows[cursor]?.type === "section") cursor++;
+      }
+      if (cursor < scrollOffset) scrollOffset = cursor;
+    }
+
+    // Page Down / Ctrl+D — scroll down by a full page
+    if (key === KEY_PAGE_DOWN || key === KEY_CTRL_D) {
+      const pageSize = Math.max(1, getViewportHeight());
+      cursor = Math.min(rows.length - 1, cursor + pageSize);
+      while (cursor < rows.length - 1 && rows[cursor]?.type === "section") cursor++;
+      while (
+        scrollOffset < cursor &&
+        !isCursorVisible(rows, groups, cursor, scrollOffset, getViewportHeight())
+      ) {
+        scrollOffset++;
+      }
+    }
+
     if (key === " " && row && row.type !== "section") {
       if (row.type === "repo") {
         const group = groups[row.repoIndex];
@@ -410,6 +534,19 @@ export async function runInteractive(
     // `n` — select none (respects active filter)
     if (key === "n" && row && row.type !== "section") {
       applySelectNone(groups, row, filterPath, filterTarget, filterRegex);
+    }
+
+    // `o` — open focused result (or repo) in the default browser
+    if (key === "o" && row && row.type !== "section") {
+      let url: string;
+      if (row.type === "repo") {
+        // Open the repository page on GitHub
+        url = `https://github.com/${groups[row.repoIndex].repoFullName}`;
+      } else {
+        // Open the specific file at the matching line
+        url = groups[row.repoIndex].matches[row.extractIndex!].htmlUrl;
+      }
+      openInBrowser(url);
     }
 
     redraw();

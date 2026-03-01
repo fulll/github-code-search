@@ -1,15 +1,20 @@
 # Keyboard shortcuts
 
-All shortcuts are active in the interactive TUI. Keys are **case-sensitive** and must be typed in lowercase.
+All shortcuts are active in the interactive TUI. Keys are **case-sensitive** — most use lowercase letters, but a few bindings (such as `Z` and `G`) require an uppercase letter.
 
 ## Navigation
 
-| Key       | Action                                |
-| --------- | ------------------------------------- |
-| `↑` / `k` | Move cursor up (repos and extracts)   |
-| `↓` / `j` | Move cursor down (repos and extracts) |
-| `←`       | Fold the repo under the cursor        |
-| `→`       | Unfold the repo under the cursor      |
+| Key                    | Action                                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------------------ |
+| `↑` / `k`              | Move cursor up (repos and extracts)                                                        |
+| `↓` / `j`              | Move cursor down (repos and extracts)                                                      |
+| `←`                    | Fold the repo under the cursor                                                             |
+| `→`                    | Unfold the repo under the cursor                                                           |
+| `Z`                    | **Global fold / unfold** — fold all repos if any is unfolded; unfold all if all are folded |
+| `gg`                   | Jump to the **top** (first result)                                                         |
+| `G`                    | Jump to the **bottom** (last result)                                                       |
+| `Page Up` / `Ctrl+U`   | Scroll up one full page                                                                    |
+| `Page Down` / `Ctrl+D` | Scroll down one full page                                                                  |
 
 Section header rows (shown when `--group-by-team-prefix` is active) are skipped automatically during navigation.
 
@@ -20,6 +25,7 @@ Section header rows (shown when `--group-by-team-prefix` is active) are skipped 
 | `Space` | Toggle selection on the current repo or extract. On a repo row: cascades to all its extracts.                                                              |
 | `a`     | Select **all**. On a repo row: selects all repos and their extracts. On an extract row: selects all extracts in the current repo. Respects active filters. |
 | `n`     | Select **none**. Same context rules as `a`. Respects active filters.                                                                                       |
+| `o`     | **Open in browser** — opens the focused item in the default browser. On a repo row: opens the repository page. On an extract row: opens the file directly. |
 
 ## Filtering
 
