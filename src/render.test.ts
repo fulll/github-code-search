@@ -421,6 +421,25 @@ describe("isCursorVisible", () => {
     const rows = buildRows(groups);
     expect(isCursorVisible(rows, groups, 0, 0, 10)).toBe(true);
   });
+
+  it("returns false when scrollOffset is stale (greater than cursor after filter shrinks rows)", () => {
+    // Regression guard for Bug 2: in filter-mode edit handlers (Backspace, Del,
+    // word-delete, paste) tui.ts clamps `cursor` to the new rows length but does
+    // NOT clamp `scrollOffset`. When the filter reduces rows, cursor is clamped
+    // down but scrollOffset can remain larger than cursor, causing the cursor to
+    // appear "above the viewport" — isCursorVisible returns false and the while
+    // loop `while (scrollOffset < cursor ...)` never runs (already false), so the
+    // tui gets stuck showing an empty groups area.
+    //
+    // Scenario: 4 rows, user was at cursor=3, scrollOffset=2. Filter reduces rows
+    // to 2. Cursor clamped to 1. scrollOffset NOT clamped → still 2 > cursor=1.
+    const groups = [makeGroup("org/repo", ["a.ts", "b.ts", "c.ts"], false)];
+    const rows = buildRows(groups); // [repo, ext0, ext1, ext2]
+    // cursor=1 but scrollOffset=2: cursor is *above* the viewport window
+    expect(isCursorVisible(rows, groups, 1, 2, 10)).toBe(false);
+    // The fix: clamp scrollOffset = Math.min(scrollOffset, cursor) = Math.min(2,1) = 1
+    expect(isCursorVisible(rows, groups, 1, 1, 10)).toBe(true);
+  });
 });
 
 // ─── buildSummaryFull ──────────────────────────────────────────────────────────────
@@ -591,6 +610,27 @@ describe("renderGroups", () => {
     const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
     expect(stripped).toContain("▲"); // sticky indicator
     expect(stripped).toContain("org/repoA"); // repo name shown in sticky line
+  });
+
+  it("does NOT show sticky repo header when cursor is on a repo row (even with scrollOffset > 0)", () => {
+    // Regression guard for Bug 1: getViewportHeight() in tui.ts used to subtract
+    // a sticky-header line whenever scrollOffset > 0, but renderGroups only shows
+    // the sticky header when the cursor is on an *extract* row whose repo header
+    // has scrolled above the viewport. When cursor is on a repo row, no sticky
+    // header is emitted and the subtracted line makes isCursorVisible() return
+    // false prematurely (the cursor appears invisible one step too early).
+    //
+    // rows: [repo(0), ext(0,0), repo(1), ext(1,0)]
+    // cursor=2 (repo1), scrollOffset=1 → repo(0) < scrollOffset, but cursor is on
+    // repo(1), not an extract → sticky header must NOT be shown.
+    const groups = [
+      makeGroup("org/repoA", ["a.ts"], false),
+      makeGroup("org/repoB", ["b.ts"], false),
+    ];
+    const rows = buildRows(groups);
+    const out = renderGroups(groups, 2, rows, 40, 1, "q", "org");
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).not.toContain("▲");
   });
 
   it("stops rendering rows when viewport is filled (overflow break)", () => {
@@ -1060,6 +1100,34 @@ describe("buildRows (filterTarget + filterRegex)", () => {
     const rows = buildRows(groups, "[broken", "path", true);
     const extracts = rows.filter((r) => r.type === "extract");
     expect(extracts.length).toBe(0);
+  });
+
+  it("toggling regex to invalid pattern collapses rows to 0 — cursor must be clamped (regression guard for Bug 3)", () => {
+    // Regression guard for Bug 3: the Tab key in tui.ts toggles filterRegex but
+    // did not rebuild rows or clamp cursor/scrollOffset afterward. When the new
+    // regex is invalid (or simply more restrictive), the row list shrinks. If
+    // cursor was pointing at a now-removed row, isCursorVisible returns false yet
+    // the scroll-adjust while-loop doesn't fire (cursor is already 0 or the
+    // condition `scrollOffset < cursor` is already false), leaving cursor
+    // pointing at an invalid index — renderGroups skips the cursor highlight.
+    //
+    // The fix: after `filterRegex = !filterRegex`, rebuild rows and clamp:
+    //   const newRows = buildRows(groups, filterInput, filterTarget, filterRegex);
+    //   cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
+    //   scrollOffset = Math.min(scrollOffset, cursor);
+    const groups = [makeGroup("org/repo", ["src/foo.ts", "src/bar.ts"], false)];
+    // Before toggle: regex=false, pattern="src" → 2 extract rows visible
+    const rowsBefore = buildRows(groups, "src", "path", false);
+    expect(rowsBefore.filter((r) => r.type === "extract")).toHaveLength(2);
+    let cursor = 2; // cursor on second extract
+    // After toggle to regex=true with an invalid pattern:
+    const rowsAfter = buildRows(groups, "[invalid", "path", true);
+    expect(rowsAfter).toHaveLength(0); // invalid regex → no matches, no rows
+    // isCursorVisible with stale cursor (still 2, rows=[]) must return false
+    expect(isCursorVisible(rowsAfter, groups, cursor, 0, 10)).toBe(false);
+    // The required clamp:
+    cursor = Math.min(cursor, Math.max(0, rowsAfter.length - 1));
+    expect(cursor).toBe(0);
   });
 });
 

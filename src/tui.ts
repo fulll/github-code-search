@@ -93,9 +93,12 @@ export async function runInteractive(
     let barLines = 0;
     if (filterMode) barLines = 2;
     else if (filterPath || filterTarget !== "path" || filterRegex) barLines = 1;
-    // When scrolled past the top, renderGroups shows a sticky repo header
-    // that consumes one additional line from the available viewport.
-    const stickyHeaderLines = scrollOffset > 0 ? 1 : 0;
+    // When scrolled past the top and the cursor is within the visible window,
+    // renderGroups may show a sticky repo header that consumes one extra line.
+    // Mirror the condition precisely: sticky only appears when the cursor row is
+    // an extract whose repo row has scrolled above the viewport (repoRowIndex <
+    // scrollOffset). `cursor >= scrollOffset` is the necessary pre-condition.
+    const stickyHeaderLines = scrollOffset > 0 && cursor >= scrollOffset ? 1 : 0;
     return termHeight - 6 - barLines - stickyHeaderLines;
   };
 
@@ -175,8 +178,12 @@ export async function runInteractive(
         cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
         scrollOffset = Math.min(scrollOffset, cursor);
       } else if (key === KEY_TAB) {
-        // Tab — toggle regex mode
+        // Tab — toggle regex mode; rebuilds rows immediately and clamps
+        // cursor/scrollOffset so the current position stays valid.
         filterRegex = !filterRegex;
+        const newRows = buildRows(groups, filterInput, filterTarget, filterRegex);
+        cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
+        scrollOffset = Math.min(scrollOffset, cursor);
         scheduleStatsUpdate();
       } else if (key === ANSI_ARROW_LEFT) {
         // ← — move cursor left
@@ -203,19 +210,22 @@ export async function runInteractive(
         filterCursor = newPos;
         const newRows = buildRows(groups, filterInput, filterTarget, filterRegex);
         cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
+        scrollOffset = Math.min(scrollOffset, cursor);
         scheduleStatsUpdate();
       } else if ((key === "\x7f" || key === "\b") && filterCursor > 0) {
         // Backspace — delete char before cursor
         filterInput = filterInput.slice(0, filterCursor - 1) + filterInput.slice(filterCursor);
         filterCursor--;
-        const newRows = buildRows(groups, filterInput, filterTarget, filterRegex);
-        cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
+        const newRows2 = buildRows(groups, filterInput, filterTarget, filterRegex);
+        cursor = Math.min(cursor, Math.max(0, newRows2.length - 1));
+        scrollOffset = Math.min(scrollOffset, cursor);
         scheduleStatsUpdate();
       } else if (key === KEY_DELETE && filterCursor < filterInput.length) {
         // Del — delete char at cursor
         filterInput = filterInput.slice(0, filterCursor) + filterInput.slice(filterCursor + 1);
-        const newRows = buildRows(groups, filterInput, filterTarget, filterRegex);
-        cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
+        const newRows3 = buildRows(groups, filterInput, filterTarget, filterRegex);
+        cursor = Math.min(cursor, Math.max(0, newRows3.length - 1));
+        scrollOffset = Math.min(scrollOffset, cursor);
         scheduleStatsUpdate();
       } else if (key === KEY_SHIFT_TAB) {
         // Shift+Tab — cycle filter target (path → content → repo → path)
@@ -243,6 +253,7 @@ export async function runInteractive(
           filterCursor += printable.length;
           const newRows = buildRows(groups, filterInput, filterTarget, filterRegex);
           cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
+          scrollOffset = Math.min(scrollOffset, cursor);
           scheduleStatsUpdate();
         }
       }
