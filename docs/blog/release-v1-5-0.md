@@ -12,15 +12,15 @@ date: 2026-03-01
 
 ### Advanced filter targets
 
-The filter bar (press `f`) can now search across three different targets, switchable with **Shift+Tab**:
+The filter bar (press `f`) can now search across three different targets. Outside filter mode, press **`t`** to cycle targets; inside the filter bar, use **Shift+Tab**:
 
-| Badge       | What is filtered                                |
-| ----------- | ----------------------------------------------- |
-| `[content]` | Code snippet text inside each extract (default) |
-| `[path]`    | File path of each result                        |
-| `[repo]`    | Repository name (short or `org/repo` form)      |
+| Badge       | What is filtered                           |
+| ----------- | ------------------------------------------ |
+| `[path]`    | File path of each result (default)         |
+| `[content]` | Code snippet text inside each extract      |
+| `[repo]`    | Repository name (short or `org/repo` form) |
 
-The active target badge is always visible in the filter bar, even for the default `[path]` mode, so you always know what you are filtering against.
+The active target badge is always visible in the filter bar, including in the default `[path]` mode, so you always know what you are filtering against.
 
 ### Regex mode
 

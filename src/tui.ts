@@ -93,7 +93,10 @@ export async function runInteractive(
     let barLines = 0;
     if (filterMode) barLines = 2;
     else if (filterPath || filterTarget !== "path" || filterRegex) barLines = 1;
-    return termHeight - 6 - barLines;
+    // When scrolled past the top, renderGroups shows a sticky repo header
+    // that consumes one additional line from the available viewport.
+    const stickyHeaderLines = scrollOffset > 0 ? 1 : 0;
+    return termHeight - 6 - barLines - stickyHeaderLines;
   };
 
   // ─── Filter + help state ─────────────────────────────────────────────────

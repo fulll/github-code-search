@@ -36,7 +36,7 @@ export function buildFilterStats(
       if (repoMatcher(g)) {
         visibleRepos++;
         visibleMatches += g.matches.length;
-        for (const m of g.matches) visibleFileSet.add(m.path);
+        for (const m of g.matches) visibleFileSet.add(`${g.repoFullName}:${m.path}`);
       } else {
         hiddenRepos++;
         hiddenMatches += g.matches.length;
@@ -52,7 +52,7 @@ export function buildFilterStats(
       const matching = g.matches.filter(extractMatcher);
       if (matching.length > 0) {
         visibleRepos++;
-        for (const m of matching) visibleFileSet.add(m.path);
+        for (const m of matching) visibleFileSet.add(`${g.repoFullName}:${m.path}`);
       } else {
         hiddenRepos++;
       }

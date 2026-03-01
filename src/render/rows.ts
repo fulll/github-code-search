@@ -36,11 +36,18 @@ export function buildRows(
 
   if (filterTarget === "repo") {
     const repoMatcher = makeRepoMatcher(filterPath, filterRegex);
+    let pendingSectionLabel: string | undefined;
+    let lastEmittedSectionLabel: string | undefined;
     for (let ri = 0; ri < groups.length; ri++) {
       const group = groups[ri];
+      // Track the most recent section boundary so we can emit it even when the
+      // first repo of a section is filtered out.
+      if (group.sectionLabel !== undefined) pendingSectionLabel = group.sectionLabel;
       if (!repoMatcher(group)) continue;
-      if (group.sectionLabel !== undefined) {
-        rows.push({ type: "section", repoIndex: -1, sectionLabel: group.sectionLabel });
+      const sectionToEmit = group.sectionLabel ?? pendingSectionLabel;
+      if (sectionToEmit !== undefined && sectionToEmit !== lastEmittedSectionLabel) {
+        rows.push({ type: "section", repoIndex: -1, sectionLabel: sectionToEmit });
+        lastEmittedSectionLabel = sectionToEmit;
       }
       rows.push({ type: "repo", repoIndex: ri });
       if (!group.folded) {
@@ -57,15 +64,20 @@ export function buildRows(
     filterTarget as Exclude<FilterTarget, "repo">,
     filterRegex,
   );
+  let pendingSectionLabel: string | undefined;
+  let lastEmittedSectionLabel: string | undefined;
   for (let ri = 0; ri < groups.length; ri++) {
     const group = groups[ri];
+    if (group.sectionLabel !== undefined) pendingSectionLabel = group.sectionLabel;
     const visibleExtractIndices = group.matches
       .map((m, i) => (extractMatcher(m) ? i : -1))
       .filter((i) => i !== -1);
     if (filterPath && visibleExtractIndices.length === 0) continue;
 
-    if (group.sectionLabel !== undefined) {
-      rows.push({ type: "section", repoIndex: -1, sectionLabel: group.sectionLabel });
+    const sectionToEmit = group.sectionLabel ?? pendingSectionLabel;
+    if (sectionToEmit !== undefined && sectionToEmit !== lastEmittedSectionLabel) {
+      rows.push({ type: "section", repoIndex: -1, sectionLabel: sectionToEmit });
+      lastEmittedSectionLabel = sectionToEmit;
     }
     rows.push({ type: "repo", repoIndex: ri });
     if (!group.folded) {

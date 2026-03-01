@@ -81,6 +81,28 @@ function contentPatternSegments(
   return segs;
 }
 
+/**
+ * Sort and merge overlapping or adjacent TextMatchSegments before passing them
+ * to highlightFragment. GitHub query matches and content-filter matches can share
+ * character ranges; without merging, overlapping segments cause double-rendering.
+ */
+function mergeSegments(segs: TextMatchSegment[]): TextMatchSegment[] {
+  if (segs.length <= 1) return segs;
+  const sorted = segs.toSorted((a, b) => a.indices[0] - b.indices[0]);
+  const merged: TextMatchSegment[] = [{ ...sorted[0] }];
+  for (let i = 1; i < sorted.length; i++) {
+    const last = merged[merged.length - 1];
+    const cur = sorted[i];
+    if (cur.indices[0] <= last.indices[1]) {
+      // Overlapping or adjacent — extend the previous segment's end if needed.
+      if (cur.indices[1] > last.indices[1]) last.indices[1] = cur.indices[1];
+    } else {
+      merged.push({ ...cur });
+    }
+  }
+  return merged;
+}
+
 /** Strip ANSI escape sequences to measure the visible character width of a string. */
 function stripAnsi(str: string): string {
   // eslint-disable-next-line no-control-regex
@@ -372,7 +394,7 @@ export function renderGroups(
             : [];
         const fragmentLines = highlightFragment(
           tm.fragment,
-          [...tm.matches, ...extraSegs],
+          mergeSegments([...tm.matches, ...extraSegs]),
           match.path,
         );
         for (const fl of fragmentLines) {
