@@ -38,6 +38,10 @@ const KEY_ALT_B = "\x1bb";
 const KEY_ALT_F = "\x1bf";
 const KEY_DELETE = "\x1b[3~";
 const KEY_SHIFT_TAB = "\x1b[Z"; // Shift+Tab — cycle filter target in filter mode
+const KEY_PAGE_UP = "\x1b[5~"; // Page Up — scroll up one page
+const KEY_PAGE_DOWN = "\x1b[6~"; // Page Down — scroll down one page
+const KEY_CTRL_U = "\x15"; // Ctrl+U — page up (Vim-style)
+const KEY_CTRL_D = "\x04"; // Ctrl+D — page down (Vim-style)
 
 // ─── Word-boundary helpers ────────────────────────────────────────────────────
 
@@ -141,6 +145,8 @@ export async function runInteractive(
   let filterLiveStats: FilterStats | null = null;
   let statsDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   let showHelp = false;
+  // Track first 'g' keypress so that a second consecutive 'g' jumps to the top.
+  let pendingFirstG = false;
 
   /** Schedule a debounced stats recompute (while typing in filter bar). */
   const scheduleStatsUpdate = () => {
@@ -175,6 +181,11 @@ export async function runInteractive(
 
   for await (const chunk of process.stdin) {
     const key = chunk.toString();
+
+    // Reset the gg pending state on every key that isn’t g itself.
+    // This lets `gg` work as two consecutive g presses without interfering
+    // with any other shortcut.
+    if (key !== "g") pendingFirstG = false;
 
     // ── Filter input mode ────────────────────────────────────────────────────
     if (filterMode) {
@@ -438,6 +449,54 @@ export async function runInteractive(
           cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
         }
         scrollOffset = Math.min(scrollOffset, cursor);
+      }
+    }
+
+    // `g` — first g of gg sequence (jump to top on second g)
+    if (key === "g") {
+      if (pendingFirstG) {
+        // Second consecutive g — jump to the first non-section row
+        cursor = 0;
+        while (cursor < rows.length - 1 && rows[cursor]?.type === "section") cursor++;
+        scrollOffset = 0;
+        pendingFirstG = false;
+      } else {
+        pendingFirstG = true;
+      }
+      redraw();
+      continue;
+    }
+
+    // `G` — jump to last row (bottom)
+    if (key === "G") {
+      cursor = rows.length - 1;
+      while (cursor > 0 && rows[cursor]?.type === "section") cursor--;
+      while (
+        scrollOffset < cursor &&
+        !isCursorVisible(rows, groups, cursor, scrollOffset, getViewportHeight())
+      ) {
+        scrollOffset++;
+      }
+    }
+
+    // Page Up / Ctrl+U — scroll up by a full page
+    if (key === KEY_PAGE_UP || key === KEY_CTRL_U) {
+      const pageSize = Math.max(1, getViewportHeight());
+      cursor = Math.max(0, cursor - pageSize);
+      while (cursor > 0 && rows[cursor]?.type === "section") cursor--;
+      if (cursor < scrollOffset) scrollOffset = cursor;
+    }
+
+    // Page Down / Ctrl+D — scroll down by a full page
+    if (key === KEY_PAGE_DOWN || key === KEY_CTRL_D) {
+      const pageSize = Math.max(1, getViewportHeight());
+      cursor = Math.min(rows.length - 1, cursor + pageSize);
+      while (cursor < rows.length - 1 && rows[cursor]?.type === "section") cursor++;
+      while (
+        scrollOffset < cursor &&
+        !isCursorVisible(rows, groups, cursor, scrollOffset, getViewportHeight())
+      ) {
+        scrollOffset++;
       }
     }
 
