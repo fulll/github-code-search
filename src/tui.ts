@@ -66,14 +66,29 @@ function nextWordBoundary(s: string, pos: number): number {
 
 /**
  * Open a URL in the system default browser.
- * macOS: `open`, Linux: `xdg-open`, Windows: `start`.
- * Uses Bun.spawn detached so the TUI remains fully responsive.
+ * macOS: `open`, Linux: `xdg-open`, Windows: `cmd /c start "" <url>`.
+ * Fire-and-forget with all stdio set to null so the TUI remains fully responsive.
  */
 function openInBrowser(url: string): void {
-  const cmd =
-    process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
-  // Spawn detached: fire-and-forget, do not await or pipe stdio.
-  Bun.spawn([cmd, url], { stdout: null, stderr: null, stdin: null });
+  let command: string;
+  let args: string[];
+
+  if (process.platform === "darwin") {
+    command = "open";
+    args = [url];
+  } else if (process.platform === "win32") {
+    // `start` is a cmd.exe built-in, not a standalone executable.
+    // The empty string is the mandatory window-title argument; without it,
+    // `start` mis-parses the URL as the title and may fail to open it.
+    command = "cmd";
+    args = ["/c", "start", "", url];
+  } else {
+    command = "xdg-open";
+    args = [url];
+  }
+
+  // Fire-and-forget: do not await, and set all stdio to null so the TUI stays responsive.
+  Bun.spawn([command, ...args], { stdout: null, stderr: null, stdin: null });
 }
 
 // ─── Interactive TUI ─────────────────────────────────────────────────────────
