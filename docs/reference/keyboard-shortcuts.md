@@ -55,7 +55,7 @@ When the filter bar is open (after pressing `f`):
 | `Esc`                                   | Cancel without applying the filter                      |
 
 ::: tip
-Invalid regex patterns are silently ignored (no results hidden, no crash). The badge turns yellow when a valid regex is active.
+Invalid regex patterns do not crash the TUI but are treated as matching nothing (zero visible rows). The badge is always yellow when regex mode is active, regardless of whether the pattern is valid.
 :::
 
 ## Help and exit

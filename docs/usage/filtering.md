@@ -93,7 +93,7 @@ With `repo` mode the matching portion of the repository name is highlighted in y
 
 ### Regex mode
 
-Press `Tab` inside the filter bar to enable regex matching. The badge updates to `[path·regex]` (or `[content·regex]`, etc.). Invalid expressions are silently ignored.
+Press `Tab` inside the filter bar to enable regex matching. The badge updates to `[path·regex]` (or `[content·regex]`, etc.). If you enter an invalid regular expression, it is treated as matching nothing: the filter will show zero results but the UI remains responsive.
 
 ### Filter vs. exclusions: when to use which
 

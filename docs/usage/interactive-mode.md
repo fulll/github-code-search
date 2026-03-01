@@ -60,7 +60,7 @@ github-code-search "useFeatureFlag" --org fulll
 Press `f` to enter filter mode. A two-line bar appears at the top of the results:
 
 ```text
-🔍 [path]  src/▌                               3 repos · 5 files
+🔍  src/▌                                 3 repos · 5 files
            ←→ move  ·  ⌥←→ word  ·  ⌥⌫ del word  ·  Tab regex  ·  ↵ OK  ·  Esc cancel
 ```
 
@@ -81,7 +81,7 @@ The matching part is highlighted in **yellow** in the result list so you can ins
 
 ### Regex mode
 
-Press `Tab` in filter mode to toggle regular-expression matching. The badge updates to `[path·regex]` (or `[content·regex]`, etc.) while regex is active. Invalid expressions are silently ignored.
+Press `Tab` in filter mode to toggle regular-expression matching. The badge updates to `[path·regex]` (or `[content·regex]`, etc.) while regex is active. If the expression is invalid, it matches nothing (no results are shown until you correct the pattern).
 
 ### Confirmed filter
 

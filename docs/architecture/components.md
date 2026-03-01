@@ -41,8 +41,10 @@ C4Component
 
 ## 3b — TUI render layer
 
-The seven pure render functions called by the TUI on every redraw. All seven live in
-`src/render/` and are re-exported through the `src/render.ts` façade.
+The render-layer modules called by the TUI on every redraw. Most live in
+`src/render/` and are re-exported through the `src/render.ts` façade;
+`src/output.ts` is the output formatter invoked on confirmation and `src/render/filter-match.ts`
+provides shared pattern-matching helpers used by several render modules.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"fontFamily": "Poppins, Aestetico, Arial, sans-serif", "primaryColor": "#66CCFF", "primaryTextColor": "#000000", "lineColor": "#0000CC", "tertiaryColor": "#FFCC33"}, "themeCSS": ".label,.nodeLabel,.cluster-label > span{font-family:Poppins,Arial,sans-serif;letter-spacing:.2px} .cluster-label > span{font-weight:600;font-size:13px} .edgePath .path{stroke-width:2px}"}}%%

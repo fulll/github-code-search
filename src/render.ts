@@ -1,5 +1,5 @@
 import pc from "picocolors";
-import type { FilterTarget, RepoGroup, Row } from "./types.ts";
+import type { FilterTarget, RepoGroup, Row, TextMatchSegment } from "./types.ts";
 import { highlightFragment } from "./render/highlight.ts";
 import { buildFilterStats, type FilterStats } from "./render/filter.ts";
 import { rowTerminalLines, buildRows, isCursorVisible } from "./render/rows.ts";
@@ -88,38 +88,41 @@ function stripAnsi(str: string): string {
 }
 
 /**
- * Apply `baseStyle` to `text`, highlighting every occurrence of `pattern` in
- * bold-yellow — but only when `filterTarget === target` and pattern is non-empty.
+ * Returns a text-highlight function compiled once per renderGroups call.
+ * The returned function applies bold-yellow highlighting to every occurrence of
+ * `pattern` in the given text — but only when `filterTarget === target`.
+ * Compiling the regex here avoids recompiling on every row during the render loop.
  * Matching is case-insensitive; invalid regex silently falls back to plain style.
  */
-function applyTextHighlight(
-  text: string,
+function makeTextHighlighter(
   pattern: string,
   filterTarget: FilterTarget,
   filterRegex: boolean,
-  target: FilterTarget,
-  baseStyle: (s: string) => string,
-): string {
-  if (!pattern || filterTarget !== target) return baseStyle(text);
+): (text: string, target: FilterTarget, baseStyle: (s: string) => string) => string {
+  if (!pattern) return (_text, _target, style) => style(_text);
   let re: RegExp;
   try {
     re = filterRegex
       ? new RegExp(pattern, "gi")
       : new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
   } catch {
-    return baseStyle(text);
+    return (_text, _target, style) => style(_text);
   }
-  const parts: string[] = [];
-  let last = 0;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
-    if (m.index > last) parts.push(baseStyle(text.slice(last, m.index)));
-    parts.push(pc.bold(pc.yellow(m[0])));
-    last = m.index + m[0].length;
-    if (m[0].length === 0) re.lastIndex++; // guard zero-length match
-  }
-  if (last < text.length) parts.push(baseStyle(text.slice(last)));
-  return parts.length > 0 ? parts.join("") : baseStyle(text);
+  return (text, target, baseStyle) => {
+    if (filterTarget !== target) return baseStyle(text);
+    re.lastIndex = 0; // reset for each new text (g flag retains state across calls)
+    const parts: string[] = [];
+    let last = 0;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) {
+      if (m.index > last) parts.push(baseStyle(text.slice(last, m.index)));
+      parts.push(pc.bold(pc.yellow(m[0])));
+      last = m.index + m[0].length;
+      if (m[0].length === 0) re.lastIndex++; // guard zero-length match
+    }
+    if (last < text.length) parts.push(baseStyle(text.slice(last)));
+    return parts.length > 0 ? parts.join("") : baseStyle(text);
+  };
 }
 
 /** Options bag for renderGroups — all fields optional. */
@@ -180,6 +183,9 @@ export function renderGroups(
 
   // Active filter text used for in-row highlighting (filterInput while typing, filterPath once confirmed)
   const activeFilter = filterMode ? filterInput : filterPath;
+
+  // Compile text highlighter once for this render call — avoids regex recompilation per row.
+  const highlightText = makeTextHighlighter(activeFilter, filterTarget, filterRegex);
 
   // ── Filter bar (sticky, shown when active or typing) ──────────────────────
   const IS_MAC = process.platform === "darwin";
@@ -335,16 +341,9 @@ export function renderGroups(
       // nested ANSI resets do not bleed into neighbouring segments.
       const repoName = isCursor
         ? pc.bgMagenta(
-            ` ${applyTextHighlight(group.repoFullName, activeFilter, filterTarget, filterRegex, "repo", (s) => pc.bold(pc.white(s)))} `,
+            ` ${highlightText(group.repoFullName, "repo", (s) => pc.bold(pc.white(s)))} `,
           )
-        : applyTextHighlight(
-            group.repoFullName,
-            activeFilter,
-            filterTarget,
-            filterRegex,
-            "repo",
-            pc.bold,
-          );
+        : highlightText(group.repoFullName, "repo", pc.bold);
       const count = pc.dim(buildMatchCountLabel(group));
       // Right-align the match count flush to the terminal edge
       const leftPart = `${arrow} ${checkbox} ${repoName}`;
@@ -362,7 +361,7 @@ export function renderGroups(
       const locSuffix = seg ? `:${seg.line}:${seg.col}` : "";
       const filePath = isCursor
         ? pc.bgMagenta(pc.bold(pc.white(` ${match.path}${locSuffix} `)))
-        : `${applyTextHighlight(match.path, activeFilter, filterTarget, filterRegex, "path", pc.cyan)}${pc.dim(locSuffix)}`;
+        : `${highlightText(match.path, "path", pc.cyan)}${pc.dim(locSuffix)}`;
       lines.push(`${INDENT}${INDENT}${checkbox} ${filePath}`);
 
       if (match.textMatches.length > 0) {

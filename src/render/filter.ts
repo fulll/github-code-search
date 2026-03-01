@@ -27,6 +27,8 @@ export function buildFilterStats(
   let hiddenRepos = 0;
   let visibleMatches = 0;
   let hiddenMatches = 0;
+  // Collect visible file paths in the same pass to avoid recomputing matchers.
+  const visibleFileSet = new Set<string>();
 
   if (filterTarget === "repo") {
     const repoMatcher = makeRepoMatcher(filterPath, filterRegex);
@@ -34,6 +36,7 @@ export function buildFilterStats(
       if (repoMatcher(g)) {
         visibleRepos++;
         visibleMatches += g.matches.length;
+        for (const m of g.matches) visibleFileSet.add(m.path);
       } else {
         hiddenRepos++;
         hiddenMatches += g.matches.length;
@@ -46,28 +49,23 @@ export function buildFilterStats(
       filterRegex,
     );
     for (const g of groups) {
-      const matching = g.matches.filter(extractMatcher).length;
-      if (matching > 0) visibleRepos++;
-      else hiddenRepos++;
-      visibleMatches += matching;
-      hiddenMatches += g.matches.length - matching;
+      const matching = g.matches.filter(extractMatcher);
+      if (matching.length > 0) {
+        visibleRepos++;
+        for (const m of matching) visibleFileSet.add(m.path);
+      } else {
+        hiddenRepos++;
+      }
+      visibleMatches += matching.length;
+      hiddenMatches += g.matches.length - matching.length;
     }
   }
 
-  const visibleFiles = new Set(
-    groups.flatMap((g) => {
-      if (filterTarget === "repo") {
-        const repoMatcher = makeRepoMatcher(filterPath, filterRegex);
-        return repoMatcher(g) ? g.matches.map((m) => m.path) : [];
-      }
-      const extractMatcher = makeExtractMatcher(
-        filterPath,
-        filterTarget as Exclude<FilterTarget, "repo">,
-        filterRegex,
-      );
-      return g.matches.filter(extractMatcher).map((m) => m.path);
-    }),
-  ).size;
-
-  return { visibleRepos, hiddenRepos, visibleMatches, hiddenMatches, visibleFiles };
+  return {
+    visibleRepos,
+    hiddenRepos,
+    visibleMatches,
+    hiddenMatches,
+    visibleFiles: visibleFileSet.size,
+  };
 }
