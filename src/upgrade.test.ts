@@ -1,10 +1,15 @@
 import { afterEach, describe, expect, it } from "bun:test";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   blogPostUrl,
   checkForUpdate,
   fetchLatestRelease,
   isNewerVersion,
   performUpgrade,
+  refreshCompletions,
   selectAsset,
 } from "./upgrade.ts";
 import type { ReleaseAsset } from "./upgrade.ts";
@@ -424,5 +429,133 @@ describe("performUpgrade — download path", () => {
     expect(stdoutWrites.some((s) => s.includes("blog/release-v9-9-9"))).toBe(true);
     expect(stdoutWrites.some((s) => s.includes("Commit log"))).toBe(true);
     expect(stdoutWrites.some((s) => s.includes("Report a bug"))).toBe(true);
+  });
+});
+
+// ─── refreshCompletions ───────────────────────────────────────────────────────
+
+describe("refreshCompletions", () => {
+  it("returns null when shell is null", async () => {
+    expect(await refreshCompletions(null)).toBeNull();
+  });
+
+  it("returns null when the completion file does not exist (never installed)", async () => {
+    const tmp = await mkdtemp(join(tmpdir(), "gcs-test-"));
+    try {
+      const result = await refreshCompletions("fish", tmp);
+      expect(result).toBeNull();
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("overwrites an existing fish completion file", async () => {
+    const tmp = await mkdtemp(join(tmpdir(), "gcs-test-"));
+    try {
+      const dir = join(tmp, ".config", "fish", "completions");
+      mkdirSync(dir, { recursive: true });
+      const filePath = join(dir, "github-code-search.fish");
+      writeFileSync(filePath, "# old content");
+
+      const result = await refreshCompletions("fish", tmp);
+      expect(result).toBe(filePath);
+
+      const updated = await Bun.file(filePath).text();
+      expect(updated).toContain("github-code-search");
+      expect(updated).not.toContain("# old content");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("overwrites an existing zsh completion file", async () => {
+    const tmp = await mkdtemp(join(tmpdir(), "gcs-test-"));
+    try {
+      const dir = join(tmp, ".zfunc");
+      mkdirSync(dir, { recursive: true });
+      const filePath = join(dir, "_github-code-search");
+      writeFileSync(filePath, "# old zsh content");
+
+      const result = await refreshCompletions("zsh", tmp);
+      expect(result).toBe(filePath);
+
+      const updated = await Bun.file(filePath).text();
+      expect(updated).toContain("compdef");
+      expect(updated).not.toContain("# old zsh content");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("overwrites an existing bash completion file", async () => {
+    const tmp = await mkdtemp(join(tmpdir(), "gcs-test-"));
+    try {
+      const dir = join(tmp, ".local", "share", "bash-completion", "completions");
+      mkdirSync(dir, { recursive: true });
+      const filePath = join(dir, "github-code-search");
+      writeFileSync(filePath, "# old bash content");
+
+      const result = await refreshCompletions("bash", tmp);
+      expect(result).toBe(filePath);
+
+      const updated = await Bun.file(filePath).text();
+      expect(updated).toContain("complete ");
+      expect(updated).not.toContain("# old bash content");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("emits a debug line when no completion file exists and debug=true", async () => {
+    const tmp = await mkdtemp(join(tmpdir(), "gcs-test-"));
+    const stdoutWrites: string[] = [];
+    const origWrite = process.stdout.write.bind(process.stdout);
+    process.stdout.write = ((s: string) => {
+      stdoutWrites.push(s);
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await refreshCompletions("bash", tmp, true);
+      expect(
+        stdoutWrites.some((s) => s.includes("[debug]") && s.includes("skipping refresh")),
+      ).toBe(true);
+    } finally {
+      process.stdout.write = origWrite;
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("emits a debug line when the file is refreshed and debug=true", async () => {
+    const tmp = await mkdtemp(join(tmpdir(), "gcs-test-"));
+    const stdoutWrites: string[] = [];
+    const origWrite = process.stdout.write.bind(process.stdout);
+    process.stdout.write = ((s: string) => {
+      stdoutWrites.push(s);
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      const dir = join(tmp, ".config", "fish", "completions");
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, "github-code-search.fish"), "# old");
+
+      await refreshCompletions("fish", tmp, true);
+      expect(
+        stdoutWrites.some((s) => s.includes("[debug]") && s.includes("refreshed completions")),
+      ).toBe(true);
+    } finally {
+      process.stdout.write = origWrite;
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("does not create the file if it did not already exist", async () => {
+    const tmp = await mkdtemp(join(tmpdir(), "gcs-test-"));
+    try {
+      await refreshCompletions("fish", tmp);
+      const dir = join(tmp, ".config", "fish", "completions");
+      expect(existsSync(join(dir, "github-code-search.fish"))).toBe(false);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });

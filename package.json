@@ -36,6 +36,7 @@
   "scripts": {
     "build": "bun build.ts",
     "test": "bun test",
+    "test:bats": "bats install.test.bats",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "lint": "oxlint .",
