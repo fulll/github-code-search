@@ -97,7 +97,7 @@ export function renderHelpOverlay(): string {
     sep,
     row(`  ${pc.dim("Filter mode:")}`),
     row(
-      `    type to filter  ·  ${pc.yellow("←→")} cursor  ·  ${pc.yellow(`${optStr}←→ / Ctrl+←→`)} word jump  ·  ${pc.yellow(optBs)} del word`,
+      `    type to filter  ·  ${pc.yellow("←→")} cursor  ·  ${pc.yellow(`${optStr}←→`)} word jump  ·  ${pc.yellow(optBs)} del word`,
     ),
     row(
       `    ${pc.yellow("Tab")} regex  ·  ${pc.yellow("Shift+Tab")} target  ·  ${pc.yellow("↵")} confirm  ·  ${pc.yellow("Esc")} cancel`,
