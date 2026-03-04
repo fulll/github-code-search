@@ -481,3 +481,295 @@ describe("highlightFragment multiline behaviour", () => {
     expect(plain.length).toBe(120);
   });
 });
+
+// ─── PHP tokenizer ────────────────────────────────────────────────────────────
+
+describe("PHP tokenizer", () => {
+  // Strict detection test: keyword must produce magenta (\x1b[35m), not just dim
+  it("detects PHP for .php extension (not default dim)", () => {
+    const phpOut = highlightFragment("function", [], "f.php").join("");
+    expect(phpOut).toContain("\x1b[35m"); // pc.magenta for keywords
+  });
+
+  it("detects PHP for .phtml extension (not default dim)", () => {
+    const out = highlightFragment("class", [], "view.phtml").join("");
+    expect(out).toContain("\x1b[35m"); // pc.magenta for keywords
+  });
+
+  it("colorizes PHP keywords in magenta", () => {
+    for (const kw of ["function", "class", "return", "echo", "if", "else", "foreach"]) {
+      const out = highlightFragment(kw, [], "f.php").join("");
+      expect(out).toContain("\x1b[35m"); // magenta
+    }
+  });
+
+  it("colorizes PHP variable ($var) in cyan", () => {
+    const out = highlightFragment("$myVar", [], "f.php").join("");
+    expect(out).toContain("\x1b[36m"); // pc.cyan for $variables
+    expect(strip(out)).toBe("$myVar");
+  });
+
+  it("colorizes double-quoted strings", () => {
+    expect(strip(highlightFragment('"hello"', [], "f.php").join(""))).toBe('"hello"');
+  });
+
+  it("colorizes single-quoted strings", () => {
+    expect(strip(highlightFragment("'world'", [], "f.php").join(""))).toBe("'world'");
+  });
+
+  it("colorizes line comments (//)", () => {
+    expect(strip(highlightFragment("// comment", [], "f.php").join(""))).toBe("// comment");
+  });
+
+  it("colorizes hash comments (#)", () => {
+    expect(strip(highlightFragment("# comment", [], "f.php").join(""))).toBe("# comment");
+  });
+
+  it("does NOT dim PHP 8+ attribute syntax #[...] as a comment", () => {
+    // Without the fix, '#[Route(...)]' is consumed as a single dim comment token.
+    // With the fix, '#' falls through to the default dim rule, but 'Route'
+    // is recognised as a PascalCase identifier → cyan (not part of a comment).
+    const out = highlightFragment("#[Route('/')]", [], "f.php").join("");
+    expect(out).toContain("\x1b[36m"); // cyan for PascalCase 'Route' — proves it's NOT swallowed by the comment rule
+    expect(strip(out)).toBe("#[Route('/')]");
+  });
+
+  it("colorizes block comments", () => {
+    expect(strip(highlightFragment("/* block */", [], "f.php").join(""))).toBe("/* block */");
+  });
+
+  it("colorizes numeric literals", () => {
+    expect(strip(highlightFragment("42", [], "f.php").join(""))).toBe("42");
+  });
+
+  it("preserves PHP-specific keywords (null, true, false)", () => {
+    for (const kw of ["null", "true", "false"]) {
+      expect(strip(highlightFragment(kw, [], "f.php").join(""))).toBe(kw);
+    }
+  });
+});
+
+// ─── C/C++ tokenizer ──────────────────────────────────────────────────────────
+
+describe("C/C++ tokenizer", () => {
+  it("detects C for .c extension (not default dim)", () => {
+    const out = highlightFragment("int", [], "main.c").join("");
+    expect(out).toContain("\x1b[35m"); // pc.magenta for keywords
+  });
+
+  it("detects C for .h extension (not default dim)", () => {
+    const out = highlightFragment("void", [], "header.h").join("");
+    expect(out).toContain("\x1b[35m"); // pc.magenta for keywords
+  });
+
+  it("detects C++ for .cpp extension (not default dim)", () => {
+    const out = highlightFragment("class", [], "foo.cpp").join("");
+    expect(out).toContain("\x1b[35m"); // pc.magenta for keywords
+  });
+
+  it("detects C++ for .cc/.cxx/.hpp/.hxx extensions (not default dim)", () => {
+    for (const ext of ["cc", "cxx", "hpp", "hxx"]) {
+      const out = highlightFragment("int", [], `f.${ext}`).join("");
+      expect(out).toContain("\x1b[35m"); // pc.magenta for keywords
+    }
+  });
+
+  it("colorizes C/C++ keywords in magenta", () => {
+    for (const kw of ["int", "void", "return", "struct", "class", "if", "else", "for", "while"]) {
+      const out = highlightFragment(kw, [], "f.cpp").join("");
+      expect(out).toContain("\x1b[35m"); // magenta
+    }
+  });
+
+  it("colorizes preprocessor directives in cyan", () => {
+    const out = highlightFragment("#include <stdio.h>", [], "f.c").join("");
+    expect(out).toContain("\x1b[36m"); // pc.cyan for preprocessor
+    expect(strip(out)).toBe("#include <stdio.h>");
+  });
+
+  it("colorizes string literals", () => {
+    expect(strip(highlightFragment('"hello"', [], "f.c").join(""))).toBe('"hello"');
+  });
+
+  it("colorizes line comments", () => {
+    expect(strip(highlightFragment("// comment", [], "f.cpp").join(""))).toBe("// comment");
+  });
+
+  it("colorizes block comments", () => {
+    expect(strip(highlightFragment("/* block */", [], "f.c").join(""))).toBe("/* block */");
+  });
+
+  it("colorizes numeric literals", () => {
+    expect(strip(highlightFragment("42", [], "f.c").join(""))).toBe("42");
+    expect(strip(highlightFragment("3.14f", [], "f.cpp").join(""))).toBe("3.14f");
+  });
+
+  it("colorizes nullptr / true / false", () => {
+    for (const kw of ["nullptr", "true", "false"]) {
+      expect(strip(highlightFragment(kw, [], "f.cpp").join(""))).toBe(kw);
+    }
+  });
+});
+
+// ─── Swift tokenizer ──────────────────────────────────────────────────────────
+
+describe("Swift tokenizer", () => {
+  it("detects Swift for .swift extension (not default dim)", () => {
+    const out = highlightFragment("var", [], "App.swift").join("");
+    expect(out).toContain("\x1b[35m"); // pc.magenta for keywords
+  });
+
+  it("colorizes Swift keywords in magenta", () => {
+    for (const kw of ["var", "let", "func", "class", "struct", "return", "if", "else", "guard"]) {
+      const out = highlightFragment(kw, [], "f.swift").join("");
+      expect(out).toContain("\x1b[35m"); // magenta
+    }
+  });
+
+  it("colorizes string literals", () => {
+    expect(strip(highlightFragment('"hello"', [], "f.swift").join(""))).toBe('"hello"');
+  });
+
+  it("colorizes line comments", () => {
+    expect(strip(highlightFragment("// comment", [], "f.swift").join(""))).toBe("// comment");
+  });
+
+  it("colorizes block comments", () => {
+    expect(strip(highlightFragment("/* block */", [], "f.swift").join(""))).toBe("/* block */");
+  });
+
+  it("colorizes numeric literals", () => {
+    expect(strip(highlightFragment("42", [], "f.swift").join(""))).toBe("42");
+  });
+
+  it("preserves nil / true / false", () => {
+    for (const kw of ["nil", "true", "false"]) {
+      expect(strip(highlightFragment(kw, [], "f.swift").join(""))).toBe(kw);
+    }
+  });
+
+  it("colorizes PascalCase types", () => {
+    const out = highlightFragment("MyClass", [], "f.swift").join("");
+    expect(out).toContain("\x1b[36m"); // cyan for PascalCase identifiers
+    expect(strip(out)).toBe("MyClass");
+  });
+});
+
+// ─── Terraform / HCL tokenizer ────────────────────────────────────────────────
+
+describe("Terraform/HCL tokenizer", () => {
+  it("detects Terraform for .tf extension (not default dim)", () => {
+    const out = highlightFragment("resource", [], "main.tf").join("");
+    expect(out).toContain("\x1b[35m"); // pc.magenta for block keywords
+  });
+
+  it("detects Terraform for .hcl extension (not default dim)", () => {
+    const out = highlightFragment("variable", [], "vars.hcl").join("");
+    expect(out).toContain("\x1b[35m"); // pc.magenta for block keywords
+  });
+
+  it("colorizes Terraform block keywords in magenta", () => {
+    for (const kw of ["resource", "variable", "output", "module", "provider", "locals", "data"]) {
+      const out = highlightFragment(kw, [], "f.tf").join("");
+      expect(out).toContain("\x1b[35m"); // magenta
+    }
+  });
+
+  it("colorizes string literals", () => {
+    expect(strip(highlightFragment('"value"', [], "f.tf").join(""))).toBe('"value"');
+  });
+
+  it("colorizes hash comments", () => {
+    expect(strip(highlightFragment("# comment", [], "f.tf").join(""))).toBe("# comment");
+  });
+
+  it("colorizes line comments (//)", () => {
+    expect(strip(highlightFragment("// comment", [], "f.tf").join(""))).toBe("// comment");
+  });
+
+  it("colorizes boolean literals", () => {
+    for (const kw of ["true", "false", "null"]) {
+      const out = highlightFragment(kw, [], "f.tf").join("");
+      expect(out).toContain("\x1b[35m"); // magenta for boolean/null literals
+      expect(strip(out)).toBe(kw);
+    }
+  });
+
+  it("colorizes numeric literals", () => {
+    expect(strip(highlightFragment("42", [], "f.tf").join(""))).toBe("42");
+  });
+});
+
+// ─── Dockerfile tokenizer ─────────────────────────────────────────────────────
+
+describe("Dockerfile tokenizer", () => {
+  it("detects Dockerfile for filename 'Dockerfile' (not default dim)", () => {
+    const out = highlightFragment("FROM", [], "Dockerfile").join("");
+    expect(out).toContain("\x1b[35m"); // pc.magenta for instructions
+  });
+
+  it("detects Dockerfile for 'dockerfile' (lowercase, not default dim)", () => {
+    const out = highlightFragment("RUN", [], "dockerfile").join("");
+    expect(out).toContain("\x1b[35m"); // pc.magenta for instructions
+  });
+
+  it("detects Dockerfile for 'Dockerfile.prod' (prefixed, not default dim)", () => {
+    const out = highlightFragment("FROM", [], "Dockerfile.prod").join("");
+    expect(out).toContain("\x1b[35m"); // pc.magenta for instructions
+  });
+
+  it("does NOT mis-detect 'Dockerfile.ts' as Dockerfile — extension wins", () => {
+    // 'const' is a TypeScript keyword → magenta via TS rules, not Dockerfile rules.
+    // The key assertion is that the extension-based lookup takes priority.
+    const out = highlightFragment("const", [], "Dockerfile.ts").join("");
+    expect(out).toContain("\x1b[35m"); // magenta via TypeScript keywords, not Dockerfile
+    expect(strip(out)).toBe("const");
+  });
+
+  it("colorizes all standard Dockerfile instructions in magenta", () => {
+    for (const instr of [
+      "FROM",
+      "RUN",
+      "CMD",
+      "LABEL",
+      "EXPOSE",
+      "ENV",
+      "ADD",
+      "COPY",
+      "ENTRYPOINT",
+      "VOLUME",
+      "USER",
+      "WORKDIR",
+      "ARG",
+      "ONBUILD",
+      "STOPSIGNAL",
+      "HEALTHCHECK",
+      "SHELL",
+      "MAINTAINER", // deprecated but still present in the regex
+    ]) {
+      const out = highlightFragment(instr, [], "Dockerfile").join("");
+      expect(out).toContain("\x1b[35m"); // magenta
+    }
+  });
+
+  it("colorizes comments", () => {
+    expect(strip(highlightFragment("# comment", [], "Dockerfile").join(""))).toBe("# comment");
+  });
+
+  it("colorizes $ENV_VAR references in cyan", () => {
+    const out = highlightFragment("$BUILD_VERSION", [], "Dockerfile").join("");
+    expect(out).toContain("\x1b[36m"); // pc.cyan for $VAR refs
+    expect(strip(out)).toBe("$BUILD_VERSION");
+  });
+
+  it("colorizes ${VAR} references in cyan", () => {
+    const out = highlightFragment("${IMAGE_TAG}", [], "Dockerfile").join("");
+    expect(out).toContain("\x1b[36m"); // pc.cyan for ${VAR} refs
+    expect(strip(out)).toBe("${IMAGE_TAG}");
+  });
+
+  it("preserves plain text after instruction", () => {
+    const out = strip(highlightFragment("FROM ubuntu:22.04", [], "Dockerfile").join(""));
+    expect(out).toBe("FROM ubuntu:22.04");
+  });
+});

@@ -15,9 +15,16 @@ type Lang =
   | "json"
   | "css"
   | "html"
+  | "php"
+  | "c"
+  | "swift"
+  | "terraform"
+  | "dockerfile"
   | "text";
 
 function detectLang(filePath: string): Lang {
+  // Extension-based detection takes priority to avoid false positives
+  // (e.g. Dockerfile.ts must be detected as typescript, not dockerfile).
   const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
   const map: Record<string, Lang> = {
     ts: "typescript",
@@ -46,8 +53,31 @@ function detectLang(filePath: string): Lang {
     xml: "html",
     svelte: "html",
     vue: "html",
+    php: "php",
+    phtml: "php",
+    c: "c",
+    h: "c",
+    cpp: "c",
+    cc: "c",
+    cxx: "c",
+    hpp: "c",
+    hxx: "c",
+    swift: "swift",
+    tf: "terraform",
+    hcl: "terraform",
   };
-  return map[ext] ?? "text";
+  const langFromExt = map[ext];
+  if (langFromExt) return langFromExt;
+
+  // Dockerfile detection by filename — only reached when no extension matched,
+  // so Dockerfile.ts / Dockerfile.php are never misidentified.
+  const base = filePath.split("/").pop() ?? "";
+  const baseLower = base.toLowerCase();
+  if (baseLower === "dockerfile" || baseLower.startsWith("dockerfile.")) {
+    return "dockerfile";
+  }
+
+  return "text";
 }
 
 // ─── Syntax token rules ───────────────────────────────────────────────────────
@@ -64,6 +94,17 @@ const RS_KW =
   /^(?:fn|let|mut|const|static|struct|enum|trait|impl|use|mod|pub|crate|super|self|return|if|else|while|for|in|loop|match|break|continue|type|where|async|await|move|ref|dyn|unsafe|true|false|Some|None|Ok|Err)\b/;
 const JAVA_KW =
   /^(?:public|private|protected|class|interface|enum|extends|implements|import|package|return|if|else|while|for|do|switch|case|default|break|continue|new|null|true|false|static|final|abstract|void|int|long|double|float|boolean|char|byte|short|try|catch|finally|throw|throws|instanceof|this|super|synchronized|volatile|transient|native|strictfp)\b/;
+const PHP_KW =
+  /^(?:function|class|return|echo|print|if|elseif|else|while|for|foreach|as|do|switch|case|default|break|continue|new|null|true|false|this|self|static|public|private|protected|extends|implements|interface|abstract|final|try|catch|finally|throw|use|namespace|trait|match|fn|array|list|isset|empty|unset|include|require|include_once|require_once|and|or|not|instanceof)\b/;
+const C_KW =
+  /^(?:int|void|char|float|double|long|short|unsigned|signed|struct|union|enum|typedef|const|static|extern|auto|register|volatile|inline|return|if|else|while|for|do|switch|case|default|break|continue|goto|sizeof|nullptr|true|false|class|public|private|protected|virtual|new|delete|this|namespace|template|using|operator|override|final|explicit|mutable|friend|try|catch|throw|decltype|constexpr|noexcept)\b/;
+const SWIFT_KW =
+  /^(?:var|let|func|class|struct|enum|protocol|extension|import|return|if|else|for|while|repeat|switch|case|default|break|continue|guard|in|where|nil|true|false|self|super|init|deinit|throws|throw|rethrows|try|catch|async|await|actor|some|typealias|override|final|open|public|internal|private|fileprivate|static|mutating|nonmutating|lazy|weak|unowned|inout|defer)\b/;
+const TF_KW =
+  /^(?:resource|variable|output|module|provider|terraform|locals|data|backend|required_providers|required_version|for_each|count|depends_on|lifecycle|provisioner|connection)\b/;
+
+const DOCKERFILE_INSTR =
+  /^(?:FROM|RUN|CMD|LABEL|EXPOSE|ENV|ADD|COPY|ENTRYPOINT|VOLUME|USER|WORKDIR|ARG|ONBUILD|STOPSIGNAL|HEALTHCHECK|SHELL|MAINTAINER)\b/;
 
 const tokenRules: Partial<Record<Lang, TokenRule[]>> & {
   default: TokenRule[];
@@ -159,6 +200,65 @@ const tokenRules: Partial<Record<Lang, TokenRule[]>> & {
     [/^./, (s) => pc.dim(s)],
   ],
   default: [
+    [/^\s+/, (s) => s],
+    [/^./, (s) => pc.dim(s)],
+  ],
+  php: [
+    [/^\/\/[^\n]*/, (s) => pc.dim(s)],
+    // Fix: exclude PHP 8+ attribute syntax (#[Route(...)], #[ORM\Entity]) from being dimmed as comments
+    [/^#(?!\[)[^\n]*/, (s) => pc.dim(s)],
+    [/^\/\*[\s\S]*?\*\//, (s) => pc.dim(s)],
+    [/^"(?:[^"\\]|\\.)*"/, (s) => pc.green(s)],
+    [/^'(?:[^'\\]|\\.)*'/, (s) => pc.green(s)],
+    [/^\$[a-zA-Z_]\w*/, (s) => pc.cyan(s)],
+    [PHP_KW, (s) => pc.magenta(s)],
+    [/^\d+(?:\.\d+)?/, (s) => pc.yellow(s)],
+    [/^[A-Z][a-zA-Z0-9_]*/, (s) => pc.cyan(s)],
+    [/^\s+/, (s) => s],
+    [/^./, (s) => pc.dim(s)],
+  ],
+  c: [
+    [/^\/\/[^\n]*/, (s) => pc.dim(s)],
+    [/^\/\*[\s\S]*?\*\//, (s) => pc.dim(s)],
+    [/^"(?:[^"\\]|\\.)*"/, (s) => pc.green(s)],
+    [/^'(?:[^'\\]|\\.)*'/, (s) => pc.green(s)],
+    [
+      /^#\s*(?:include|define|undef|ifdef|ifndef|endif|if|else|elif|pragma|error|warning)\b[^\n]*/,
+      (s) => pc.cyan(s),
+    ],
+    [C_KW, (s) => pc.magenta(s)],
+    [/^\d+(?:\.\d+)?(?:[eE][+-]?\d+)?[uUlLfFdD]*/, (s) => pc.yellow(s)],
+    [/^[A-Z][A-Z0-9_]+\b/, (s) => pc.cyan(s)],
+    [/^\s+/, (s) => s],
+    [/^./, (s) => pc.dim(s)],
+  ],
+  swift: [
+    [/^\/\/[^\n]*/, (s) => pc.dim(s)],
+    [/^\/\*[\s\S]*?\*\//, (s) => pc.dim(s)],
+    [/^"(?:[^"\\]|\\.)*"/, (s) => pc.green(s)],
+    [SWIFT_KW, (s) => pc.magenta(s)],
+    [/^\d+(?:\.\d+)?/, (s) => pc.yellow(s)],
+    [/^[A-Z][a-zA-Z0-9_]*/, (s) => pc.cyan(s)],
+    [/^\s+/, (s) => s],
+    [/^./, (s) => pc.dim(s)],
+  ],
+  terraform: [
+    [/^#[^\n]*/, (s) => pc.dim(s)],
+    [/^\/\/[^\n]*/, (s) => pc.dim(s)],
+    [/^\/\*[\s\S]*?\*\//, (s) => pc.dim(s)],
+    [/^"(?:[^"\\]|\\.)*"/, (s) => pc.green(s)],
+    [TF_KW, (s) => pc.magenta(s)],
+    [/^(?:true|false|null)\b/, (s) => pc.magenta(s)],
+    [/^\d+(?:\.\d+)?/, (s) => pc.yellow(s)],
+    [/^[a-zA-Z_][\w-]*/, (s) => pc.cyan(s)],
+    [/^\s+/, (s) => s],
+    [/^./, (s) => pc.dim(s)],
+  ],
+  dockerfile: [
+    [/^#[^\n]*/, (s) => pc.dim(s)],
+    [DOCKERFILE_INSTR, (s) => pc.magenta(s)],
+    [/^"(?:[^"\\]|\\.)*"/, (s) => pc.green(s)],
+    [/^\$\{?[a-zA-Z_]\w*\}?/, (s) => pc.cyan(s)],
     [/^\s+/, (s) => s],
     [/^./, (s) => pc.dim(s)],
   ],
