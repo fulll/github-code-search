@@ -331,8 +331,8 @@ export async function runInteractive(
       process.exit(0);
     }
 
-    // `h` / `?` — toggle help overlay
-    if (key === "h" || key === "?") {
+    // `h` / `?` / Esc — toggle help overlay (Esc closes only, h/? toggle)
+    if (key === "h" || key === "?" || (key === "\x1b" && showHelp)) {
       showHelp = !showHelp;
       redraw();
       continue;
