@@ -6,7 +6,7 @@ Each release entry covers the motivation, new features, breaking changes (if any
 
 | Version                                                                  | Blog post                                                                                                       |
 | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| [v1.8.0](https://fulll.github.io/github-code-search/blog/release-v1-8-0) | Purple TUI theme, fetch progress bar, position indicator, line-anchored file links                              |
+| [v1.8.0](https://fulll.github.io/github-code-search/blog/release-v1-8-0) | Purple TUI theme, fetch progress bar, position indicator, line-anchored file links, Esc to close help           |
 | [v1.7.0](https://fulll.github.io/github-code-search/blog/release-v1-7-0) | Shell completions (bash/zsh/fish) + extended syntax highlighting (PHP, C/C++, Swift, Terraform/HCL, Dockerfile) |
 | [v1.6.1](https://fulll.github.io/github-code-search/blog/release-v1-6-1) | Fix TUI only displaying first text fragment when a file has multiple matches                                    |
 | [v1.6.0](https://fulll.github.io/github-code-search/blog/release-v1-6-0) | Power navigation: global fold/unfold, gg/G top/bottom, paged scroll, open-in-browser                            |
