@@ -144,23 +144,54 @@ export async function searchCode(
   return { items: data.items ?? [], total: data.total_count ?? 0 };
 }
 
+// ─── Fetch progress bar ───────────────────────────────────────────────────────
+
+const PROGRESS_BAR_WIDTH = 20;
+
+/**
+ * Build a single-line purple progress bar string suitable for writing to
+ * stderr with a leading \r so it overwrites the current line.
+ *
+ * Pure function — no side effects; exported for unit testing.
+ */
+export function buildFetchProgress(currentPage: number, totalPages: number): string {
+  const filled = totalPages > 0 ? Math.round((currentPage / totalPages) * PROGRESS_BAR_WIDTH) : 0;
+  const empty = PROGRESS_BAR_WIDTH - filled;
+  // \x1b[38;5;129m — bright purple (filled blocks)
+  // \x1b[38;5;240m — dark grey (empty blocks)
+  const bar = `\x1b[38;5;129m${"▓".repeat(filled)}\x1b[38;5;240m${"░".repeat(empty)}\x1b[0m`;
+  return `\r  Fetching results from GitHub… ${bar}  page ${currentPage}/${totalPages}`;
+}
+
 export async function fetchAllResults(
   query: string,
   org: string,
   token: string,
 ): Promise<CodeMatch[]> {
-  process.stderr.write(pc.dim("Fetching results from GitHub…\n"));
+  // Write the initial progress line (no newline — will be overwritten by \r).
+  process.stderr.write(pc.dim("  Fetching results from GitHub…"));
+  let totalPages = 0;
   // GitHub code search is capped at 1000 results; paginatedFetch stops naturally
   // when a page returns fewer than 100 items (or the API returns an empty page
   // after the cap is reached).
   const allItems = await paginatedFetch<RawCodeItem>(
     async (page) => {
-      const { items } = await searchCode(query, org, token, page);
+      const { items, total } = await searchCode(query, org, token, page);
+      // On the first page, compute the expected number of pages so the bar
+      // can show realistic progress. GitHub caps at 1 000 results (10 pages).
+      if (page === 1) {
+        totalPages = Math.min(Math.ceil(total / 100), 10);
+      }
+      if (totalPages > 0) {
+        process.stderr.write(buildFetchProgress(page, totalPages));
+      }
       return items;
     },
     100, // GitHub returns up to 100 items per page
     250, // Be kind to rate limits between pages
   );
+  // Terminate the progress line.
+  process.stderr.write("\n");
 
   // ─── Resolve absolute line numbers ──────────────────────────────────────
   // The GitHub Code Search API returns fragment-relative character indices

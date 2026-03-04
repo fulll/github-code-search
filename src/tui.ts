@@ -3,6 +3,7 @@ import * as readline from "readline";
 import {
   applySelectAll,
   applySelectNone,
+  buildFileUrl,
   buildFilterStats,
   buildRows,
   isCursorVisible,
@@ -330,8 +331,8 @@ export async function runInteractive(
       process.exit(0);
     }
 
-    // `h` / `?` — toggle help overlay
-    if (key === "h" || key === "?") {
+    // `h` / `?` / Esc — toggle help overlay (Esc closes only, h/? toggle)
+    if (key === "h" || key === "?" || (key === "\x1b" && showHelp)) {
       showHelp = !showHelp;
       redraw();
       continue;
@@ -543,8 +544,8 @@ export async function runInteractive(
         // Open the repository page on GitHub
         url = `https://github.com/${groups[row.repoIndex].repoFullName}`;
       } else {
-        // Open the specific file at the matching line
-        url = groups[row.repoIndex].matches[row.extractIndex!].htmlUrl;
+        // Open the specific file at the matching line (#L{line} anchor)
+        url = buildFileUrl(groups[row.repoIndex].matches[row.extractIndex!]);
       }
       openInBrowser(url);
     }
