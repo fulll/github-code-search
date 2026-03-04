@@ -11,6 +11,7 @@ Full release notes and changelogs are always available on
 
 | Release                    | Highlights                                                                                            |
 | -------------------------- | ----------------------------------------------------------------------------------------------------- |
+| [v1.6.1](./release-v1-6-1) | Fix TUI rendering only the first fragment for multi-match files                                       |
 | [v1.6.0](./release-v1-6-0) | Power navigation: global fold/unfold (`Z`), Vim `gg`/`G` jumps, paged scroll, open-in-browser (`o`)   |
 | [v1.5.0](./release-v1-5-0) | Advanced filter targets (content/path/repo), regex mode, word-jump shortcuts, scroll accuracy fix     |
 | [v1.4.0](./release-v1-4-0) | TUI visual overhaul, violet branding, demo animation, SECURITY / Code of Conduct, README improvements |
