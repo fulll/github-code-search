@@ -46,6 +46,8 @@ jobs:
   test-bats:
     name: Shell tests (bats)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
