@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { fetchAllResults, fetchRepoTeams, searchCode, segmentLineCol } from "./api.ts";
+import {
+  buildFetchProgress,
+  fetchAllResults,
+  fetchRepoTeams,
+  searchCode,
+  segmentLineCol,
+} from "./api.ts";
 
 const originalFetch = globalThis.fetch;
 const originalSetTimeout = globalThis.setTimeout;
@@ -504,5 +510,37 @@ describe("fetchRepoTeams", () => {
 
     const result = await fetchRepoTeams("myorg", "tok", ["FRONTEND"], false);
     expect(result.has("myorg/repo-a")).toBe(true);
+  });
+});
+
+// ─── buildFetchProgress ───────────────────────────────────────────────────────
+
+describe("buildFetchProgress", () => {
+  it("starts with \\r to overwrite the current line", () => {
+    const s = buildFetchProgress(1, 10);
+    expect(s.startsWith("\r")).toBe(true);
+  });
+
+  it("contains bright purple ANSI escape 38;5;129m", () => {
+    const s = buildFetchProgress(1, 10);
+    expect(s).toContain("\x1b[38;5;129m");
+  });
+
+  it("contains page counter text", () => {
+    const s = buildFetchProgress(3, 10);
+    const stripped = s.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).toContain("3/10");
+  });
+
+  it("full bar when currentPage equals totalPages — no empty block character", () => {
+    const s = buildFetchProgress(10, 10);
+    const stripped = s.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).not.toContain("░");
+  });
+
+  it("empty bar at page 0 — no filled block character", () => {
+    const s = buildFetchProgress(0, 10);
+    const stripped = s.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).not.toContain("▓");
   });
 });
