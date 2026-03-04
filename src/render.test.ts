@@ -1464,3 +1464,43 @@ describe("renderHelpOverlay — cosmetic box", () => {
     }
   });
 });
+
+// ─── renderGroups — repo name and count colour palette ────────────────────────
+
+describe("renderGroups — repo name colour palette", () => {
+  it("inactive repo name uses bright purple 256-colour escape (38;5;129)", () => {
+    const groups = [makeGroup("org/repoA", ["src/a.ts"]), makeGroup("org/repoB", ["src/b.ts"])];
+    const rows = buildRows(groups);
+    // cursor=0 → repoA is active, repoB is inactive
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", { termWidth: 80 });
+    const lines = out.split("\n");
+    const repoBLine = lines.find((l) => l.replace(/\x1b\[[0-9;]*m/g, "").includes("org/repoB"));
+    expect(repoBLine).toBeDefined();
+    // Inactive repo name must be coloured with bright purple 38;5;129
+    expect(repoBLine!).toContain("\x1b[38;5;129m");
+  });
+
+  it("active row background uses a purple shade (48;5;53), not the grey 48;5;236", () => {
+    const groups = [makeGroup("org/repoA", ["src/a.ts"])];
+    const rows = buildRows(groups);
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", { termWidth: 80 });
+    const lines = out.split("\n");
+    const repoLine = lines.find((l) => l.replace(/\x1b\[[0-9;]*m/g, "").includes("org/repoA"));
+    expect(repoLine).toBeDefined();
+    // Must NOT use the old grey background 48;5;236
+    expect(repoLine!).not.toContain("\x1b[48;5;236m");
+    // Must use the new purple background 48;5;53
+    expect(repoLine!).toContain("\x1b[48;5;53m");
+  });
+
+  it("match count uses muted purple 256-colour escape (38;5;99)", () => {
+    const groups = [makeGroup("org/repoA", ["src/a.ts"])];
+    const rows = buildRows(groups);
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", { termWidth: 80 });
+    const lines = out.split("\n");
+    const repoLine = lines.find((l) => l.replace(/\x1b\[[0-9;]*m/g, "").includes("org/repoA"));
+    expect(repoLine).toBeDefined();
+    // Count must use muted purple 38;5;99
+    expect(repoLine!).toContain("\x1b[38;5;99m");
+  });
+});

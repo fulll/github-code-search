@@ -125,11 +125,11 @@ const HEADER_LINES = 4; // title + summaryFull + hints + blank
  * width to equal `termWidth`.
  */
 function renderActiveLine(content: string): string {
-  // \x1b[48;5;236m  — very dark grey background (256-colour bg)
+  // \x1b[48;5;53m  — dark purple background (256-colour bg)
   // \x1b[38;5;129m  — saturated purple foreground for the ▌ bar
   // \x1b[39m        — reset foreground only (background stays active)
   // \x1b[49m        — reset background at the end of the line
-  return `\x1b[48;5;236m\x1b[38;5;129m▌\x1b[39m${content}\x1b[49m`;
+  return `\x1b[48;5;53m\x1b[38;5;129m▌\x1b[39m${content}\x1b[49m`;
 }
 
 /** Width in visible columns of the left-bar character. */
@@ -437,10 +437,12 @@ export function renderGroups(
       const checkbox = group.repoSelected ? pc.green("✓") : " ";
       // On cursor rows, use bold+white for the repo name (dark bg applied
       // to the whole line via renderActiveLine; no inline bgMagenta needed).
+      // On inactive rows, use bright purple (same as the bar) in bold.
       const repoName = isCursor
         ? highlightText(group.repoFullName, "repo", (s) => pc.bold(pc.white(s)))
-        : highlightText(group.repoFullName, "repo", pc.bold);
-      const count = pc.dim(buildMatchCountLabel(group));
+        : highlightText(group.repoFullName, "repo", (s) => `\x1b[38;5;129m${pc.bold(s)}\x1b[39m`);
+      // Use muted purple for the match count (both active and inactive rows).
+      const count = `\x1b[38;5;99m${buildMatchCountLabel(group)}\x1b[39m`;
       // Right-align the match count flush to the terminal edge.
       // When active, subtract ACTIVE_BAR_WIDTH from padding so that
       // bar (1 char) + line content = termWidth total.
