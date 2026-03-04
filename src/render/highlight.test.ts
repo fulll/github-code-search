@@ -525,6 +525,15 @@ describe("PHP tokenizer", () => {
     expect(strip(highlightFragment("# comment", [], "f.php").join(""))).toBe("# comment");
   });
 
+  it("does NOT dim PHP 8+ attribute syntax #[...] as a comment", () => {
+    // Without the fix, '#[Route(...)]' is consumed as a single dim comment token.
+    // With the fix, '#' falls through to the default dim rule, but 'Route'
+    // is recognised as a PascalCase identifier → cyan (not part of a comment).
+    const out = highlightFragment("#[Route('/')]", [], "f.php").join("");
+    expect(out).toContain("\x1b[36m"); // cyan for PascalCase 'Route' — proves it's NOT swallowed by the comment rule
+    expect(strip(out)).toBe("#[Route('/')]");
+  });
+
   it("colorizes block comments", () => {
     expect(strip(highlightFragment("/* block */", [], "f.php").join(""))).toBe("/* block */");
   });
@@ -679,7 +688,9 @@ describe("Terraform/HCL tokenizer", () => {
 
   it("colorizes boolean literals", () => {
     for (const kw of ["true", "false", "null"]) {
-      expect(strip(highlightFragment(kw, [], "f.tf").join(""))).toBe(kw);
+      const out = highlightFragment(kw, [], "f.tf").join("");
+      expect(out).toContain("\x1b[35m"); // magenta for boolean/null literals
+      expect(strip(out)).toBe(kw);
     }
   });
 
@@ -706,6 +717,14 @@ describe("Dockerfile tokenizer", () => {
     expect(out).toContain("\x1b[35m"); // pc.magenta for instructions
   });
 
+  it("does NOT mis-detect 'Dockerfile.ts' as Dockerfile — extension wins", () => {
+    // 'const' is a TypeScript keyword → magenta via TS rules, not Dockerfile rules.
+    // The key assertion is that the extension-based lookup takes priority.
+    const out = highlightFragment("const", [], "Dockerfile.ts").join("");
+    expect(out).toContain("\x1b[35m"); // magenta via TypeScript keywords, not Dockerfile
+    expect(strip(out)).toBe("const");
+  });
+
   it("colorizes all standard Dockerfile instructions in magenta", () => {
     for (const instr of [
       "FROM",
@@ -725,6 +744,7 @@ describe("Dockerfile tokenizer", () => {
       "STOPSIGNAL",
       "HEALTHCHECK",
       "SHELL",
+      "MAINTAINER", // deprecated but still present in the regex
     ]) {
       const out = highlightFragment(instr, [], "Dockerfile").join("");
       expect(out).toContain("\x1b[35m"); // magenta

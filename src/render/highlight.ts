@@ -23,13 +23,8 @@ type Lang =
   | "text";
 
 function detectLang(filePath: string): Lang {
-  // Dockerfile detection by filename (no extension)
-  const base = filePath.split("/").pop() ?? "";
-  const baseLower = base.toLowerCase();
-  if (baseLower === "dockerfile" || baseLower.startsWith("dockerfile.")) {
-    return "dockerfile";
-  }
-
+  // Extension-based detection takes priority to avoid false positives
+  // (e.g. Dockerfile.ts must be detected as typescript, not dockerfile).
   const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
   const map: Record<string, Lang> = {
     ts: "typescript",
@@ -71,7 +66,18 @@ function detectLang(filePath: string): Lang {
     tf: "terraform",
     hcl: "terraform",
   };
-  return map[ext] ?? "text";
+  const langFromExt = map[ext];
+  if (langFromExt) return langFromExt;
+
+  // Dockerfile detection by filename — only reached when no extension matched,
+  // so Dockerfile.ts / Dockerfile.php are never misidentified.
+  const base = filePath.split("/").pop() ?? "";
+  const baseLower = base.toLowerCase();
+  if (baseLower === "dockerfile" || baseLower.startsWith("dockerfile.")) {
+    return "dockerfile";
+  }
+
+  return "text";
 }
 
 // ─── Syntax token rules ───────────────────────────────────────────────────────
@@ -199,7 +205,8 @@ const tokenRules: Partial<Record<Lang, TokenRule[]>> & {
   ],
   php: [
     [/^\/\/[^\n]*/, (s) => pc.dim(s)],
-    [/^#[^\n]*/, (s) => pc.dim(s)],
+    // Fix: exclude PHP 8+ attribute syntax (#[Route(...)], #[ORM\Entity]) from being dimmed as comments
+    [/^#(?!\[)[^\n]*/, (s) => pc.dim(s)],
     [/^\/\*[\s\S]*?\*\//, (s) => pc.dim(s)],
     [/^"(?:[^"\\]|\\.)*"/, (s) => pc.green(s)],
     [/^'(?:[^'\\]|\\.)*'/, (s) => pc.green(s)],
