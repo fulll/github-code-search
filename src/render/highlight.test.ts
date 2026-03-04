@@ -650,7 +650,8 @@ describe("Swift tokenizer", () => {
 
   it("colorizes PascalCase types", () => {
     const out = highlightFragment("MyClass", [], "f.swift").join("");
-    expect(out).toMatch(/\x1b\[/);
+    expect(out).toContain("\x1b[36m"); // cyan for PascalCase identifiers
+    expect(strip(out)).toBe("MyClass");
   });
 });
 
@@ -753,6 +754,18 @@ describe("Dockerfile tokenizer", () => {
 
   it("colorizes comments", () => {
     expect(strip(highlightFragment("# comment", [], "Dockerfile").join(""))).toBe("# comment");
+  });
+
+  it("colorizes $ENV_VAR references in cyan", () => {
+    const out = highlightFragment("$BUILD_VERSION", [], "Dockerfile").join("");
+    expect(out).toContain("\x1b[36m"); // pc.cyan for $VAR refs
+    expect(strip(out)).toBe("$BUILD_VERSION");
+  });
+
+  it("colorizes ${VAR} references in cyan", () => {
+    const out = highlightFragment("${IMAGE_TAG}", [], "Dockerfile").join("");
+    expect(out).toContain("\x1b[36m"); // pc.cyan for ${VAR} refs
+    expect(strip(out)).toBe("${IMAGE_TAG}");
   });
 
   it("preserves plain text after instruction", () => {
