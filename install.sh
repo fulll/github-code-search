@@ -8,12 +8,13 @@
 #   INSTALL_DIR   destination directory (default: /usr/local/bin)
 #   VERSION       specific version tag to install (default: latest)
 
-set -euo pipefail
-
 BINARY_NAME="github-code-search"
 
 # ─── Shell completions ────────────────────────────────────────────────────────
 # Defined early so it can be sourced and tested independently (INSTALL_SH_TEST=1).
+# Note: set -euo pipefail is intentionally NOT set here — it is applied only in
+# the main installation block below so that sourcing this file for bats tests
+# does not alter the caller's shell options.
 
 install_completions() {
   local bin="$1"
@@ -61,6 +62,7 @@ install_completions() {
 # Skipped when sourced for testing (export INSTALL_SH_TEST=1 before sourcing).
 
 if [ -z "${INSTALL_SH_TEST:-}" ]; then
+  set -euo pipefail
 
   REPO="fulll/github-code-search"
   INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"

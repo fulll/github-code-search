@@ -53,9 +53,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Install bats-core
-        # bats is not pre-installed on GitHub-hosted Ubuntu runners.
-        run: npm install -g bats
+      - name: Setup Bats
+        uses: bats-core/bats-action@4.0.0
+        with:
+          support-install: false
+          assert-install: false
+          detik-install: false
+          file-install: false
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run install.sh shell tests
+        shell: bash
         run: bats install.test.bats
