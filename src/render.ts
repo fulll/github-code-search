@@ -20,6 +20,18 @@ export {
 } from "./render/summary.ts";
 export { applySelectAll, applySelectNone } from "./render/selection.ts";
 
+// ─── buildFileUrl ─────────────────────────────────────────────────────────────
+
+/**
+ * Returns the URL to open when the user presses `o` on an extract row.
+ * When the first text-match segment has an absolute line number, appends the
+ * GitHub `#L{line}` anchor so the browser jumps directly to that line.
+ */
+export function buildFileUrl(match: import("./types.ts").CodeMatch): string {
+  const line = match.textMatches[0]?.matches[0]?.line;
+  return line != null ? `${match.htmlUrl}#L${line}` : match.htmlUrl;
+}
+
 // ─── Help overlay ─────────────────────────────────────────────────────────────
 
 export function renderHelpOverlay(): string {

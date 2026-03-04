@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   applySelectAll,
   applySelectNone,
+  buildFileUrl,
   buildFilterStats,
   buildMatchCountLabel,
   buildRows,
@@ -1252,5 +1253,224 @@ describe("buildFilterStats (filterTarget + filterRegex)", () => {
     const stats = buildFilterStats(groups, "^src/", "path", true);
     expect(stats.visibleMatches).toBe(1);
     expect(stats.hiddenMatches).toBe(1);
+  });
+});
+
+// ─── buildFileUrl ─────────────────────────────────────────────────────────────
+
+describe("buildFileUrl", () => {
+  it("returns htmlUrl unchanged when no textMatches", () => {
+    const group = makeGroup("org/repo", ["src/a.ts"]);
+    const match = group.matches[0]; // no textMatches (makeGroup default)
+    expect(buildFileUrl(match)).toBe("https://github.com/org/repo/blob/main/src/a.ts");
+  });
+
+  it("returns htmlUrl unchanged when textMatches is empty array", () => {
+    const group = makeGroup("org/repo", ["src/a.ts"]);
+    const match = { ...group.matches[0], textMatches: [] };
+    expect(buildFileUrl(match)).toBe("https://github.com/org/repo/blob/main/src/a.ts");
+  });
+
+  it("returns htmlUrl unchanged when textMatch has no matches", () => {
+    const group = makeGroup("org/repo", ["src/a.ts"]);
+    const match = {
+      ...group.matches[0],
+      textMatches: [{ fragment: "some code", matches: [] }],
+    };
+    expect(buildFileUrl(match)).toBe("https://github.com/org/repo/blob/main/src/a.ts");
+  });
+
+  it("appends #L{line} anchor when first segment has a line number", () => {
+    const group = makeGroup("org/repo", ["src/a.ts"]);
+    const match = {
+      ...group.matches[0],
+      textMatches: [
+        {
+          fragment: "const x = 1",
+          matches: [{ text: "const", indices: [0, 5] as [number, number], line: 42, col: 1 }],
+        },
+      ],
+    };
+    expect(buildFileUrl(match)).toBe(
+      "https://github.com/org/repo/blob/main/src/a.ts#L42",
+    );
+  });
+
+  it("uses line from first match in first textMatch (ignores subsequent matches)", () => {
+    const group = makeGroup("org/repo", ["src/b.ts"]);
+    const match = {
+      ...group.matches[0],
+      textMatches: [
+        {
+          fragment: "line one\nline two",
+          matches: [
+            { text: "one", indices: [5, 8] as [number, number], line: 10, col: 5 },
+            { text: "two", indices: [14, 17] as [number, number], line: 11, col: 5 },
+          ],
+        },
+      ],
+    };
+    expect(buildFileUrl(match)).toBe(
+      "https://github.com/org/repo/blob/main/src/b.ts#L10",
+    );
+  });
+});
+
+// ─── renderGroups — active row full-width highlight + left bar ────────────────
+
+describe("renderGroups — active row styling", () => {
+  it("active repo row starts with saturated purple left bar character ▌", () => {
+    const groups = [makeGroup("org/repoA", ["src/a.ts"])];
+    const rows = buildRows(groups);
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", { termWidth: 80 });
+    const lines = out.split("\n");
+    // Find repo row by its content
+    const repoLine = lines.find((l) => l.replace(/\x1b\[[0-9;]*m/g, "").includes("org/repoA"));
+    expect(repoLine).toBeDefined();
+    // Must contain ▌ character (the left-bar indicator)
+    expect(repoLine!.replace(/\x1b\[[0-9;]*m/g, "")).toMatch(/▌/);
+  });
+
+  it("inactive repo row does NOT have left bar ▌", () => {
+    const groups = [makeGroup("org/repoA", ["src/a.ts"]), makeGroup("org/repoB", ["src/b.ts"])];
+    const rows = buildRows(groups);
+    // cursor=0 → repoA is active, repoB is inactive
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", { termWidth: 80 });
+    const lines = out.split("\n");
+    const repoBLine = lines.find((l) => l.replace(/\x1b\[[0-9;]*m/g, "").includes("org/repoB"));
+    // repoB line must NOT contain ▌
+    expect(repoBLine).toBeDefined();
+    expect(repoBLine!.replace(/\x1b\[[0-9;]*m/g, "")).not.toMatch(/▌/);
+  });
+
+  it("active repo row has a background colour escape sequence (256-colour dark bg)", () => {
+    const groups = [makeGroup("org/repoA", ["src/a.ts"])];
+    const rows = buildRows(groups);
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", { termWidth: 80 });
+    const lines = out.split("\n");
+    const repoLine = lines.find((l) => l.replace(/\x1b\[[0-9;]*m/g, "").includes("org/repoA"));
+    expect(repoLine).toBeDefined();
+    // Must contain a 48;5; 256-colour background escape
+    expect(repoLine!).toMatch(/\x1b\[48;5;\d+m/);
+  });
+
+  it("active extract row starts with left bar ▌", () => {
+    const groups = [makeGroup("org/repoA", ["src/a.ts"], false)];
+    const rows = buildRows(groups);
+    // cursor=1 → the extract row is active
+    const out = renderGroups(groups, 1, rows, 40, 0, "q", "org", { termWidth: 80 });
+    const lines = out.split("\n");
+    const extractLine = lines.find((l) =>
+      l.replace(/\x1b\[[0-9;]*m/g, "").includes("src/a.ts"),
+    );
+    expect(extractLine).toBeDefined();
+    expect(extractLine!.replace(/\x1b\[[0-9;]*m/g, "")).toMatch(/▌/);
+  });
+});
+
+// ─── renderGroups — active extract row: homogeneous locSuffix colour ──────────
+
+describe("renderGroups — active extract row locSuffix colour", () => {
+  function makeGroupWithLineInfo(): RepoGroup {
+    return {
+      repoFullName: "org/repo",
+      matches: [
+        {
+          path: "src/a.ts",
+          repoFullName: "org/repo",
+          htmlUrl: "https://github.com/org/repo/blob/main/src/a.ts",
+          archived: false,
+          textMatches: [
+            {
+              fragment: "const x = 1",
+              matches: [{ text: "x", indices: [6, 7], line: 42, col: 7 }],
+            },
+          ],
+        },
+      ],
+      folded: false,
+      repoSelected: true,
+      extractSelected: [true],
+    };
+  }
+
+  it("active extract row: locSuffix (:42:7) uses white/bold, not dim", () => {
+    const groups = [makeGroupWithLineInfo()];
+    const rows = buildRows(groups);
+    // cursor=1 → extract row is active
+    const out = renderGroups(groups, 1, rows, 40, 0, "q", "org", { termWidth: 80 });
+    const lines = out.split("\n");
+    const extractLine = lines.find((l) =>
+      l.replace(/\x1b\[[0-9;]*m/g, "").includes("src/a.ts"),
+    );
+    expect(extractLine).toBeDefined();
+    // The suffix :42:7 must appear in the line
+    expect(extractLine!.replace(/\x1b\[[0-9;]*m/g, "")).toContain(":42:7");
+    // On active row the locSuffix must NOT be wrapped in a dim ANSI sequence \x1b[2m
+    // We isolate the suffix portion of the raw line and verify no dim before it.
+    // Strategy: check that \x1b[2m (dim on) does NOT appear immediately before ":42"
+    expect(extractLine!).not.toMatch(/\x1b\[2m[^m]*:42/);
+  });
+
+  it("inactive extract row: locSuffix uses dim styling", () => {
+    const groups = [makeGroupWithLineInfo(), makeGroup("org/other", ["x.ts"])];
+    const rows = buildRows(groups);
+    // cursor=0 (repo row) → extract row at index 1 is inactive
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", { termWidth: 80 });
+    const lines = out.split("\n");
+    const extractLine = lines.find((l) =>
+      l.replace(/\x1b\[[0-9;]*m/g, "").includes("src/a.ts"),
+    );
+    expect(extractLine).toBeDefined();
+    // Inactive: dim (\x1b[2m) must appear in the line (applied to locSuffix)
+    expect(extractLine!).toMatch(/\x1b\[2m/);
+  });
+});
+
+// ─── renderHelpOverlay — bordered box + Esc key documentation ─────────────────
+
+describe("renderHelpOverlay — cosmetic box", () => {
+  it("output contains rounded-corner box characters ╭ and ╮", () => {
+    const out = renderHelpOverlay();
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).toContain("╭");
+    expect(stripped).toContain("╮");
+  });
+
+  it("output contains bottom rounded-corner characters ╰ and ╯", () => {
+    const out = renderHelpOverlay();
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).toContain("╰");
+    expect(stripped).toContain("╯");
+  });
+
+  it("output contains vertical bar │ for side borders", () => {
+    const out = renderHelpOverlay();
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).toContain("│");
+  });
+
+  it("documents Esc to close the help overlay", () => {
+    const out = renderHelpOverlay();
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).toContain("Esc");
+    // Esc should close/dismiss the overlay, documented near the close hint
+    expect(stripped).toMatch(/[Ee]sc.*close|close.*[Ee]sc/);
+  });
+
+  it("no content line exceeds box inner width (all lines fit within the box)", () => {
+    const out = renderHelpOverlay();
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    const lines = stripped.split("\n");
+    // The first line is the top border — its length defines the box width
+    const topBorder = lines.find((l) => l.includes("╭"));
+    expect(topBorder).toBeDefined();
+    const boxWidth = topBorder!.length;
+    // Every line that starts with │ must be exactly boxWidth wide
+    for (const line of lines) {
+      if (line.startsWith("│")) {
+        expect(line.length).toBe(boxWidth);
+      }
+    }
   });
 });
