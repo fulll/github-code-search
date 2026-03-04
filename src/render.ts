@@ -47,6 +47,7 @@ export function renderHelpOverlay(): string {
 
   /** Pad a visible-width string to CONTENT chars. */
   const pad = (s: string) => {
+    // eslint-disable-next-line no-control-regex
     const visible = s.replace(/\x1b\[[0-9;]*m/g, "").length;
     return s + " ".repeat(Math.max(0, CONTENT - visible));
   };
@@ -61,21 +62,46 @@ export function renderHelpOverlay(): string {
     top,
     row(`  ${pc.bold("Key bindings")}`),
     sep,
-    row(`  ${pc.yellow("↑")} / ${pc.yellow("k")}       navigate up            ${pc.yellow("↓")} / ${pc.yellow("j")}       navigate down`),
-    row(`  ${pc.yellow("←")}           fold repo              ${pc.yellow("→")}           unfold repo`),
+    row(
+      `  ${pc.yellow("↑")} / ${pc.yellow("k")}       navigate up            ${pc.yellow("↓")} / ${pc.yellow("j")}       navigate down`,
+    ),
+    row(
+      `  ${pc.yellow("←")}           fold repo              ${pc.yellow("→")}           unfold repo`,
+    ),
     row(`  ${pc.yellow("Z")}           fold / unfold all repos`),
-    row(`  ${pc.yellow("gg")}          jump to top            ${pc.yellow("G")}           jump to bottom`),
-    row(`  ${pc.yellow("PgUp")} / ${pc.yellow("Ctrl+U")}  page up                ${pc.yellow("PgDn")} / ${pc.yellow("Ctrl+D")}  page down`),
-    row(`  ${pc.yellow("Space")}       toggle selection       ${pc.yellow("Enter")}       confirm & output`),
-    row(`  ${pc.yellow("a")}           select all             ${pc.yellow("n")}           select none`),
+    row(
+      `  ${pc.yellow("gg")}          jump to top            ${pc.yellow("G")}           jump to bottom`,
+    ),
+    row(
+      `  ${pc.yellow("PgUp")} / ${pc.yellow("Ctrl+U")}  page up                ${pc.yellow("PgDn")} / ${pc.yellow("Ctrl+D")}  page down`,
+    ),
+    row(
+      `  ${pc.yellow("Space")}       toggle selection       ${pc.yellow("Enter")}       confirm & output`,
+    ),
+    row(
+      `  ${pc.yellow("a")}           select all             ${pc.yellow("n")}           select none`,
+    ),
     row(`                 ${pc.dim("(respects active filter)")}`),
-    row(`  ${pc.yellow("o")}           open in browser        ${pc.dim("(repo row → page · extract row → file)")}`),    row(`  ${pc.yellow("f")}           enter filter mode      ${pc.yellow("r")}           reset filter`),
-    row(`  ${pc.yellow("t")}           cycle filter target    ${pc.dim("(path → content → repo)")}`),
-    row(`  ${pc.yellow("h")} / ${pc.yellow("?")}       toggle this help       ${pc.yellow("q")} / Ctrl+C  quit`),
+    row(
+      `  ${pc.yellow("o")}           open in browser        ${pc.dim("(repo row → page · extract row → file)")}`,
+    ),
+    row(
+      `  ${pc.yellow("f")}           enter filter mode      ${pc.yellow("r")}           reset filter`,
+    ),
+    row(
+      `  ${pc.yellow("t")}           cycle filter target    ${pc.dim("(path → content → repo)")}`,
+    ),
+    row(
+      `  ${pc.yellow("h")} / ${pc.yellow("?")}       toggle this help       ${pc.yellow("q")} / Ctrl+C  quit`,
+    ),
     sep,
     row(`  ${pc.dim("Filter mode:")}`),
-    row(`    type to filter  ·  ${pc.yellow("←→")} cursor  ·  ${pc.yellow(`${optStr}←→ / Ctrl+←→`)} word jump  ·  ${pc.yellow(optBs)} del word`),
-    row(`    ${pc.yellow("Tab")} regex  ·  ${pc.yellow("Shift+Tab")} target  ·  ${pc.yellow("↵")} confirm  ·  ${pc.yellow("Esc")} cancel`),
+    row(
+      `    type to filter  ·  ${pc.yellow("←→")} cursor  ·  ${pc.yellow(`${optStr}←→ / Ctrl+←→`)} word jump  ·  ${pc.yellow(optBs)} del word`,
+    ),
+    row(
+      `    ${pc.yellow("Tab")} regex  ·  ${pc.yellow("Shift+Tab")} target  ·  ${pc.yellow("↵")} confirm  ·  ${pc.yellow("Esc")} cancel`,
+    ),
     sep,
     row(pc.dim(`  press ${pc.yellow("Esc")}, ${pc.yellow("h")} or ${pc.yellow("?")} to close`)),
     bot,
@@ -423,8 +449,7 @@ export function renderGroups(
       const countLen = stripAnsi(count).length;
       const barAdjust = isCursor ? ACTIVE_BAR_WIDTH : 0;
       const pad = Math.max(0, termWidth - leftLen - countLen - barAdjust);
-      const lineContent =
-        pad > 0 ? `${leftPart}${" ".repeat(pad)}${count}` : `${leftPart}${count}`;
+      const lineContent = pad > 0 ? `${leftPart}${" ".repeat(pad)}${count}` : `${leftPart}${count}`;
       lines.push(isCursor ? renderActiveLine(lineContent) : lineContent);
     } else {
       const ei = row.extractIndex!;
@@ -440,7 +465,11 @@ export function renderGroups(
         ? `${highlightText(match.path, "path", (s) => pc.bold(pc.white(s)))}${styledLocSuffix}`
         : `${highlightText(match.path, "path", pc.cyan)}${styledLocSuffix}`;
       const extractLineContent = `${INDENT}${checkbox} ${filePath}`;
-      lines.push(isCursor ? renderActiveLine(extractLineContent) : `${INDENT}${INDENT}${checkbox} ${filePath}`);
+      lines.push(
+        isCursor
+          ? renderActiveLine(extractLineContent)
+          : `${INDENT}${INDENT}${checkbox} ${filePath}`,
+      );
 
       // Fix: render every fragment, not just textMatches[0] — see issue #74
       for (const tm of match.textMatches) {

@@ -1291,9 +1291,7 @@ describe("buildFileUrl", () => {
         },
       ],
     };
-    expect(buildFileUrl(match)).toBe(
-      "https://github.com/org/repo/blob/main/src/a.ts#L42",
-    );
+    expect(buildFileUrl(match)).toBe("https://github.com/org/repo/blob/main/src/a.ts#L42");
   });
 
   it("uses line from first match in first textMatch (ignores subsequent matches)", () => {
@@ -1310,9 +1308,7 @@ describe("buildFileUrl", () => {
         },
       ],
     };
-    expect(buildFileUrl(match)).toBe(
-      "https://github.com/org/repo/blob/main/src/b.ts#L10",
-    );
+    expect(buildFileUrl(match)).toBe("https://github.com/org/repo/blob/main/src/b.ts#L10");
   });
 });
 
@@ -1360,9 +1356,7 @@ describe("renderGroups — active row styling", () => {
     // cursor=1 → the extract row is active
     const out = renderGroups(groups, 1, rows, 40, 0, "q", "org", { termWidth: 80 });
     const lines = out.split("\n");
-    const extractLine = lines.find((l) =>
-      l.replace(/\x1b\[[0-9;]*m/g, "").includes("src/a.ts"),
-    );
+    const extractLine = lines.find((l) => l.replace(/\x1b\[[0-9;]*m/g, "").includes("src/a.ts"));
     expect(extractLine).toBeDefined();
     expect(extractLine!.replace(/\x1b\[[0-9;]*m/g, "")).toMatch(/▌/);
   });
@@ -1370,39 +1364,37 @@ describe("renderGroups — active row styling", () => {
 
 // ─── renderGroups — active extract row: homogeneous locSuffix colour ──────────
 
-describe("renderGroups — active extract row locSuffix colour", () => {
-  function makeGroupWithLineInfo(): RepoGroup {
-    return {
-      repoFullName: "org/repo",
-      matches: [
-        {
-          path: "src/a.ts",
-          repoFullName: "org/repo",
-          htmlUrl: "https://github.com/org/repo/blob/main/src/a.ts",
-          archived: false,
-          textMatches: [
-            {
-              fragment: "const x = 1",
-              matches: [{ text: "x", indices: [6, 7], line: 42, col: 7 }],
-            },
-          ],
-        },
-      ],
-      folded: false,
-      repoSelected: true,
-      extractSelected: [true],
-    };
-  }
+function makeGroupWithLineInfo(): RepoGroup {
+  return {
+    repoFullName: "org/repo",
+    matches: [
+      {
+        path: "src/a.ts",
+        repoFullName: "org/repo",
+        htmlUrl: "https://github.com/org/repo/blob/main/src/a.ts",
+        archived: false,
+        textMatches: [
+          {
+            fragment: "const x = 1",
+            matches: [{ text: "x", indices: [6, 7], line: 42, col: 7 }],
+          },
+        ],
+      },
+    ],
+    folded: false,
+    repoSelected: true,
+    extractSelected: [true],
+  };
+}
 
+describe("renderGroups — active extract row locSuffix colour", () => {
   it("active extract row: locSuffix (:42:7) uses white/bold, not dim", () => {
     const groups = [makeGroupWithLineInfo()];
     const rows = buildRows(groups);
     // cursor=1 → extract row is active
     const out = renderGroups(groups, 1, rows, 40, 0, "q", "org", { termWidth: 80 });
     const lines = out.split("\n");
-    const extractLine = lines.find((l) =>
-      l.replace(/\x1b\[[0-9;]*m/g, "").includes("src/a.ts"),
-    );
+    const extractLine = lines.find((l) => l.replace(/\x1b\[[0-9;]*m/g, "").includes("src/a.ts"));
     expect(extractLine).toBeDefined();
     // The suffix :42:7 must appear in the line
     expect(extractLine!.replace(/\x1b\[[0-9;]*m/g, "")).toContain(":42:7");
@@ -1418,9 +1410,7 @@ describe("renderGroups — active extract row locSuffix colour", () => {
     // cursor=0 (repo row) → extract row at index 1 is inactive
     const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", { termWidth: 80 });
     const lines = out.split("\n");
-    const extractLine = lines.find((l) =>
-      l.replace(/\x1b\[[0-9;]*m/g, "").includes("src/a.ts"),
-    );
+    const extractLine = lines.find((l) => l.replace(/\x1b\[[0-9;]*m/g, "").includes("src/a.ts"));
     expect(extractLine).toBeDefined();
     // Inactive: dim (\x1b[2m) must appear in the line (applied to locSuffix)
     expect(extractLine!).toMatch(/\x1b\[2m/);
