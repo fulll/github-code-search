@@ -51,13 +51,14 @@ How the CLI drives the TUI for interactive use, produces output, and self-upgrad
 C4Container
   title Level 2b: Display & output layer
 
-  UpdateLayoutConfig($c4ShapeInRow="2", $c4BoundaryInRow="1")
+  UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
 
   Person(user, "Developer", "Reads results<br/>on stdout")
   System_Ext(github, "GitHub REST API", "Releases endpoint<br/>/repos/{owner}/{repo}/releases")
 
   System_Boundary(tool, "github-code-search") {
     Container(output, "Output renderer", "TypeScript", "Markdown & JSON<br/>formatter — src/output.ts")
+    Container(completions, "Shell completion generator", "TypeScript", "generateCompletion()<br/>detectShell()<br/>src/completions.ts")
     Container(upgrade, "Upgrader", "TypeScript", "Self-replace binary<br/>src/upgrade.ts")
     Container(tui, "TUI", "TypeScript / raw TTY", "Keyboard input,<br/>interactive result browser<br/>src/tui.ts")
     Container(cli, "CLI parser", "TypeScript / Commander", "Orchestrates all flows<br/>github-code-search.ts")
@@ -71,6 +72,12 @@ C4Container
 
   Rel(upgrade, github, "Fetch<br/>latest release", "HTTPS")
   UpdateRelStyle(upgrade, github, $offsetX="10", $offsetY="-35")
+
+  Rel(upgrade, completions, "Refresh on<br/>upgrade")
+  UpdateRelStyle(upgrade, completions, $offsetX="-20", $offsetY="-22")
+
+  Rel(cli, completions, "completions<br/>subcommand")
+  UpdateRelStyle(cli, completions, $offsetX="10", $offsetY="-5")
 
   Rel(cli, tui, "Renders if<br/>interactive")
   UpdateRelStyle(cli, tui, $offsetX="-25", $offsetY="-25")
@@ -86,19 +93,21 @@ C4Container
   UpdateElementStyle(upgrade, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
   UpdateElementStyle(tui, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
   UpdateElementStyle(output, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
+  UpdateElementStyle(completions, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
   UpdateElementStyle(github, $bgColor="#FF9933", $borderColor="#0000CC", $fontColor="#000000")
 ```
 
 ## Container descriptions
 
-| Container           | Source file(s)                    | Responsibility                                                                                                                                                                                                                     |
-| ------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **CLI parser**      | `github-code-search.ts`           | Entry point. Registers the `query` and `upgrade` Commander subcommands, resolves option defaults, and orchestrates the full search-display-output flow.                                                                            |
-| **API client**      | `src/api.ts` · `src/api-utils.ts` | The only layer allowed to make network calls. Handles authentication, pagination (`paginatedFetch`), exponential-backoff retry (`fetchWithRetry`), and team/repository listing.                                                    |
-| **TUI**             | `src/tui.ts`                      | The only layer allowed to read raw stdin and write directly to the TTY. Manages the keyboard event loop, cursor position, filter mode, help overlay, and selection state. Disabled when `CI=true` or `--no-interactive` is passed. |
-| **Output renderer** | `src/output.ts`                   | Pure formatter. Converts the selected `RepoGroup[]` into a markdown document (`--format markdown`, default) or a JSON array (`--format json`). No I/O.                                                                             |
-| **Upgrader**        | `src/upgrade.ts`                  | Checks the latest GitHub release tag, downloads the matching binary asset, and atomically replaces the running executable.                                                                                                         |
-| **Team cache**      | `src/cache.ts`                    | Persists the org team list to disk (`~/.cache/github-code-search/` on Linux, `~/Library/Caches/` on macOS) to avoid hitting the `read:org` rate limit on every run.                                                                |
+| Container                      | Source file(s)                    | Responsibility                                                                                                                                                                                                                          |
+| ------------------------------ | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **CLI parser**                 | `github-code-search.ts`           | Entry point. Registers the `query`, `upgrade`, and `completions` Commander subcommands, resolves option defaults, and orchestrates the full search-display-output flow.                                                                 |
+| **API client**                 | `src/api.ts` · `src/api-utils.ts` | The only layer allowed to make network calls. Handles authentication, pagination (`paginatedFetch`), exponential-backoff retry (`fetchWithRetry`), and team/repository listing.                                                         |
+| **TUI**                        | `src/tui.ts`                      | The only layer allowed to read raw stdin and write directly to the TTY. Manages the keyboard event loop, cursor position, filter mode, help overlay, and selection state. Disabled when `CI=true` or `--no-interactive` is passed.      |
+| **Output renderer**            | `src/output.ts`                   | Pure formatter. Converts the selected `RepoGroup[]` into a markdown document (`--format markdown`, default) or a JSON array (`--format json`). No I/O.                                                                                  |
+| **Upgrader**                   | `src/upgrade.ts`                  | Checks the latest GitHub release tag, downloads the matching binary asset, and atomically replaces the running executable. After a successful upgrade, calls `refreshCompletions()` to silently overwrite any existing completion file. |
+| **Shell completion generator** | `src/completions.ts`              | Pure-function module. `generateCompletion(shell)` returns the full bash/zsh/fish script; `detectShell()` reads `$SHELL`; `getCompletionFilePath(shell, opts)` resolves the XDG-aware destination path. No I/O.                          |
+| **Team cache**                 | `src/cache.ts`                    | Persists the org team list to disk (`~/.cache/github-code-search/` on Linux, `~/Library/Caches/` on macOS) to avoid hitting the `read:org` rate limit on every run.                                                                     |
 
 ## Data flow — interactive query
 

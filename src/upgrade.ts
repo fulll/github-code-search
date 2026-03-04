@@ -1,3 +1,8 @@
+import { existsSync, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
+import { generateCompletion, getCompletionFilePath } from "./completions.ts";
+import type { Shell } from "./completions.ts";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface ReleaseAsset {
@@ -251,4 +256,33 @@ export async function checkForUpdate(
   } catch {
     return null;
   }
+}
+
+// ─── Completion refresh ────────────────────────────────────────────────────────
+
+/**
+ * Refreshes the shell completion file if it was previously installed.
+ * Only overwrites — never creates from scratch (respects the user's opt-in choice).
+ * Returns the refreshed file path, or null if no completion file was found.
+ */
+export async function refreshCompletions(
+  shell: Shell | null,
+  homeDir?: string,
+  debug = false,
+): Promise<string | null> {
+  if (!shell) return null;
+  const opts = homeDir ? { homeDir } : {};
+  const filePath = getCompletionFilePath(shell, opts);
+
+  if (!existsSync(filePath)) {
+    if (debug)
+      process.stdout.write(`[debug] no existing completions at ${filePath}, skipping refresh\n`);
+    return null;
+  }
+
+  const script = generateCompletion(shell);
+  mkdirSync(dirname(filePath), { recursive: true });
+  await Bun.write(filePath, script);
+  if (debug) process.stdout.write(`[debug] refreshed completions at ${filePath}\n`);
+  return filePath;
 }

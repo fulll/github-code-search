@@ -18,7 +18,7 @@ bun install
 ## Project structure
 
 ```
-github-code-search.ts    # CLI entry point (Commander subcommands: query, upgrade)
+github-code-search.ts    # CLI entry point (Commander subcommands: query, upgrade, completions)
 build.ts                 # Build script (compiles the standalone binary)
 src/
   types.ts               # Shared TypeScript types (TextMatchSegment, CodeMatch, RepoGroup, Row, FilterTarget, …)
@@ -30,6 +30,8 @@ src/
   cache.test.ts          # Unit tests for cache.ts
   aggregate.ts           # Result grouping and filtering logic
   aggregate.test.ts      # Unit tests for aggregate.ts
+  completions.ts         # Pure shell-completion generators (generateCompletion, detectShell, getCompletionFilePath)
+  completions.test.ts    # Unit tests for completions.ts
   render.ts              # Façade: re-exports sub-modules + TUI renderGroups/renderHelpOverlay
   render.test.ts         # Unit tests for render.ts (rows, filter, selection, rendering)
   render/
@@ -44,18 +46,28 @@ src/
   output.ts              # Text (markdown) and JSON output formatters
   output.test.ts         # Unit tests for output.ts
   tui.ts                 # Interactive keyboard-driven UI (navigation, filter mode, help overlay)
-  upgrade.ts             # Auto-upgrade logic (fetch latest release, replace binary)
+  upgrade.ts             # Auto-upgrade logic (fetch latest release, replace binary) + refreshCompletions()
   upgrade.test.ts        # Unit tests for upgrade.ts
 dist/                    # Compiled binary (git-ignored)
+install.sh               # Install script (binary download + shell completions installation)
+install.test.bats        # Shell-integration tests for install.sh (bats-core)
 ```
 
 ## Running tests
 
 ```bash
-bun test
+bun test              # TypeScript unit tests (co-located *.test.ts files)
+bun run test:bats     # Shell-integration tests for install.sh (requires bats-core)
 ```
 
-Tests are co-located with their source files and cover the pure functions in `aggregate.ts`, `output.ts`, `render.ts`, `render/highlight.ts`, and `upgrade.ts`.
+TypeScript tests are co-located with their source files and cover the pure functions in `aggregate.ts`, `completions.ts`, `output.ts`, `render.ts`, `render/highlight.ts`, and `upgrade.ts`.
+
+Shell-integration tests use [bats-core](https://github.com/bats-core/bats-core). Install it once with:
+
+```bash
+brew install bats-core   # macOS
+# or: sudo apt-get install -y bats  # Debian/Ubuntu
+```
 
 ## Building a self-contained binary
 

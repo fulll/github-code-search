@@ -21,19 +21,21 @@ If the report is incomplete, do not guess. Review the relevant module(s) to loca
 
 Use the module map in `AGENTS.md` to identify where the bug likely lives:
 
-| Symptom                                | Look in                            |
-| -------------------------------------- | ---------------------------------- |
-| Wrong grouping / filtering of results  | `src/aggregate.ts`, `src/group.ts` |
-| Incorrect markdown / JSON output       | `src/output.ts`                    |
-| Wrong syntax highlighting              | `src/render/highlight.ts`          |
-| Bad row navigation or visibility       | `src/render/rows.ts`               |
-| Incorrect select-all / select-none     | `src/render/selection.ts`          |
-| Wrong stats / summary line             | `src/render/summary.ts`            |
-| Filter stats incorrect                 | `src/render/filter.ts`             |
-| API pagination or rate-limit issue     | `src/api.ts`                       |
-| TUI keyboard handling / display glitch | `src/tui.ts`                       |
-| Upgrade failure                        | `src/upgrade.ts`                   |
-| CLI option parsing / defaults          | `github-code-search.ts`            |
+| Symptom                                            | Look in                                |
+| -------------------------------------------------- | -------------------------------------- |
+| Wrong grouping / filtering of results              | `src/aggregate.ts`, `src/group.ts`     |
+| Incorrect markdown / JSON output                   | `src/output.ts`                        |
+| Wrong syntax highlighting                          | `src/render/highlight.ts`              |
+| Bad row navigation or visibility                   | `src/render/rows.ts`                   |
+| Incorrect select-all / select-none                 | `src/render/selection.ts`              |
+| Wrong stats / summary line                         | `src/render/summary.ts`                |
+| Filter stats incorrect                             | `src/render/filter.ts`                 |
+| API pagination or rate-limit issue                 | `src/api.ts`                           |
+| TUI keyboard handling / display glitch             | `src/tui.ts`                           |
+| Upgrade failure                                    | `src/upgrade.ts`                       |
+| CLI option parsing / defaults                      | `github-code-search.ts`                |
+| Completion script wrong / not refreshed on upgrade | `src/completions.ts`, `src/upgrade.ts` |
+| Completion file written to wrong path              | `src/completions.ts`                   |
 
 ## 3. Write a failing test before fixing
 

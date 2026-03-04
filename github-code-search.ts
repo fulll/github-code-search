@@ -22,6 +22,7 @@ import { buildOutput } from "./src/output.ts";
 import { groupByTeamPrefix, flattenTeamSections } from "./src/group.ts";
 import { checkForUpdate } from "./src/upgrade.ts";
 import { runInteractive } from "./src/tui.ts";
+import { generateCompletion, detectShell } from "./src/completions.ts";
 import type { OutputFormat, OutputType } from "./src/types.ts";
 
 // Version + build metadata injected at compile time via --define (see build.ts).
@@ -347,6 +348,48 @@ program
       // Print upgrade errors to stdout so they are always visible (stderr
       // is sometimes swallowed by shells or terminal multiplexers).
       process.stdout.write(`error: ${e instanceof Error ? e.message : String(e)}\n`);
+      process.exit(1);
+    }
+    try {
+      const { refreshCompletions } = await import("./src/upgrade.ts");
+      const refreshedPath = await refreshCompletions(detectShell(), undefined, opts.debug);
+      if (refreshedPath) {
+        process.stdout.write(`✓ Shell completions refreshed at ${refreshedPath}\n`);
+      }
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      const prefix = opts.debug ? "[debug] " : "warning: ";
+      process.stdout.write(`${prefix}failed to refresh shell completions: ${message}\n`);
+    }
+    process.exit(0);
+  });
+
+// `completions` subcommand — print a shell completion script to stdout
+program
+  .command("completions")
+  .description("Print a shell completion script for bash, zsh or fish")
+  .configureHelp(helpFormatConfig)
+  .addHelpText(
+    "after",
+    helpSection("Documentation:", "https://fulll.github.io/github-code-search/usage/upgrade"),
+  )
+  .option(
+    "--shell <shell>",
+    ["Target shell: bash, zsh or fish.", "Auto-detected from $SHELL when omitted."].join("\n"),
+  )
+  .action((opts: { shell?: string }) => {
+    const shell = opts.shell ?? detectShell();
+    if (!shell) {
+      writeFileSync(
+        2,
+        `error: could not detect shell. Use --shell bash|zsh|fish to specify it explicitly.\n`,
+      );
+      process.exit(1);
+    }
+    try {
+      writeFileSync(1, generateCompletion(shell) + "\n");
+    } catch (e: unknown) {
+      writeFileSync(2, `error: ${e instanceof Error ? e.message : String(e)}\n`);
       process.exit(1);
     }
     process.exit(0);

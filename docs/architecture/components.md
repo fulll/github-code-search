@@ -14,14 +14,15 @@ into a filtered, grouped, formatted output.
 C4Component
   title Level 3a: CLI data pipeline
 
-  UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
+  UpdateLayoutConfig($c4ShapeInRow="4", $c4BoundaryInRow="1")
 
-  Container(cli, "CLI parser", "github-code-search.ts", "Orchestrates filter,<br/>group and output")
+  Container(cli, "CLI parser", "github-code-search.ts", "Orchestrates filter,<br/>group, output and<br/>shell completions")
 
   Container_Boundary(core, "Pure-function core — no I/O") {
     Component(aggregate, "Filter & aggregation", "src/aggregate.ts", "aggregate()<br/>exclude repos & extracts")
     Component(group, "Team grouping", "src/group.ts", "groupByTeamPrefix()<br/>flattenTeamSections()")
     Component(outputFn, "Output formatter", "src/output.ts", "buildOutput()<br/>markdown or JSON")
+    Component(completions, "Shell completions", "src/completions.ts", "generateCompletion()<br/>detectShell()<br/>getCompletionFilePath()")
   }
 
   Rel(cli, aggregate, "Filter<br/>CodeMatch[]")
@@ -33,10 +34,14 @@ C4Component
   Rel(cli, outputFn, "Format<br/>(non-interactive)")
   UpdateRelStyle(cli, outputFn, $offsetX="-60", $offsetY="-17")
 
+  Rel(cli, completions, "Generate<br/>script")
+  UpdateRelStyle(cli, completions, $offsetX="-90", $offsetY="-17")
+
   UpdateElementStyle(cli, $bgColor="#FFCC33", $borderColor="#0000CC", $fontColor="#000000")
   UpdateElementStyle(aggregate, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
   UpdateElementStyle(group, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
   UpdateElementStyle(outputFn, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
+  UpdateElementStyle(completions, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
 ```
 
 ## 3b — TUI render layer
@@ -108,6 +113,7 @@ C4Component
 | ------------------------ | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Filter & aggregation** | `src/aggregate.ts`           | `aggregate()` — filters `CodeMatch[]` by repository and extract exclusion lists; normalises both `repoName` and `org/repoName` forms.                                                               |
 | **Team grouping**        | `src/group.ts`               | `groupByTeamPrefix()` — groups `RepoGroup[]` into `TeamSection[]` keyed by team slug; `flattenTeamSections()` — converts back to a flat list for the TUI row builder.                               |
+| **Shell completions**    | `src/completions.ts`         | `generateCompletion(shell)` — returns the full bash/zsh/fish completion script; `detectShell()` — reads `$SHELL`; `getCompletionFilePath(shell, opts)` — resolves the XDG-aware installation path.  |
 | **Row builder**          | `src/render/rows.ts`         | `buildRows()` — converts `RepoGroup[]` into `Row[]` filtered by the active target (path / content / repo); `rowTerminalLines()` — measures wrapped height; `isCursorVisible()` — viewport clipping. |
 | **Summary builder**      | `src/render/summary.ts`      | `buildSummary()` — compact header line; `buildSummaryFull()` — detailed counts; `buildSelectionSummary()` — "N files selected" footer.                                                              |
 | **Filter stats**         | `src/render/filter.ts`       | `buildFilterStats()` — produces the `FilterStats` object (visible repos, files, matches) used by the TUI filter bar live counter.                                                                   |
