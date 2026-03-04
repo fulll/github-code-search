@@ -1,14 +1,12 @@
 name: CI
 
 on:
-  push:
-    branches: ["**"]
   pull_request:
     branches: ["main"]
 
 jobs:
   test:
-    name: Unit tests
+    name: Test · Format · Lint · Dead code
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -30,27 +28,11 @@ jobs:
 
       - name: Post LCOV coverage comment
         if: always() && github.event_name == 'pull_request'
-        uses: romeovs/lcov-reporter-action@v0.3.1
+        uses: romeovs/lcov-reporter-action@87a815f34ec27a5826abba44ce09bbc688da58fd # v0.4.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           lcov-file: coverage/lcov.info
         continue-on-error: true
-
-  quality:
-    name: Format · Lint · Dead code
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3 # v2.1.2
-        with:
-          bun-version: latest
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
 
       - name: Check formatting (oxfmt)
         run: bun run format:check
@@ -60,3 +42,26 @@ jobs:
 
       - name: Dead code detection (knip)
         run: bun run knip
+
+  test-bats:
+    name: Shell tests (bats)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Bats
+        uses: bats-core/bats-action@77d6fb60505b4d0d1d73e48bd035b55074bbfb43 # v4.0.0
+        with:
+          support-install: false
+          assert-install: false
+          detik-install: false
+          file-install: false
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run install.sh shell tests
+        shell: bash
+        run: bats install.test.bats
