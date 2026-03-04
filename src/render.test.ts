@@ -297,6 +297,31 @@ describe("rowTerminalLines", () => {
     };
     expect(rowTerminalLines(undefined, row)).toBe(2);
   });
+
+  // Fix: rowTerminalLines must account for all textMatches, not just textMatches[0] — see issue #74
+  it("extract row with two single-line fragments takes 3 lines (1 path + 2 fragments)", () => {
+    const group: RepoGroup = {
+      repoFullName: "org/repo",
+      matches: [
+        {
+          path: "src/foo.ts",
+          repoFullName: "org/repo",
+          htmlUrl: "https://github.com/org/repo/blob/main/src/foo.ts",
+          archived: false,
+          textMatches: [
+            { fragment: "first match line", matches: [] },
+            { fragment: "second match line", matches: [] },
+          ],
+        },
+      ],
+      folded: false,
+      repoSelected: true,
+      extractSelected: [true],
+    };
+    const row: Row = { type: "extract", repoIndex: 0, extractIndex: 0 };
+    // 1 line for the path + 1 line per fragment = 3 total
+    expect(rowTerminalLines(group, row)).toBe(3);
+  });
 });
 
 // ─── buildRows ────────────────────────────────────────────────────────────────
@@ -661,6 +686,35 @@ describe("renderGroups", () => {
     expect(repoLine).toBeDefined();
     const visibleLen = repoLine!.replace(/\x1b\[[0-9;]*m/g, "").length;
     expect(visibleLen).toBe(termWidth);
+  });
+
+  // Fix: renderGroups must display all textMatches for a file, not just textMatches[0] — see issue #74
+  it("shows all fragments when a file has multiple textMatches", () => {
+    const groups: RepoGroup[] = [
+      {
+        repoFullName: "org/repo",
+        matches: [
+          {
+            path: "src/multi.ts",
+            repoFullName: "org/repo",
+            htmlUrl: "https://github.com/org/repo/blob/main/src/multi.ts",
+            archived: false,
+            textMatches: [
+              { fragment: "first_fragment_content", matches: [] },
+              { fragment: "second_fragment_content", matches: [] },
+            ],
+          },
+        ],
+        folded: false,
+        repoSelected: true,
+        extractSelected: [true],
+      },
+    ];
+    const rows = buildRows(groups);
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org");
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).toContain("first_fragment_content");
+    expect(stripped).toContain("second_fragment_content");
   });
 });
 

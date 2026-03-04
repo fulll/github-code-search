@@ -10,9 +10,14 @@ export function rowTerminalLines(group: RepoGroup | undefined, row: Row): number
   if (row.type === "repo") return 1;
   const match = group!.matches[row.extractIndex!];
   if (match.textMatches.length === 0) return 1;
-  // 1 line for the file path + N lines for the fragment
-  const rawLines = match.textMatches[0].fragment.split("\n");
-  return 1 + Math.min(rawLines.length, MAX_FRAGMENT_LINES + 1); // +1 for potential "more" line
+  // Fix: sum lines for every fragment, not just textMatches[0] — see issue #74
+  // 1 line for the file path + N lines per fragment
+  let total = 1;
+  for (const tm of match.textMatches) {
+    const rawLines = tm.fragment.split("\n");
+    total += Math.min(rawLines.length, MAX_FRAGMENT_LINES + 1); // +1 for potential "more" line
+  }
+  return total;
 }
 
 /**
