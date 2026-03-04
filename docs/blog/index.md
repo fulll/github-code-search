@@ -11,6 +11,7 @@ Full release notes and changelogs are always available on
 
 | Release                    | Highlights                                                                                            |
 | -------------------------- | ----------------------------------------------------------------------------------------------------- |
+| [v1.7.0](./release-v1-7-0) | Shell completions (bash/zsh/fish), extended syntax highlighting (PHP, C/C++, Swift, Terraform, Dockerfile) |
 | [v1.6.1](./release-v1-6-1) | Fix TUI rendering only the first fragment for multi-match files                                       |
 | [v1.6.0](./release-v1-6-0) | Power navigation: global fold/unfold (`Z`), Vim `gg`/`G` jumps, paged scroll, open-in-browser (`o`)   |
 | [v1.5.0](./release-v1-5-0) | Advanced filter targets (content/path/repo), regex mode, word-jump shortcuts, scroll accuracy fix     |
