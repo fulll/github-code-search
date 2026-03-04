@@ -38,29 +38,47 @@ export function renderHelpOverlay(): string {
   const IS_MAC = process.platform === "darwin";
   const optStr = IS_MAC ? "⌥" : "Alt+";
   const optBs = IS_MAC ? "⌥⌫" : "Ctrl+W";
-  const bar = pc.dim("─".repeat(62));
+
+  // Box geometry: inner visible width = 80 (between │ chars), including 1-space
+  // padding on each side → usable content width = 78.
+  // Total box line visible length = 82 (╭ + 80×─ + ╮).
+  const INNER = 80; // visible chars between │ and │
+  const CONTENT = INNER - 2; // usable content chars (inner minus 2 side spaces)
+
+  /** Pad a visible-width string to CONTENT chars. */
+  const pad = (s: string) => {
+    const visible = s.replace(/\x1b\[[0-9;]*m/g, "").length;
+    return s + " ".repeat(Math.max(0, CONTENT - visible));
+  };
+
+  const top = `╭${"─".repeat(INNER)}╮`;
+  const sep = `│ ${pc.dim("─".repeat(CONTENT))} │`;
+  const bot = `╰${"─".repeat(INNER)}╯`;
+
+  const row = (s: string) => `│ ${pad(s)} │`;
+
   const rows = [
-    bar,
-    `  ${pc.bold("Key bindings")}`,
-    bar,
-    `  ${pc.yellow("↑")} / ${pc.yellow("k")}       navigate up            ${pc.yellow("↓")} / ${pc.yellow("j")}       navigate down`,
-    `  ${pc.yellow("←")}           fold repo              ${pc.yellow("→")}           unfold repo`,
-    `  ${pc.yellow("Z")}           fold / unfold all repos`,
-    `  ${pc.yellow("gg")}          jump to top            ${pc.yellow("G")}           jump to bottom`,
-    `  ${pc.yellow("PgUp")} / ${pc.yellow("Ctrl+U")}  page up               ${pc.yellow("PgDn")} / ${pc.yellow("Ctrl+D")}  page down`,
-    `  ${pc.yellow("Space")}       toggle selection       ${pc.yellow("Enter")}       confirm & output`,
-    `  ${pc.yellow("a")}           select all             ${pc.yellow("n")}           select none`,
-    `                 ${pc.dim("(respects active filter)")}`,
-    `  ${pc.yellow("o")}           open in browser        ${pc.dim("(repo row → repo page, extract row → file)")}`,
-    `  ${pc.yellow("f")}           enter filter mode      ${pc.yellow("r")}           reset filter`,
-    `  ${pc.yellow("t")}           cycle filter target    ${pc.dim("(path → content → repo)")}`,
-    `  ${pc.yellow("h")} / ${pc.yellow("?")}       toggle this help       ${pc.yellow("q")} / Ctrl+C  quit`,
-    bar,
-    `  ${pc.dim("Filter mode:")}`,
-    `    type to filter  ·  ${pc.yellow("←→")} cursor  ·  ${pc.yellow(`${optStr}←→ / Ctrl+←→`)} word jump  ·  ${pc.yellow(optBs)} del word`,
-    `    ${pc.yellow("Tab")} regex  ·  ${pc.yellow("Shift+Tab")} target  ·  ${pc.yellow("↵")} confirm  ·  ${pc.yellow("Esc")} cancel`,
-    bar,
-    pc.dim(`  press ${pc.yellow("h")} or ${pc.yellow("?")} to close`),
+    top,
+    row(`  ${pc.bold("Key bindings")}`),
+    sep,
+    row(`  ${pc.yellow("↑")} / ${pc.yellow("k")}       navigate up            ${pc.yellow("↓")} / ${pc.yellow("j")}       navigate down`),
+    row(`  ${pc.yellow("←")}           fold repo              ${pc.yellow("→")}           unfold repo`),
+    row(`  ${pc.yellow("Z")}           fold / unfold all repos`),
+    row(`  ${pc.yellow("gg")}          jump to top            ${pc.yellow("G")}           jump to bottom`),
+    row(`  ${pc.yellow("PgUp")} / ${pc.yellow("Ctrl+U")}  page up                ${pc.yellow("PgDn")} / ${pc.yellow("Ctrl+D")}  page down`),
+    row(`  ${pc.yellow("Space")}       toggle selection       ${pc.yellow("Enter")}       confirm & output`),
+    row(`  ${pc.yellow("a")}           select all             ${pc.yellow("n")}           select none`),
+    row(`                 ${pc.dim("(respects active filter)")}`),
+    row(`  ${pc.yellow("o")}           open in browser        ${pc.dim("(repo row → page · extract row → file)")}`),    row(`  ${pc.yellow("f")}           enter filter mode      ${pc.yellow("r")}           reset filter`),
+    row(`  ${pc.yellow("t")}           cycle filter target    ${pc.dim("(path → content → repo)")}`),
+    row(`  ${pc.yellow("h")} / ${pc.yellow("?")}       toggle this help       ${pc.yellow("q")} / Ctrl+C  quit`),
+    sep,
+    row(`  ${pc.dim("Filter mode:")}`),
+    row(`    type to filter  ·  ${pc.yellow("←→")} cursor  ·  ${pc.yellow(`${optStr}←→ / Ctrl+←→`)} word jump  ·  ${pc.yellow(optBs)} del word`),
+    row(`    ${pc.yellow("Tab")} regex  ·  ${pc.yellow("Shift+Tab")} target  ·  ${pc.yellow("↵")} confirm  ·  ${pc.yellow("Esc")} cancel`),
+    sep,
+    row(pc.dim(`  press ${pc.yellow("Esc")}, ${pc.yellow("h")} or ${pc.yellow("?")} to close`)),
+    bot,
   ];
   return rows.join("\n");
 }
@@ -69,6 +87,27 @@ export function renderHelpOverlay(): string {
 
 const INDENT = "  ";
 const HEADER_LINES = 4; // title + summaryFull + hints + blank
+
+// ─── Active row styling ───────────────────────────────────────────────────────
+
+/**
+ * Wrap a content string with a full-width dark background and a saturated
+ * purple left-bar character (▌).
+ *
+ * The bar occupies 1 visible column, so the caller must ensure that
+ * `stripAnsi(content).length === termWidth - 1` for the total visible row
+ * width to equal `termWidth`.
+ */
+function renderActiveLine(content: string): string {
+  // \x1b[48;5;236m  — very dark grey background (256-colour bg)
+  // \x1b[38;5;129m  — saturated purple foreground for the ▌ bar
+  // \x1b[39m        — reset foreground only (background stays active)
+  // \x1b[49m        — reset background at the end of the line
+  return `\x1b[48;5;236m\x1b[38;5;129m▌\x1b[39m${content}\x1b[49m`;
+}
+
+/** Width in visible columns of the left-bar character. */
+const ACTIVE_BAR_WIDTH = 1;
 
 /**
  * Compute flat-offset segments for all occurrences of `pattern` in `fragment`.
@@ -370,23 +409,23 @@ export function renderGroups(
       // green checkmark clearly signals selection. The space preserves column
       // alignment so the repo name always starts at the same offset.
       const checkbox = group.repoSelected ? pc.green("✓") : " ";
-      // On cursor rows, keep the magenta background but still highlight the
-      // matching chars in yellow so the pattern remains visible.
-      // Each segment is individually styled (bold+white or bold+yellow) so
-      // nested ANSI resets do not bleed into neighbouring segments.
+      // On cursor rows, use bold+white for the repo name (dark bg applied
+      // to the whole line via renderActiveLine; no inline bgMagenta needed).
       const repoName = isCursor
-        ? pc.bgMagenta(
-            ` ${highlightText(group.repoFullName, "repo", (s) => pc.bold(pc.white(s)))} `,
-          )
+        ? highlightText(group.repoFullName, "repo", (s) => pc.bold(pc.white(s)))
         : highlightText(group.repoFullName, "repo", pc.bold);
       const count = pc.dim(buildMatchCountLabel(group));
-      // Right-align the match count flush to the terminal edge
+      // Right-align the match count flush to the terminal edge.
+      // When active, subtract ACTIVE_BAR_WIDTH from padding so that
+      // bar (1 char) + line content = termWidth total.
       const leftPart = `${arrow} ${checkbox} ${repoName}`;
       const leftLen = stripAnsi(leftPart).length;
       const countLen = stripAnsi(count).length;
-      const pad = Math.max(0, termWidth - leftLen - countLen);
-      const line = pad > 0 ? `${leftPart}${" ".repeat(pad)}${count}` : `${leftPart}${count}`;
-      lines.push(line);
+      const barAdjust = isCursor ? ACTIVE_BAR_WIDTH : 0;
+      const pad = Math.max(0, termWidth - leftLen - countLen - barAdjust);
+      const lineContent =
+        pad > 0 ? `${leftPart}${" ".repeat(pad)}${count}` : `${leftPart}${count}`;
+      lines.push(isCursor ? renderActiveLine(lineContent) : lineContent);
     } else {
       const ei = row.extractIndex!;
       const match = group.matches[ei];
@@ -394,12 +433,14 @@ export function renderGroups(
       const checkbox = selected ? pc.green("✓") : " ";
       const seg = match.textMatches[0]?.matches[0];
       const locSuffix = seg ? `:${seg.line}:${seg.col}` : "";
+      // Active extract row: locSuffix uses bold+white (same as path) for
+      // visual homogeneity. Inactive: dim to de-emphasise the coordinates.
+      const styledLocSuffix = isCursor ? pc.bold(pc.white(locSuffix)) : pc.dim(locSuffix);
       const filePath = isCursor
-        ? pc.bgMagenta(
-            ` ${highlightText(match.path, "path", (s) => pc.bold(pc.white(s)))}${pc.dim(locSuffix)} `,
-          )
-        : `${highlightText(match.path, "path", pc.cyan)}${pc.dim(locSuffix)}`;
-      lines.push(`${INDENT}${INDENT}${checkbox} ${filePath}`);
+        ? `${highlightText(match.path, "path", (s) => pc.bold(pc.white(s)))}${styledLocSuffix}`
+        : `${highlightText(match.path, "path", pc.cyan)}${styledLocSuffix}`;
+      const extractLineContent = `${INDENT}${checkbox} ${filePath}`;
+      lines.push(isCursor ? renderActiveLine(extractLineContent) : `${INDENT}${INDENT}${checkbox} ${filePath}`);
 
       // Fix: render every fragment, not just textMatches[0] — see issue #74
       for (const tm of match.textMatches) {
