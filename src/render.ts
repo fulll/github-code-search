@@ -389,8 +389,8 @@ export function renderGroups(
         : `${highlightText(match.path, "path", pc.cyan)}${pc.dim(locSuffix)}`;
       lines.push(`${INDENT}${INDENT}${checkbox} ${filePath}`);
 
-      if (match.textMatches.length > 0) {
-        const tm = match.textMatches[0];
+      // Fix: render every fragment, not just textMatches[0] — see issue #74
+      for (const tm of match.textMatches) {
         // When filtering by content, overlay the typed pattern on the fragment.
         const extraSegs =
           filterTarget === "content" && activeFilter
