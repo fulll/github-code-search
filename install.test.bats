@@ -11,6 +11,10 @@ setup() {
   TEST_HOME="$(mktemp -d)"
   export HOME="$TEST_HOME"
 
+  # Clear XDG overrides so tests use the expected default paths.
+  # GitHub Actions runners have XDG_CONFIG_HOME/XDG_DATA_HOME already set.
+  unset XDG_CONFIG_HOME XDG_DATA_HOME ZDOTDIR
+
   # Stub binary: responds to "completions --shell <shell>" by printing a
   # recognisable string that includes the shell name.
   MOCK_BIN="${TEST_HOME}/github-code-search"

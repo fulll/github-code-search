@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -435,6 +435,23 @@ describe("performUpgrade — download path", () => {
 // ─── refreshCompletions ───────────────────────────────────────────────────────
 
 describe("refreshCompletions", () => {
+  // Save and clear XDG env vars — GitHub Actions runners have these set,
+  // which would make getCompletionFilePath ignore the injected homeDir.
+  let savedXdgConfigHome: string | undefined;
+  let savedXdgDataHome: string | undefined;
+
+  beforeEach(() => {
+    savedXdgConfigHome = process.env.XDG_CONFIG_HOME;
+    savedXdgDataHome = process.env.XDG_DATA_HOME;
+    delete process.env.XDG_CONFIG_HOME;
+    delete process.env.XDG_DATA_HOME;
+  });
+
+  afterEach(() => {
+    if (savedXdgConfigHome !== undefined) process.env.XDG_CONFIG_HOME = savedXdgConfigHome;
+    if (savedXdgDataHome !== undefined) process.env.XDG_DATA_HOME = savedXdgDataHome;
+  });
+
   it("returns null when shell is null", async () => {
     expect(await refreshCompletions(null)).toBeNull();
   });

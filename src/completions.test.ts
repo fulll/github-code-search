@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { beforeEach, afterEach, describe, expect, it } from "bun:test";
 import { generateCompletion, detectShell, getCompletionFilePath } from "./completions.ts";
 
 // ─── generateCompletion ───────────────────────────────────────────────────────
@@ -168,6 +168,27 @@ describe("detectShell", () => {
 
 describe("getCompletionFilePath", () => {
   const HOME = "/home/testuser";
+
+  // Save and clear XDG env vars so tests are not affected by the CI environment
+  // (GitHub Actions runners have XDG_CONFIG_HOME/XDG_DATA_HOME already set).
+  let savedXdgConfigHome: string | undefined;
+  let savedXdgDataHome: string | undefined;
+  let savedZdotdir: string | undefined;
+
+  beforeEach(() => {
+    savedXdgConfigHome = process.env.XDG_CONFIG_HOME;
+    savedXdgDataHome = process.env.XDG_DATA_HOME;
+    savedZdotdir = process.env.ZDOTDIR;
+    delete process.env.XDG_CONFIG_HOME;
+    delete process.env.XDG_DATA_HOME;
+    delete process.env.ZDOTDIR;
+  });
+
+  afterEach(() => {
+    if (savedXdgConfigHome !== undefined) process.env.XDG_CONFIG_HOME = savedXdgConfigHome;
+    if (savedXdgDataHome !== undefined) process.env.XDG_DATA_HOME = savedXdgDataHome;
+    if (savedZdotdir !== undefined) process.env.ZDOTDIR = savedZdotdir;
+  });
 
   describe("fish", () => {
     it("uses ~/.config/fish/completions/ by default", () => {
