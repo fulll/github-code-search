@@ -8,18 +8,26 @@ Use this page as a reference for all commands and flags when running the tool fr
 github-code-search <query> --org <org> [options]   # default (backward-compatible)
 github-code-search query <query> --org <org> [options]
 github-code-search upgrade [--debug]
+github-code-search completions [--shell <shell>]
 ```
 
-| Command                     | Description                                         |
-| --------------------------- | --------------------------------------------------- |
-| `<query>` / `query <query>` | Search GitHub code (default command)                |
-| `upgrade`                   | Check for a new release and auto-upgrade the binary |
+| Command                     | Description                                                     |
+| --------------------------- | --------------------------------------------------------------- |
+| `<query>` / `query <query>` | Search GitHub code (default command)                            |
+| `upgrade`                   | Check for a new release and auto-upgrade the binary             |
+| `completions`               | Print a shell completion script for bash, zsh or fish to stdout |
 
 ## Upgrade options
 
 | Option    | Type           | Default | Description                                                                                                                                                                                          |
 | --------- | -------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--debug` | boolean (flag) | `false` | Print verbose diagnostics: resolved binary path, available release assets, selected asset, HTTP response status, downloaded byte count, and result of each file operation (write, chmod, mv, xattr). |
+
+## Completions options
+
+| Option            | Type                      | Default       | Description                                                                                                                                                              |
+| ----------------- | ------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--shell <shell>` | `bash` \| `zsh` \| `fish` | auto-detected | Target shell for the completion script. When omitted, the shell is detected from `$SHELL`. If detection fails, the command exits with an error listing the valid values. |
 
 ## Search options
 
@@ -48,3 +56,5 @@ github-code-search upgrade [--debug]
 - The `--exclude-repositories` and `--exclude-extracts` options accept both the short form (without org prefix) and the full `org/repo` form.
 - `--no-cache` has no effect unless `--group-by-team-prefix` is also set.
 - The `upgrade` subcommand does not require `--org` or `GITHUB_TOKEN` (token is used only if already set, to avoid rate limiting).
+- After a successful upgrade, existing completion files are refreshed automatically. New files are never created by `upgrade` — use `completions` or `install.sh` for initial installation.
+- The `completions` subcommand prints to stdout; pipe it to a file or source it in your shell's config to enable tab completion.

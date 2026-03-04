@@ -38,11 +38,14 @@ The build script (`build.ts`) injects the git commit SHA, target OS and architec
 ## Running tests
 
 ```bash
-bun test            # run the whole test suite
+bun test            # run the whole TypeScript test suite
 bun test --watch    # re-run on file changes (development)
+bun run test:bats   # run the shell-integration tests for install.sh (requires bats-core)
 ```
 
-All tests use Bun's built-in test runner (`@jest/globals`-compatible API: `describe`, `it`, `expect`). No additional testing library is needed. The setup file is `src/test-setup.ts` (referenced in `bunfig.toml`).
+All TypeScript tests use Bun's built-in test runner (`@jest/globals`-compatible API: `describe`, `it`, `expect`). No additional testing library is needed. The setup file is `src/test-setup.ts` (referenced in `bunfig.toml`).
+
+Shell-integration tests use [bats-core](https://github.com/bats-core/bats-core) (`brew install bats-core` or install via your package manager). They cover `install_completions()` from `install.sh` and are located in `install.test.bats`.
 
 ## Linting & formatting
 
@@ -58,7 +61,7 @@ Always run `bun run lint` and `bun run format:check` before considering a change
 ## Project layout
 
 ```
-github-code-search.ts    # CLI entry point — Commander subcommands: query, upgrade
+github-code-search.ts    # CLI entry point — Commander subcommands: query, upgrade, completions
 build.ts                 # Build script (Bun.build)
 bunfig.toml              # Bun configuration (smol install, test preload)
 tsconfig.json            # TypeScript configuration
@@ -74,6 +77,8 @@ src/
   cache.ts               # Disk cache for the team list (getCacheDir, getCacheKey,
                          #   readCache, writeCache) — performs filesystem I/O
   aggregate.ts           # Result grouping & filtering (applyFiltersAndExclusions)
+  completions.ts         # Pure shell-completion generators: generateCompletion(),
+                         #   detectShell(), getCompletionFilePath() — no I/O
   group.ts               # groupByTeamPrefix — team-prefix grouping logic
   render.ts              # Façade re-exporting sub-modules + top-level
                          #   renderGroups() / renderHelpOverlay()
@@ -81,6 +86,7 @@ src/
                          #   help overlay, selection)
   output.ts              # Text (markdown) and JSON output formatters
   upgrade.ts             # Auto-upgrade logic (fetch latest GitHub release, replace binary)
+                         #   + refreshCompletions() — overwrites existing completion file
 
   render/
     highlight.ts         # Syntax highlighting (language detection + token rules)
@@ -108,6 +114,7 @@ src/
 - Only pure functions need tests; `tui.ts` and `api.ts` are not unit-tested.
   `api-utils.ts` is the exception: its helpers are unit-tested by mocking `globalThis.fetch`.
   `cache.ts` is also tested: it uses the `GITHUB_CODE_SEARCH_CACHE_DIR` env var override to redirect to a temp directory, so tests have no filesystem side effects on the real cache dir.
+  `completions.ts` is fully unit-tested (`completions.test.ts`). Tests that exercise `getCompletionFilePath()` must unset `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, and `ZDOTDIR` in `beforeEach` (and restore them in `afterEach`) to avoid contamination from the CI runner environment.
 - When adding a function to an existing module, add the corresponding test case in the existing `<module>.test.ts`.
 - When creating a new module that contains pure functions, create a companion `<module>.test.ts`.
 - Tests must be self-contained: no network calls, no filesystem side effects.
@@ -229,5 +236,8 @@ For minor/major releases update `docs/blog/index.md` to add a row in the version
 - The `--exclude-repositories` and `--exclude-extracts` options accept both short (`repoName`) and long (`org/repoName`) forms — this normalisation happens in `aggregate.ts`.
 - The `--group-by-team-prefix` option requires a `read:org` GitHub token scope; this is documented in `README.md`.
 - The `upgrade` subcommand replaces the running binary in-place using `src/upgrade.ts`; be careful with filesystem operations there.
+- After a successful upgrade, `refreshCompletions()` (in `src/upgrade.ts`) silently overwrites the existing completion file if one is already present. It never creates a file from scratch — installation is the user's responsibility (via `install.sh` or the `completions` subcommand).
+- The `completions` subcommand (in `github-code-search.ts`) prints the completion script for the detected (or specified) shell to stdout. It is a thin wrapper around `generateCompletion()` in `src/completions.ts`.
+- Shell-integration tests for `install.sh` live in `install.test.bats` and require `bats-core`. Run them with `bun run test:bats`. The CI runs them in a dedicated `test-bats` job using `bats-core/bats-action`.
 - `picocolors` is the only styling dependency; do not add `chalk` or similar.
 - Keep `knip` clean: every exported symbol must be used; every import must resolve.
