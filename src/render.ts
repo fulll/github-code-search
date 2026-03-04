@@ -156,7 +156,12 @@ function contentPatternSegments(
   const segs: TextMatchSegment[] = [];
   let m: RegExpExecArray | null;
   while ((m = re.exec(fragment)) !== null) {
-    segs.push({ text: m[0], indices: [m.index, m.index + m[0].length], line: 0, col: 0 });
+    segs.push({
+      text: m[0],
+      indices: [m.index, m.index + m[0].length],
+      line: 0,
+      col: 0,
+    });
     if (m[0].length === 0) re.lastIndex++;
   }
   return segs;
@@ -409,9 +414,6 @@ export function renderGroups(
 
   const viewportHeight =
     termHeight - HEADER_LINES - filterBarLines - 2 - (stickyRepoLine !== null ? 1 : 0);
-  // Fix: track the index of the last row actually rendered so the position
-  // indicator can show the correct "XX–YY of ZZ" range — see issue #79
-  let lastVisibleRowIndex = scrollOffset - 1;
   let usedLines = 0;
 
   for (let i = scrollOffset; i < rows.length; i++) {
@@ -420,7 +422,6 @@ export function renderGroups(
     // ── Section header row ────────────────────────────────────────────────
     if (row.type === "section") {
       lines.push(pc.magenta(pc.bold(`\n── ${row.sectionLabel} `)));
-      lastVisibleRowIndex = i;
       usedLines += 2; // blank separator line + label line
       if (usedLines >= viewportHeight) break;
       continue;
@@ -430,9 +431,6 @@ export function renderGroups(
     const h = rowTerminalLines(group, row);
 
     if (usedLines + h > viewportHeight && usedLines > 0) break;
-
-    // This row fits — record it as the last rendered row.
-    lastVisibleRowIndex = i;
 
     const isCursor = i === cursor;
 
@@ -502,10 +500,10 @@ export function renderGroups(
     if (usedLines >= viewportHeight) break;
   }
 
-  // Position indicator
+  // Position indicator — uses cursor position so it always updates on every
+  // navigation keystroke, regardless of whether scrollOffset changed.
   if (rows.length > 0) {
-    const lastRow = Math.max(scrollOffset, lastVisibleRowIndex);
-    lines.push(pc.dim(`\n  ↕ row ${scrollOffset + 1}–${lastRow + 1} of ${rows.length}`));
+    lines.push(pc.dim(`\n  ↕ row ${cursor + 1} of ${rows.length}`));
   }
 
   return lines.join("\n");
