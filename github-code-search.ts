@@ -350,10 +350,18 @@ program
       process.stdout.write(`error: ${e instanceof Error ? e.message : String(e)}\n`);
       process.exit(1);
     }
-    const { refreshCompletions } = await import("./src/upgrade.ts");
-    const refreshedPath = await refreshCompletions(detectShell(), undefined, opts.debug);
-    if (refreshedPath) {
-      process.stdout.write(`✓ Shell completions refreshed at ${refreshedPath}\n`);
+    try {
+      const { refreshCompletions } = await import("./src/upgrade.ts");
+      const refreshedPath = await refreshCompletions(detectShell(), undefined, opts.debug);
+      if (refreshedPath) {
+        process.stdout.write(`✓ Shell completions refreshed at ${refreshedPath}\n`);
+      }
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      const prefix = opts.debug ? "[debug] " : "warning: ";
+      process.stdout.write(
+        `${prefix}failed to refresh shell completions: ${message}\n`,
+      );
     }
     process.exit(0);
   });
