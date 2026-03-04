@@ -409,6 +409,9 @@ export function renderGroups(
 
   const viewportHeight =
     termHeight - HEADER_LINES - filterBarLines - 2 - (stickyRepoLine !== null ? 1 : 0);
+  // Fix: track the index of the last row actually rendered so the position
+  // indicator can show the correct "XX–YY of ZZ" range — see issue #79
+  let lastVisibleRowIndex = scrollOffset - 1;
   let usedLines = 0;
 
   for (let i = scrollOffset; i < rows.length; i++) {
@@ -417,6 +420,7 @@ export function renderGroups(
     // ── Section header row ────────────────────────────────────────────────
     if (row.type === "section") {
       lines.push(pc.magenta(pc.bold(`\n── ${row.sectionLabel} `)));
+      lastVisibleRowIndex = i;
       usedLines += 2; // blank separator line + label line
       if (usedLines >= viewportHeight) break;
       continue;
@@ -426,6 +430,9 @@ export function renderGroups(
     const h = rowTerminalLines(group, row);
 
     if (usedLines + h > viewportHeight && usedLines > 0) break;
+
+    // This row fits — record it as the last rendered row.
+    lastVisibleRowIndex = i;
 
     const isCursor = i === cursor;
 
@@ -497,11 +504,8 @@ export function renderGroups(
 
   // Position indicator
   if (rows.length > 0) {
-    lines.push(
-      pc.dim(
-        `\n  ↕ row ${scrollOffset + 1}–${Math.min(scrollOffset + rows.length, rows.length)} of ${rows.length}`,
-      ),
-    );
+    const lastRow = Math.max(scrollOffset, lastVisibleRowIndex);
+    lines.push(pc.dim(`\n  ↕ row ${scrollOffset + 1}–${lastRow + 1} of ${rows.length}`));
   }
 
   return lines.join("\n");

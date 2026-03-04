@@ -1504,3 +1504,41 @@ describe("renderGroups — repo name colour palette", () => {
     expect(repoLine!).toContain("\x1b[38;5;99m");
   });
 });
+
+// ─── renderGroups — position indicator ───────────────────────────────────────
+
+describe("renderGroups — position indicator", () => {
+  it("shows correct last-visible-row when viewport is smaller than row list", () => {
+    // 15 folded repos → 15 rows; termHeight=8 → viewport≈2 lines → only 2 rows visible
+    const groups = Array.from({ length: 15 }, (_, i) => makeGroup(`org/repo${i}`, ["file.ts"]));
+    const rows = buildRows(groups);
+    const out = renderGroups(groups, 0, rows, 8, 0, "q", "org", { termWidth: 80 });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    const m = stripped.match(/↕ row (\d+)–(\d+) of 15/);
+    expect(m).toBeDefined();
+    // With a small viewport, the last visible row must NOT be 15
+    expect(Number(m![2])).toBeLessThan(15);
+  });
+
+  it("last-visible-row equals total when scrolled to the bottom", () => {
+    // 15 folded repos; scrollOffset=13 → rows 13+14 remain; termHeight=10 → both fit
+    const groups = Array.from({ length: 15 }, (_, i) => makeGroup(`org/repo${i}`, ["file.ts"]));
+    const rows = buildRows(groups);
+    const out = renderGroups(groups, 13, rows, 10, 13, "q", "org", { termWidth: 80 });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    const m = stripped.match(/↕ row (\d+)–(\d+) of 15/);
+    expect(m).toBeDefined();
+    // At the bottom: last visible row must equal the total (15)
+    expect(Number(m![2])).toBe(15);
+  });
+
+  it("first-visible-row equals scrollOffset+1", () => {
+    const groups = Array.from({ length: 15 }, (_, i) => makeGroup(`org/repo${i}`, ["file.ts"]));
+    const rows = buildRows(groups);
+    const out = renderGroups(groups, 5, rows, 40, 5, "q", "org", { termWidth: 80 });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    const m = stripped.match(/↕ row (\d+)–(\d+) of 15/);
+    expect(m).toBeDefined();
+    expect(Number(m![1])).toBe(6); // scrollOffset=5 → first row = 6
+  });
+});
