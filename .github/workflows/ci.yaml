@@ -28,7 +28,7 @@ jobs:
 
       - name: Post LCOV coverage comment
         if: always() && github.event_name == 'pull_request'
-        uses: romeovs/lcov-reporter-action@v0.3.1
+        uses: romeovs/lcov-reporter-action@87a815f34ec27a5826abba44ce09bbc688da58fd # v0.4.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           lcov-file: coverage/lcov.info
@@ -54,7 +54,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Setup Bats
-        uses: bats-core/bats-action@4.0.0
+        uses: bats-core/bats-action@77d6fb60505b4d0d1d73e48bd035b55074bbfb43 # v4.0.0
         with:
           support-install: false
           assert-install: false
