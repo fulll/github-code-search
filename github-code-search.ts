@@ -359,9 +359,7 @@ program
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : String(e);
       const prefix = opts.debug ? "[debug] " : "warning: ";
-      process.stdout.write(
-        `${prefix}failed to refresh shell completions: ${message}\n`,
-      );
+      process.stdout.write(`${prefix}failed to refresh shell completions: ${message}\n`);
     }
     process.exit(0);
   });
