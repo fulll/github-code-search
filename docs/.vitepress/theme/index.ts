@@ -10,6 +10,8 @@ import ComparisonTable from "./ComparisonTable.vue";
 import ProductionCta from "./ProductionCta.vue";
 import InstallSection from "./InstallSection.vue";
 import HowItWorks from "./HowItWorks.vue";
+import RichFooter from "./RichFooter.vue";
+import MinimalFooter from "./MinimalFooter.vue";
 import "./custom.css";
 
 export default {
@@ -22,7 +24,7 @@ export default {
     app.component("HowItWorks", HowItWorks);
   },
   Layout: () => {
-    const { isDark } = useData();
+    const { isDark, frontmatter } = useData();
 
     const initMermaid = () => {
       createMermaidRenderer({
@@ -46,6 +48,9 @@ export default {
       "home-hero-image": () => h("div", { class: "td-slot-desktop" }, [h(TerminalDemo)]),
       // Mobile/tablet (<1280px): after tagline, before action buttons
       "home-hero-info-after": () => h("div", { class: "td-slot-mobile" }, [h(TerminalDemo)]),
+      // Home: rich multi-column footer ; other pages: minimal one-liner
+      "layout-bottom": () =>
+        frontmatter.value.layout === "home" ? h(RichFooter) : h(MinimalFooter),
     });
   },
 } satisfies Theme;

@@ -4,7 +4,7 @@ layout: home
 hero:
   name: "github-code-search"
   text: "Search GitHub code across your org"
-  tagline: Per-repository aggregation · Keyboard-driven TUI · Markdown & JSON output
+  tagline: Search up to 1,000 results across every repo. Group by team. Triage interactively. Export to Markdown or JSON.
   image:
     src: /logo.svg
     alt: github-code-search
