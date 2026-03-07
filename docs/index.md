@@ -45,6 +45,8 @@ features:
 
 <InstallSection />
 
+<HowItWorks />
+
 <UseCaseTabs />
 
 <ComparisonTable />
