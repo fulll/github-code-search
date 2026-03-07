@@ -212,6 +212,30 @@ describe("buildReplayCommand", () => {
     const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set());
     expect(cmd).not.toContain("--regex-hint");
   });
+
+  it("emits --pick-team for each entry in pickTeams", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const opts: ReplayOptions = {
+      groupByTeamPrefix: "squad-",
+      pickTeams: { "squad-frontend + squad-mobile": "squad-frontend" },
+    };
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
+    expect(cmd).toContain('--pick-team "squad-frontend + squad-mobile"=squad-frontend');
+  });
+
+  it("emits multiple --pick-team flags when pickTeams has multiple entries", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const opts: ReplayOptions = {
+      groupByTeamPrefix: "squad-",
+      pickTeams: {
+        "squad-a + squad-b": "squad-a",
+        "squad-c + squad-d": "squad-c",
+      },
+    };
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
+    expect(cmd).toContain('--pick-team "squad-a + squad-b"=squad-a');
+    expect(cmd).toContain('--pick-team "squad-c + squad-d"=squad-c');
+  });
 });
 
 describe("buildReplayDetails", () => {

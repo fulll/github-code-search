@@ -73,6 +73,66 @@ export function groupByTeamPrefix(groups: RepoGroup[], prefixes: string[]): Team
 }
 
 /**
+ * Assigns all repos from the combined-label section (e.g. `"squad-frontend + squad-mobile"`)
+ * to a single chosen team section.
+ *
+ * If the chosen team's section already exists, the repos are appended to it.
+ * Otherwise a new single-team section is inserted at the position the combined
+ * section occupied.
+ *
+ * Returns a new `TeamSection[]` without mutating the input.
+ */
+export function applyTeamPick(
+  sections: TeamSection[],
+  combinedLabel: string,
+  chosenTeam: string,
+): TeamSection[] {
+  const combinedIdx = sections.findIndex((s) => s.label === combinedLabel);
+  if (combinedIdx === -1) return sections;
+
+  // Tag every moved repo so the TUI can mark them as "picked" and later offer a split
+  const reposToMove = sections[combinedIdx].groups.map((g) => ({
+    ...g,
+    pickedFrom: combinedLabel,
+  }));
+
+  // Build array without the combined section
+  const remaining = sections.filter((_, i) => i !== combinedIdx);
+
+  // Find if the chosen team already has a section
+  const targetIdx = remaining.findIndex((s) => s.label === chosenTeam);
+  if (targetIdx !== -1) {
+    // Append repos to the existing chosen-team section
+    return remaining.map((s, i) =>
+      i === targetIdx ? { ...s, groups: [...s.groups, ...reposToMove] } : s,
+    );
+  }
+
+  // Insert a new single-team section where the combined section was
+  const newSection: TeamSection = { label: chosenTeam, groups: reposToMove };
+  const result = [...remaining];
+  result.splice(combinedIdx, 0, newSection);
+  return result;
+}
+
+/**
+ * Reconstructs a `TeamSection[]` from a flat `RepoGroup[]` that was produced
+ * by `flattenTeamSections`. Repos whose `sectionLabel` is set start a new
+ * section; subsequent repos (no `sectionLabel`) belong to the current section.
+ */
+export function rebuildTeamSections(groups: RepoGroup[]): TeamSection[] {
+  const sections: TeamSection[] = [];
+  for (const g of groups) {
+    if (g.sectionLabel !== undefined) {
+      sections.push({ label: g.sectionLabel, groups: [g] });
+    } else if (sections.length > 0) {
+      sections[sections.length - 1].groups.push(g);
+    }
+  }
+  return sections;
+}
+
+/**
  * Flattens `TeamSection[]` back into a plain `RepoGroup[]`, marking the first
  * repo of each section with `sectionLabel`. This is the format consumed by the
  * TUI renderer and output builders.

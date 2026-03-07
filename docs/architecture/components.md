@@ -55,7 +55,7 @@ provides shared pattern-matching helpers used by several render modules.
 C4Component
   title Level 3b: TUI render layer
 
-  UpdateLayoutConfig($c4ShapeInRow="5", $c4BoundaryInRow="1")
+  UpdateLayoutConfig($c4ShapeInRow="6", $c4BoundaryInRow="1")
 
   Container(tui, "TUI", "src/tui.ts", "Calls render functions<br/>on every redraw;<br/>formats output on Enter")
 
@@ -65,6 +65,7 @@ C4Component
     Component(filter, "Filter stats", "src/render/filter.ts", "buildFilterStats()<br/>FilterStats — visible/hidden counts")
     Component(selection, "Selection helpers", "src/render/selection.ts", "applySelectAll()<br/>applySelectNone()")
     Component(highlight, "Syntax highlighter", "src/render/highlight.ts", "highlightFragment()<br/>ANSI token colouring")
+    Component(teamPick, "Team pick bar", "src/render/team-pick.ts", "renderTeamPickHeader()<br/>ANSI candidate bar")
     Component(outputFn, "Output formatter", "src/output.ts", "buildOutput()<br/>markdown or JSON")
     Component(filterMatch, "Pattern matchers", "src/render/filter-match.ts", "makeExtractMatcher()<br/>makeRepoMatcher()")
   }
@@ -84,6 +85,9 @@ C4Component
   Rel(tui, highlight, "Highlight<br/>extracts")
   UpdateRelStyle(tui, highlight, $offsetX="-150", $offsetY="-16")
 
+  Rel(tui, teamPick, "Render pick<br/>mode bar")
+  UpdateRelStyle(tui, teamPick, $offsetX="-180", $offsetY="-16")
+
   Rel(tui, outputFn, "Format<br/>on Enter")
   UpdateRelStyle(tui, outputFn, $offsetX="17", $offsetY="160")
 
@@ -96,26 +100,36 @@ C4Component
   Rel(selection, filterMatch, "Uses pattern<br/>matchers")
   UpdateRelStyle(selection, filterMatch, $offsetX="165", $offsetY="-25")
 
+  UpdateElementStyle(tui, $bgColor="#FFCC33", $borderColor="#0000CC", $fontColor="#000000")
+  UpdateElementStyle(rows, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
+  UpdateElementStyle(filterMatch, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
+  UpdateElementStyle(summary, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
+  UpdateElementStyle(filter, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
+  UpdateElementStyle(selection, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
+  UpdateElementStyle(highlight, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
+  UpdateElementStyle(teamPick, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
+  UpdateElementStyle(outputFn, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
 ```
 
 ## Component descriptions
 
-| Component                | Source file                  | Key exports                                                                                                                                                                                         |
-| ------------------------ | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Filter & aggregation** | `src/aggregate.ts`           | `aggregate()` — filters `CodeMatch[]` by repository and extract exclusion lists; normalises both `repoName` and `org/repoName` forms.                                                               |
-| **Team grouping**        | `src/group.ts`               | `groupByTeamPrefix()` — groups `RepoGroup[]` into `TeamSection[]` keyed by team slug; `flattenTeamSections()` — converts back to a flat list for the TUI row builder.                               |
-| **Shell completions**    | `src/completions.ts`         | `generateCompletion(shell)` — returns the full bash/zsh/fish completion script; `detectShell()` — reads `$SHELL`; `getCompletionFilePath(shell, opts)` — resolves the XDG-aware installation path.  |
-| **Row builder**          | `src/render/rows.ts`         | `buildRows()` — converts `RepoGroup[]` into `Row[]` filtered by the active target (path / content / repo); `rowTerminalLines()` — measures wrapped height; `isCursorVisible()` — viewport clipping. |
-| **Summary builder**      | `src/render/summary.ts`      | `buildSummary()` — compact header line; `buildSummaryFull()` — detailed counts; `buildSelectionSummary()` — "N files selected" footer.                                                              |
-| **Filter stats**         | `src/render/filter.ts`       | `buildFilterStats()` — produces the `FilterStats` object (visible repos, files, matches) used by the TUI filter bar live counter.                                                                   |
-| **Pattern matchers**     | `src/render/filter-match.ts` | `makeExtractMatcher()` — builds a case-insensitive substring or RegExp test function for path or content targets; `makeRepoMatcher()` — wraps the same logic for repo-name matching.                |
-| **Selection helpers**    | `src/render/selection.ts`    | `applySelectAll()` — marks all visible rows as selected (respects filter target); `applySelectNone()` — deselects all visible rows.                                                                 |
-| **Syntax highlighter**   | `src/render/highlight.ts`    | `highlightFragment()` — maps file extension to a language token ruleset and applies ANSI escape sequences. Falls back to plain text for unknown extensions.                                         |
-| **Output formatter**     | `src/output.ts`              | `buildOutput()` — entry point for both `--format markdown` and `--format json` serialisation of the confirmed selection.                                                                            |
+| Component                | Source file                  | Key exports                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------ | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Filter & aggregation** | `src/aggregate.ts`           | `aggregate()` — filters `CodeMatch[]` by repository and extract exclusion lists; normalises both `repoName` and `org/repoName` forms.                                                                                                                                                                                                                    |
+| **Team grouping**        | `src/group.ts`               | `groupByTeamPrefix()` — groups `RepoGroup[]` into `TeamSection[]` keyed by team slug; `flattenTeamSections()` — converts back to a flat list for the TUI row builder; `applyTeamPick()` — moves repos from a combined section to a chosen team section; `rebuildTeamSections()` — reconstructs `TeamSection[]` from a flat list (used by TUI pick mode). |
+| **Shell completions**    | `src/completions.ts`         | `generateCompletion(shell)` — returns the full bash/zsh/fish completion script; `detectShell()` — reads `$SHELL`; `getCompletionFilePath(shell, opts)` — resolves the XDG-aware installation path.                                                                                                                                                       |
+| **Row builder**          | `src/render/rows.ts`         | `buildRows()` — converts `RepoGroup[]` into `Row[]` filtered by the active target (path / content / repo); `rowTerminalLines()` — measures wrapped height; `isCursorVisible()` — viewport clipping.                                                                                                                                                      |
+| **Summary builder**      | `src/render/summary.ts`      | `buildSummary()` — compact header line; `buildSummaryFull()` — detailed counts; `buildSelectionSummary()` — "N files selected" footer.                                                                                                                                                                                                                   |
+| **Filter stats**         | `src/render/filter.ts`       | `buildFilterStats()` — produces the `FilterStats` object (visible repos, files, matches) used by the TUI filter bar live counter.                                                                                                                                                                                                                        |
+| **Pattern matchers**     | `src/render/filter-match.ts` | `makeExtractMatcher()` — builds a case-insensitive substring or RegExp test function for path or content targets; `makeRepoMatcher()` — wraps the same logic for repo-name matching.                                                                                                                                                                     |
+| **Selection helpers**    | `src/render/selection.ts`    | `applySelectAll()` — marks all visible rows as selected (respects filter target); `applySelectNone()` — deselects all visible rows.                                                                                                                                                                                                                      |
+| **Syntax highlighter**   | `src/render/highlight.ts`    | `highlightFragment()` — maps file extension to a language token ruleset and applies ANSI escape sequences. Falls back to plain text for unknown extensions.                                                                                                                                                                                              |
+| **Team pick bar**        | `src/render/team-pick.ts`    | `renderTeamPickHeader()` — renders the ANSI pick-mode candidate bar shown when the user presses `p` on a multi-team section header. Focused candidate is highlighted in bold magenta; others are dimmed.                                                                                                                                                 |
+| **Output formatter**     | `src/output.ts`              | `buildOutput()` — entry point for both `--format markdown` and `--format json` serialisation of the confirmed selection.                                                                                                                                                                                                                                 |
 
 ## Design principles
 
 - **No I/O.** Every component in this layer is a pure function: given the same inputs it always returns the same outputs. This makes them straightforward to test with Bun's built-in test runner.
 - **Single responsibility.** Each component owns exactly one concern (rows, summary, selection, …). The TUI composes them at render time rather than duplicating logic.
 - **`types.ts` as the contract.** All components share the interfaces defined in `src/types.ts` (`TextMatchSegment`, `TextMatch`, `CodeMatch`, `RepoGroup`, `Row`, `TeamSection`, `OutputFormat`, `OutputType`, `FilterTarget`). Changes to these types require updating all components.
-- **`render.ts` as façade.** External consumers import from `src/render.ts`, which re-exports all symbols from the `src/render/` sub-modules plus the top-level `renderGroups()` and `renderHelpOverlay()` functions.
+- **`render.ts` as façade.** External consumers import from `src/render.ts`, which re-exports all symbols from the `src/render/` sub-modules plus the top-level `renderGroups()` and `renderHelpOverlay()` functions. `renderTeamPickHeader` is consumed internally by `render.ts` and is not re-exported (it is not part of the public façade).

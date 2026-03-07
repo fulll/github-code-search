@@ -37,6 +37,10 @@ export interface RepoGroup {
   /** When set, this repo is the first entry of a new team section with this
    *  label. Consumed by `buildRows` to emit a preceding section-header row. */
   sectionLabel?: string;
+  /** When set, this repo was moved from a combined section via --pick-team or
+   *  interactive pick. Stores the original combined label (e.g. "squad-a + squad-b")
+   *  so future split mode can identify it and offer to re-assign. */
+  pickedFrom?: string;
 }
 
 export interface Row {

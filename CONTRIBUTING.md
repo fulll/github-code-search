@@ -32,6 +32,8 @@ src/
   aggregate.test.ts      # Unit tests for aggregate.ts
   completions.ts         # Pure shell-completion generators (generateCompletion, detectShell, getCompletionFilePath)
   completions.test.ts    # Unit tests for completions.ts
+  group.ts               # groupByTeamPrefix, applyTeamPick, rebuildTeamSections, flattenTeamSections
+  group.test.ts          # Unit tests for group.ts
   render.ts              # Façade: re-exports sub-modules + TUI renderGroups/renderHelpOverlay
   render.test.ts         # Unit tests for render.ts (rows, filter, selection, rendering)
   render/
@@ -43,6 +45,8 @@ src/
     rows.ts              # Row builder (buildRows, rowTerminalLines, isCursorVisible)
     summary.ts           # Stats labels (buildSummary, buildSummaryFull, buildSelectionSummary)
     selection.ts         # Selection mutations (applySelectAll, applySelectNone)
+    team-pick.ts         # Pick-mode candidate bar renderer (renderTeamPickHeader) — pure, no I/O
+    team-pick.test.ts    # Unit tests for team-pick.ts
   output.ts              # Text (markdown) and JSON output formatters
   output.test.ts         # Unit tests for output.ts
   tui.ts                 # Interactive keyboard-driven UI (navigation, filter mode, help overlay)
@@ -60,7 +64,7 @@ bun test              # TypeScript unit tests (co-located *.test.ts files)
 bun run test:bats     # Shell-integration tests for install.sh (requires bats-core)
 ```
 
-TypeScript tests are co-located with their source files and cover the pure functions in `aggregate.ts`, `completions.ts`, `output.ts`, `render.ts`, `render/highlight.ts`, and `upgrade.ts`.
+TypeScript tests are co-located with their source files and cover the pure functions in `aggregate.ts`, `completions.ts`, `group.ts`, `output.ts`, `render.ts`, `render/highlight.ts`, `render/team-pick.ts`, and `upgrade.ts`.
 
 Shell-integration tests use [bats-core](https://github.com/bats-core/bats-core). Install it once with:
 

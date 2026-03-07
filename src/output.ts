@@ -37,6 +37,8 @@ export interface ReplayOptions {
   /** When set, appends `--regex-hint <term>` to the replay command so the
    *  result set from a regex query can be reproduced exactly. */
   regexHint?: string;
+  /** Team-pick assignments to replay: maps combined label → chosen team. */
+  pickTeams?: Record<string, string>;
 }
 
 // ─── Replay command ───────────────────────────────────────────────────────────
@@ -50,8 +52,15 @@ export function buildReplayCommand(
   // Fix: forward all input options so the replay command is fully reproducible — see issue #11
   options: ReplayOptions = {},
 ): string {
-  const { format, outputType, includeArchived, excludeTemplates, groupByTeamPrefix, regexHint } =
-    options;
+  const {
+    format,
+    outputType,
+    includeArchived,
+    excludeTemplates,
+    groupByTeamPrefix,
+    regexHint,
+    pickTeams,
+  } = options;
   const parts: string[] = [
     `github-code-search ${shellQuote(query)} --org ${shellQuote(org)} --no-interactive`,
   ];
@@ -102,6 +111,11 @@ export function buildReplayCommand(
   }
   if (regexHint) {
     parts.push(`--regex-hint ${shellQuote(regexHint)}`);
+  }
+  if (pickTeams) {
+    for (const [combined, chosen] of Object.entries(pickTeams)) {
+      parts.push(`--pick-team "${combined}"=${chosen}`);
+    }
   }
 
   return `# Replay:\n${parts.join(" \\\n  ")}`;
@@ -273,7 +287,7 @@ export function buildOutput(
   outputType: OutputType = "repo-and-matches",
   extraOptions: Pick<
     ReplayOptions,
-    "includeArchived" | "excludeTemplates" | "groupByTeamPrefix" | "regexHint"
+    "includeArchived" | "excludeTemplates" | "groupByTeamPrefix" | "regexHint" | "pickTeams"
   > = {},
 ): string {
   const options: ReplayOptions = { format, outputType, ...extraOptions };

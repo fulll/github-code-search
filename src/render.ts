@@ -5,6 +5,7 @@ import { buildFilterStats, type FilterStats } from "./render/filter.ts";
 import { rowTerminalLines, buildRows, isCursorVisible } from "./render/rows.ts";
 import { buildMatchCountLabel, buildSummaryFull } from "./render/summary.ts";
 import { applySelectAll, applySelectNone } from "./render/selection.ts";
+import { renderTeamPickHeader } from "./render/team-pick.ts";
 
 // ─── Re-exports ───────────────────────────────────────────────────────────────
 // Consumers (tui.ts, output.ts, tests) continue to import from render.ts.
@@ -97,6 +98,9 @@ export function renderHelpOverlay(): string {
       `  ${pc.yellow("t")}           cycle filter target    ${pc.dim("(path → content → repo)")}`,
     ),
     row(
+      `  ${pc.yellow("p")}           pick team owner        ${pc.dim("(on a multi-team section header)")}`,
+    ),
+    row(
       `  ${pc.yellow("h")} / ${pc.yellow("?")}       toggle this help       ${pc.yellow("q")} / Ctrl+C  quit`,
     ),
     sep,
@@ -106,6 +110,11 @@ export function renderHelpOverlay(): string {
     ),
     row(
       `    ${pc.yellow("Tab")} regex  ·  ${pc.yellow("Shift+Tab")} target  ·  ${pc.yellow("↵")} confirm  ·  ${pc.yellow("Esc")} cancel`,
+    ),
+    sep,
+    row(`  ${pc.dim("Pick mode  (after pressing p on a multi-team section header):")}`),
+    row(
+      `    ${pc.yellow("←")} / ${pc.yellow("→")} move focus  ·  ${pc.yellow("↵")} confirm pick  ·  ${pc.yellow("Esc")} cancel`,
     ),
     sep,
     row(pc.dim(`  press ${pc.yellow("Esc")}, ${pc.yellow("h")} or ${pc.yellow("?")} to close`)),
@@ -304,6 +313,13 @@ interface RenderOptions {
   filterTarget?: FilterTarget;
   /** When true, filterPath is treated as a regular expression (default: false). */
   filterRegex?: boolean;
+  /** Active team pick mode state — when set, replaces the matching section header with a pick bar. */
+  teamPickMode?: {
+    active: boolean;
+    sectionLabel: string;
+    candidates: string[];
+    focusedIndex: number;
+  };
 }
 
 export function renderGroups(
@@ -441,14 +457,18 @@ export function renderGroups(
     filterBarLines = 1;
   }
 
-  // Fix: clip hints to termWidth visible chars so the line never wraps and always
-  // occupies exactly 1 terminal row. Without clipping the ~158-char hint string
-  // wraps on typical terminals (< 160 cols), making the rendered output exceed
-  // termHeight by 1 line and causing the title to scroll off the top — see issue #105.
-  const HINTS_TEXT =
-    "← / → fold/unfold  Z fold-all  ↑ / ↓ navigate  gg/G top/bot  PgUp/Dn page  spc select  a all  n none  o open  f filter  t target  h help  ↵ confirm  q quit";
-  const clippedHints = HINTS_TEXT.length > termWidth ? HINTS_TEXT.slice(0, termWidth) : HINTS_TEXT;
-  lines.push(pc.dim(`${clippedHints}\n`));
+  // Fix: clip hints to termWidth visible chars so the line never wraps — see issue #105.
+  if (opts.teamPickMode?.active) {
+    const PICK_HINTS = `Pick team: ← / → move focus  ↵ confirm  Esc cancel`;
+    const clippedPick = PICK_HINTS.length > termWidth ? PICK_HINTS.slice(0, termWidth) : PICK_HINTS;
+    lines.push(pc.dim(`${clippedPick}\n`));
+  } else {
+    const HINTS_TEXT =
+      "← / → fold/unfold  Z fold-all  ↑ / ↓ navigate  gg/G top/bot  PgUp/Dn page  spc select  a all  n none  o open  f filter  t target  p pick-team  h help  ↵ confirm  q quit";
+    const clippedHints =
+      HINTS_TEXT.length > termWidth ? HINTS_TEXT.slice(0, termWidth) : HINTS_TEXT;
+    lines.push(pc.dim(`${clippedHints}\n`));
+  }
 
   // ── Sticky current-repo ───────────────────────────────────────────────────
   // When the cursor is on an extract row whose repo header has scrolled above
@@ -496,30 +516,17 @@ export function renderGroups(
 
     // ── Section header row ────────────────────────────────────────────────
     if (row.type === "section") {
+      const isActiveSectionCursor = i === cursor;
       // A section occupies 2 physical lines (blank separator + label) when it
       // follows other viewport content, but only 1 line (label only) when it
-      // is the very first row rendered.
-      //
-      // The reason: the hints header line ends with a trailing \n. When joined
-      // with `lines.join("\n")`, this already produces 1 blank line before the
-      // first viewport element. If the section also prepends \n (embedded in
-      // the string), we get a *double* blank — 1 extra physical line — which
-      // pushes the footer position indicator off the bottom of the terminal.
-      // See issue #105.
+      // is the very first row rendered — see issue #105.
       const sectionCost = usedLines === 0 ? 1 : 2;
       if (sectionCost + usedLines > viewportHeight && usedLines > 0) break;
       // Fix: clip section label to termWidth so the label line never wraps.
       // "── " prefix is 3 visible chars + 1 trailing space = 4 chars total.
       const SECTION_FIXED = 4; // "── " (3) + trailing " " (1)
-      // Use Math.max(0, …) — not Math.max(4, …) — so that on very narrow
-      // terminals the label budget never exceeds the actual available width
-      // and forces a line wider than termWidth. When the budget is 0 or 1
-      // we skip rendering the section entirely to avoid wrapping.
       const maxLabelChars = Math.max(0, termWidth - SECTION_FIXED);
       if (maxLabelChars === 0) {
-        // Terminal too narrow to render even a minimal label. Push blank
-        // placeholder lines so that lines[] stays in sync with usedLines
-        // and the footer-padding arithmetic remains correct — see review #106.
         if (usedLines > 0) lines.push(""); // blank separator when not first
         lines.push(""); // empty label placeholder
         usedLines += sectionCost;
@@ -531,10 +538,19 @@ export function renderGroups(
           ? row.sectionLabel.slice(0, maxLabelChars - 1) + "…"
           : row.sectionLabel;
       // Emit the blank separator only when there are rows above in the viewport.
-      // The leading \n is no longer embedded in the label string — it is managed
-      // here to keep the line-cost calculation exact.
       if (usedLines > 0) lines.push("");
-      lines.push(pc.magenta(pc.bold(`── ${label} `)));
+      // Feat: team pick mode — show pick bar when active for this section — see issue #85.
+      const pickMode = opts.teamPickMode;
+      if (pickMode?.active && pickMode.sectionLabel === row.sectionLabel) {
+        const bar = renderTeamPickHeader(pickMode.candidates, pickMode.focusedIndex);
+        lines.push(`${pc.magenta(pc.bold("── "))}${bar}`);
+      } else if (isActiveSectionCursor) {
+        const isMultiTeam = (row.sectionLabel ?? "").includes(" + ");
+        const hint = isMultiTeam ? pc.dim("  [p: pick team]") : "";
+        lines.push(`${pc.bgMagenta(pc.bold(`── ${label} `))}${hint}`);
+      } else {
+        lines.push(pc.magenta(pc.bold(`── ${label} `)));
+      }
       usedLines += sectionCost;
       if (usedLines >= viewportHeight) break;
       continue;
@@ -559,12 +575,15 @@ export function renderGroups(
       const repoName = isCursor
         ? highlightText(group.repoFullName, "repo", (s) => pc.bold(pc.white(s)))
         : highlightText(group.repoFullName, "repo", (s) => `\x1b[38;5;129m${pc.bold(s)}\x1b[39m`);
+      // ◈ badge — signals the repo was moved from a combined section via pick.
+      // Future split mode will use this to identify pickable repos and add a hint.
+      const pickedBadge = group.pickedFrom ? ` ${pc.dim("◈")}` : "";
       // Use muted purple for the match count (both active and inactive rows).
       const count = `\x1b[38;5;99m${buildMatchCountLabel(group)}\x1b[39m`;
       // Right-align the match count flush to the terminal edge.
       // When active, subtract ACTIVE_BAR_WIDTH from padding so that
       // bar (1 char) + line content = termWidth total.
-      const leftPartRaw = `${arrow} ${checkbox} ${repoName}`;
+      const leftPartRaw = `${arrow} ${checkbox} ${repoName}${pickedBadge}`;
       const countLen = stripAnsi(count).length;
       const barAdjust = isCursor ? ACTIVE_BAR_WIDTH : 0;
       // Use Math.max(1, …) so that on very narrow terminals the floor of 1

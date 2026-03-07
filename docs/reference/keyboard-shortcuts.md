@@ -65,6 +65,24 @@ When the filter bar is open (after pressing `f`):
 Invalid regex patterns do not crash the TUI but are treated as matching nothing (zero visible rows). The badge is always yellow when regex mode is active, regardless of whether the pattern is valid.
 :::
 
+## Team ownership
+
+Available only when `--group-by-team-prefix` is active.
+
+| Key | Action                                                                                                                                         |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `p` | On a **multi-team** section header: enter team pick mode to assign the section to a single owner. Does nothing on single-team section headers. |
+
+### Pick mode bindings
+
+When pick mode is active (after pressing `p` on a multi-team section header):
+
+| Key       | Action                                                    |
+| --------- | --------------------------------------------------------- |
+| `←` / `→` | Move focus between candidate teams (highlighted / dimmed) |
+| `Enter`   | Confirm the pick and exit pick mode                       |
+| `Esc`     | Cancel and exit pick mode without changes                 |
+
 ## Help and exit
 
 | Key            | Action                                                                                                 |
