@@ -8,6 +8,7 @@ import TerminalDemo from "./TerminalDemo.vue";
 import UseCaseTabs from "./UseCaseTabs.vue";
 import ComparisonTable from "./ComparisonTable.vue";
 import ProductionCta from "./ProductionCta.vue";
+import InstallSection from "./InstallSection.vue";
 import "./custom.css";
 
 export default {
@@ -16,6 +17,7 @@ export default {
     app.component("UseCaseTabs", UseCaseTabs);
     app.component("ComparisonTable", ComparisonTable);
     app.component("ProductionCta", ProductionCta);
+    app.component("InstallSection", InstallSection);
   },
   Layout: () => {
     const { isDark } = useData();

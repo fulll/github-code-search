@@ -43,6 +43,8 @@ features:
     details: Every interactive session produces a one-liner you can run in CI to reproduce the exact same selection without the UI.
 ---
 
+<InstallSection />
+
 <UseCaseTabs />
 
 <ComparisonTable />
