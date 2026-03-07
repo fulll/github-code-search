@@ -12,6 +12,8 @@ import InstallSection from "./InstallSection.vue";
 import HowItWorks from "./HowItWorks.vue";
 import RichFooter from "./RichFooter.vue";
 import MinimalFooter from "./MinimalFooter.vue";
+import VersionBadge from "./VersionBadge.vue";
+import TestimonialsSection from "./TestimonialsSection.vue";
 import "./custom.css";
 
 export default {
@@ -22,6 +24,8 @@ export default {
     app.component("ProductionCta", ProductionCta);
     app.component("InstallSection", InstallSection);
     app.component("HowItWorks", HowItWorks);
+    app.component("VersionBadge", VersionBadge);
+    app.component("TestimonialsSection", TestimonialsSection);
   },
   Layout: () => {
     const { isDark, frontmatter } = useData();
@@ -44,6 +48,8 @@ export default {
     );
 
     return h(DefaultTheme.Layout, null, {
+      // Version badge pill ("v1.x is here!") — only on the homepage, above hero name
+      "home-hero-info-before": () => (frontmatter.value.layout === "home" ? h(VersionBadge) : null),
       // Desktop (≥1280px): image slot → right side of hero
       "home-hero-image": () => h("div", { class: "td-slot-desktop" }, [h(TerminalDemo)]),
       // Mobile/tablet (<1280px): after tagline, before action buttons

@@ -1,28 +1,35 @@
 <template>
   <div class="cta-banner">
     <span class="cta-icon" aria-hidden="true">
-      <!-- Building / production SVG — stroke-color animation cycles through brand palette -->
+      <!-- Rocket SVG — fusée avec flamme pulsée + cycling couleur brand -->
       <svg
         class="cta-svg"
-        width="40"
-        height="40"
+        width="44"
+        height="44"
         viewBox="0 0 24 24"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
         stroke-linecap="round"
         stroke-linejoin="round"
-        stroke-width="1.5"
+        stroke-width="1.6"
       >
-        <!-- Building outline -->
-        <rect x="2" y="7" width="20" height="15" rx="1.5" stroke="currentColor" />
-        <!-- Roof / pediment -->
-        <path d="M1 7.5L12 2l11 5.5" stroke="currentColor" />
-        <!-- Left window -->
-        <rect x="5" y="11" width="3" height="3" rx="0.5" stroke="currentColor" />
-        <!-- Right window -->
-        <rect x="16" y="11" width="3" height="3" rx="0.5" stroke="currentColor" />
-        <!-- Door -->
-        <path d="M10 22v-5a2 2 0 0 1 4 0v5" stroke="currentColor" />
+        <!-- Corps de la fusée -->
+        <path d="M12 2C9 6 8 9.5 8 13.5h8C16 9.5 15 6 12 2z" stroke="currentColor" />
+        <!-- Aile gauche -->
+        <path d="M8 13.5L4.5 18l4-1.5" stroke="currentColor" />
+        <!-- Aile droite -->
+        <path d="M16 13.5L19.5 18l-4-1.5" stroke="currentColor" />
+        <!-- Hublot -->
+        <circle cx="12" cy="9" r="1.6" stroke="currentColor" />
+        <!-- Tuyère -->
+        <path d="M10 17h4" stroke="currentColor" />
+        <!-- Flamme animée -->
+        <path
+          class="cta-flame"
+          d="M10.5 18.5c-.5 1.5-.5 2.5 0 3.5.5.8 1 .5 1.5 0 .5.5 1 .8 1.5 0 .5-1 .5-2 0-3.5"
+          stroke="currentColor"
+          fill="none"
+        />
       </svg>
     </span>
     <div class="cta-body">
@@ -67,11 +74,27 @@
   align-items: center;
 }
 
-/* Animated SVG — cycles stroke color through brand palette */
+/* Animated SVG — cycles stroke color + flamme pulsée */
 .cta-svg {
   color: #9933ff;
   animation: cta-color-cycle 4s ease-in-out infinite;
   filter: drop-shadow(0 0 6px rgba(153, 51, 255, 0.4));
+}
+
+.cta-flame {
+  transform-origin: 12px 18.5px;
+  animation: cta-flame-pulse 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes cta-flame-pulse {
+  from {
+    transform: scaleY(0.85) scaleX(0.9);
+    opacity: 0.7;
+  }
+  to {
+    transform: scaleY(1.15) scaleX(1.1);
+    opacity: 1;
+  }
 }
 
 @keyframes cta-color-cycle {
@@ -100,10 +123,9 @@
 
 .cta-title {
   margin: 0 0 6px;
-  font-size: 17px;
+  font-size: 19px;
   font-weight: 700;
   color: var(--vp-c-text-1);
-  /* override VitePress heading styles inside home layout */
   border-top: none;
   padding-top: 0;
   letter-spacing: -0.01em;
@@ -111,7 +133,7 @@
 
 .cta-text {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.65;
   color: var(--vp-c-text-2);
 }

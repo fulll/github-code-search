@@ -86,50 +86,52 @@ async function copyCommand() {
       </button>
     </div>
 
-    <transition name="uc-fade" mode="out-in">
-      <div :key="active" class="uc-panel" role="tabpanel">
-        <p class="uc-headline">{{ USE_CASES[active].headline }}</p>
-        <p class="uc-desc">{{ USE_CASES[active].description }}</p>
+    <div class="uc-panel-wrap">
+      <transition name="uc-fade" mode="out-in">
+        <div :key="active" class="uc-panel" role="tabpanel">
+          <p class="uc-headline">{{ USE_CASES[active].headline }}</p>
+          <p class="uc-desc">{{ USE_CASES[active].description }}</p>
 
-        <div class="uc-terminal">
-          <div class="uc-terminal-bar">
-            <span class="uc-dot uc-dot-red"></span>
-            <span class="uc-dot uc-dot-yellow"></span>
-            <span class="uc-dot uc-dot-green"></span>
-            <span class="uc-terminal-label">bash</span>
-            <button
-              class="uc-copy-btn"
-              :class="{ copied }"
-              :aria-label="copied ? 'Copied!' : 'Copy to clipboard'"
-              @click="copyCommand"
-            >
-              <span v-if="copied" class="uc-copy-text">Copied!</span>
-              <svg
-                v-else
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
+          <div class="uc-terminal">
+            <div class="uc-terminal-bar">
+              <span class="uc-dot uc-dot-red"></span>
+              <span class="uc-dot uc-dot-yellow"></span>
+              <span class="uc-dot uc-dot-green"></span>
+              <span class="uc-terminal-label">bash</span>
+              <button
+                class="uc-copy-btn"
+                :class="{ copied }"
+                :aria-label="copied ? 'Copied!' : 'Copy to clipboard'"
+                @click="copyCommand"
               >
-                <rect x="9" y="9" width="13" height="13" rx="2" />
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-              </svg>
-            </button>
-          </div>
-          <div class="uc-terminal-body">
-            <pre
-              class="uc-code"
-            ><code><span class="uc-prompt">$</span> {{ USE_CASES[active].command }}</code></pre>
+                <span v-if="copied" class="uc-copy-text">Copied!</span>
+                <svg
+                  v-else
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect x="9" y="9" width="13" height="13" rx="2" />
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
+              </button>
+            </div>
+            <div class="uc-terminal-body">
+              <pre
+                class="uc-code"
+              ><code><span class="uc-prompt">$</span> {{ USE_CASES[active].command }}</code></pre>
+            </div>
           </div>
         </div>
-      </div>
-    </transition>
+      </transition>
+    </div>
   </section>
 </template>
 
@@ -166,7 +168,7 @@ async function copyCommand() {
   background: var(--vp-c-bg-soft);
   color: var(--vp-c-text-2);
   font-family: var(--vp-font-family-base);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   cursor: pointer;
   transition:
@@ -197,6 +199,11 @@ async function copyCommand() {
   box-shadow: 0 4px 18px rgba(204, 136, 255, 0.3);
 }
 
+/* ── Panel wrapper (fixe la hauteur pour éviter le saut) ──────────────── */
+.uc-panel-wrap {
+  min-height: 280px;
+}
+
 /* ── Panel ─────────────────────────────────────────────────────────────── */
 .uc-panel {
   background: var(--vp-c-bg-soft);
@@ -213,8 +220,8 @@ async function copyCommand() {
 
 /* ── Description ───────────────────────────────────────────────────────── */
 .uc-headline {
-  margin: 0 0 4px;
-  font-size: 17px;
+  margin: 0 0 6px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--vp-c-text-1);
   letter-spacing: -0.01em;
@@ -225,7 +232,7 @@ async function copyCommand() {
   padding-left: 14px;
   border-left: 3px solid var(--vp-c-brand-1);
   color: var(--vp-c-text-2);
-  font-size: 14px;
+  font-size: 15.5px;
   line-height: 1.75;
   font-style: italic;
 }
@@ -288,7 +295,7 @@ async function copyCommand() {
   margin: 0;
   padding: 20px 22px;
   overflow-x: auto;
-  font-size: 13.5px;
+  font-size: 14px;
   line-height: 1.6;
   background: transparent;
   width: 100%;
@@ -347,22 +354,18 @@ async function copyCommand() {
   font-weight: 500;
 }
 
-/* ── Fade transition ───────────────────────────────────────────────────── */
-.uc-fade-enter-active,
+/* ── Fade transition — cross-fade pur, pas de translateY ──────────────── */
+.uc-fade-enter-active {
+  transition: opacity 0.2s ease;
+}
+
 .uc-fade-leave-active {
-  transition:
-    opacity 0.18s ease,
-    transform 0.18s ease;
+  transition: opacity 0.12s ease;
 }
 
-.uc-fade-enter-from {
-  opacity: 0;
-  transform: translateY(6px);
-}
-
+.uc-fade-enter-from,
 .uc-fade-leave-to {
   opacity: 0;
-  transform: translateY(-4px);
 }
 
 /* ── Responsive ────────────────────────────────────────────────────────── */
@@ -372,16 +375,20 @@ async function copyCommand() {
   }
 
   .uc-pill {
-    font-size: 13px;
+    font-size: 14px;
     padding: 7px 14px;
   }
 
   .uc-title {
-    font-size: 22px;
+    font-size: 24px;
   }
 
   .uc-headline {
-    font-size: 15px;
+    font-size: 17px;
+  }
+
+  .uc-panel-wrap {
+    min-height: 320px;
   }
 }
 </style>

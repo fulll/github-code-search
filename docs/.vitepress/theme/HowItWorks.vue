@@ -9,64 +9,116 @@
       <!-- Step 1 -->
       <div class="hiw-step">
         <div class="hiw-step-icon">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="11" cy="11" r="8"/>
-            <path d="m21 21-4.35-4.35"/>
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.35-4.35" />
           </svg>
         </div>
         <div class="hiw-step-content">
           <span class="hiw-step-badge">Step 1</span>
           <h3 class="hiw-step-title">Search across the org</h3>
           <p class="hiw-step-desc">
-            Run a single command. GitHub Code Search API is called automatically and results are paginated — up to 1 000 results across all repositories in your organisation.
+            Run a single command. GitHub Code Search API is called automatically and results are
+            paginated — up to 1 000 results across all repositories in your organisation.
           </p>
         </div>
       </div>
 
       <div class="hiw-arrow" aria-hidden="true">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 5v14M19 12l-7 7-7-7"/>
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M12 5v14M19 12l-7 7-7-7" />
         </svg>
       </div>
 
       <!-- Step 2 -->
       <div class="hiw-step">
         <div class="hiw-step-icon">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <rect x="3" y="3" width="18" height="18" rx="2"/>
-            <path d="M9 9h6M9 12h6M9 15h4"/>
-            <path d="m16 15 2 2 4-4" stroke="#28c840" stroke-width="2"/>
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M9 9h6M9 12h6M9 15h4" />
+            <path d="m16 15 2 2 4-4" stroke="#28c840" stroke-width="2" />
           </svg>
         </div>
         <div class="hiw-step-content">
           <span class="hiw-step-badge">Step 2</span>
           <h3 class="hiw-step-title">Triage interactively</h3>
           <p class="hiw-step-desc">
-            A keyboard-driven TUI opens. Navigate repos, expand extracts, filter by file path. Select exactly what matters — deselect noise. Works without leaving the terminal.
+            A keyboard-driven TUI opens. Navigate repos, expand extracts, filter by file path.
+            Select exactly what matters — deselect noise. Works without leaving the terminal.
           </p>
         </div>
       </div>
 
       <div class="hiw-arrow" aria-hidden="true">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 5v14M19 12l-7 7-7-7"/>
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M12 5v14M19 12l-7 7-7-7" />
         </svg>
       </div>
 
       <!-- Step 3 -->
       <div class="hiw-step">
         <div class="hiw-step-icon">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14 2 14 8 20 8"/>
-            <path d="M8 13h8M8 17h5"/>
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <path d="M8 13h8M8 17h5" />
           </svg>
         </div>
         <div class="hiw-step-content">
           <span class="hiw-step-badge">Step 3</span>
           <h3 class="hiw-step-title">Export &amp; replay</h3>
           <p class="hiw-step-desc">
-            Press <kbd>Enter</kbd>. Get clean Markdown with GitHub links, or machine-readable JSON. A replay command is printed — paste it into CI to reproduce the exact selection non-interactively.
+            Press <kbd>Enter</kbd>. Get clean Markdown with GitHub links, or machine-readable JSON.
+            A replay command is printed — paste it into CI to reproduce the exact selection
+            non-interactively.
           </p>
         </div>
       </div>
@@ -129,7 +181,10 @@
   border-radius: 14px;
   border: 1px solid rgba(153, 51, 255, 0.16);
   background: var(--vp-c-bg-soft);
-  transition: border-color 0.22s, box-shadow 0.22s, transform 0.2s;
+  transition:
+    border-color 0.22s,
+    box-shadow 0.22s,
+    transform 0.2s;
 }
 
 .hiw-step:hover {
@@ -153,11 +208,7 @@
   width: 52px;
   height: 52px;
   border-radius: 12px;
-  background: linear-gradient(
-    135deg,
-    rgba(153, 51, 255, 0.12) 0%,
-    rgba(153, 51, 255, 0.06) 100%
-  );
+  background: linear-gradient(135deg, rgba(153, 51, 255, 0.12) 0%, rgba(153, 51, 255, 0.06) 100%);
   border: 1px solid rgba(153, 51, 255, 0.2);
   display: flex;
   align-items: center;
@@ -166,11 +217,7 @@
 }
 
 .dark .hiw-step-icon {
-  background: linear-gradient(
-    135deg,
-    rgba(204, 136, 255, 0.12) 0%,
-    rgba(204, 136, 255, 0.05) 100%
-  );
+  background: linear-gradient(135deg, rgba(204, 136, 255, 0.12) 0%, rgba(204, 136, 255, 0.05) 100%);
   border-color: rgba(204, 136, 255, 0.2);
 }
 

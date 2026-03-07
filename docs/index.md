@@ -52,3 +52,5 @@ features:
 <ComparisonTable />
 
 <ProductionCta />
+
+<TestimonialsSection />

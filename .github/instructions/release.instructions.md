@@ -90,6 +90,9 @@ bun run build.ts       # binary compiles
 - [ ] GitHub Release created automatically by CD pipeline (verify within ~5 min after tag push)
 - [ ] Blog post live at `https://fulll.github.io/github-code-search/blog/release-vX-Y-Z`
 - [ ] `bun run docs:build` succeeds locally (spot-check the new blog entry)
+  - The **version badge** in the hero (`VersionBadge.vue`) reads `version` from `package.json` at
+    build time via `vite.define` — no manual update needed. It auto-points to the new blog post
+    slug (`release-vX-Y-Z`) derived from the version. Verify it shows the new version after deploy.
 - [ ] `CHANGELOG.md` has no `_pending_` entries
 - [ ] For **major** releases: versioned docs snapshot available at `/github-code-search/vX/`
 
