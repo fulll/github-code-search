@@ -2,6 +2,10 @@ import { defineConfig } from "vitepress";
 import { readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import versionsData from "../public/versions.json";
+import pkg from "../../package.json";
+
+const latestVersion: string = pkg.version;
+const latestBlogSlug = `release-v${latestVersion.replace(/\./g, "-")}`;
 
 // ─── Semantic version helpers for blog sidebar sort ───────────────────────────
 function parseBlogVersion(filename: string): number[] {
@@ -97,7 +101,69 @@ export default defineConfig({
     ],
     // fulll violet as browser theme colour
     ["meta", { name: "theme-color", content: "#9933FF" }],
+    // ── Open Graph ──────────────────────────────────────────────────────────
+    ["meta", { property: "og:type", content: "website" }],
+    ["meta", { property: "og:title", content: "github-code-search" }],
+    [
+      "meta",
+      {
+        property: "og:description",
+        content:
+          "Interactive CLI to search GitHub code across your org — per-repository aggregation, keyboard-driven TUI, markdown/JSON output.",
+      },
+    ],
+    [
+      "meta",
+      {
+        property: "og:image",
+        content: "https://fulll.github.io/github-code-search/social-preview.png",
+      },
+    ],
+    ["meta", { property: "og:url", content: "https://fulll.github.io/github-code-search/" }],
+    // ── Twitter Card ────────────────────────────────────────────────────────
+    ["meta", { name: "twitter:card", content: "summary_large_image" }],
+    ["meta", { name: "twitter:title", content: "github-code-search" }],
+    [
+      "meta",
+      {
+        name: "twitter:description",
+        content:
+          "Interactive CLI to search GitHub code across your org — per-repository aggregation, keyboard-driven TUI, markdown/JSON output.",
+      },
+    ],
+    [
+      "meta",
+      {
+        name: "twitter:image",
+        content: "https://fulll.github.io/github-code-search/social-preview.png",
+      },
+    ],
   ],
+
+  // ── Vite ─────────────────────────────────────────────────────────────────
+  vite: {
+    define: {
+      // Consumed by docs/.vitepress/theme/VersionBadge.vue — auto-updates on docs:build
+      __LATEST_VERSION__: JSON.stringify(latestVersion),
+      __LATEST_BLOG_SLUG__: JSON.stringify(latestBlogSlug),
+    },
+    plugins: [
+      {
+        name: "vitepress-generate-og",
+        // Convert social-preview.svg → social-preview.png (1200 px) during docs:build
+        async buildStart() {
+          const { Resvg } = await import("@resvg/resvg-js");
+          const { readFileSync, writeFileSync } = await import("node:fs");
+          const { fileURLToPath } = await import("node:url");
+          const svgPath = fileURLToPath(new URL("../public/social-preview.svg", import.meta.url));
+          const pngPath = fileURLToPath(new URL("../public/social-preview.png", import.meta.url));
+          const svg = readFileSync(svgPath, "utf-8");
+          const resvg = new Resvg(svg, { fitTo: { mode: "width", value: 1200 } });
+          writeFileSync(pngPath, resvg.render().asPng());
+        },
+      },
+    ],
+  },
 
   themeConfig: {
     // ── Logo (top-left, next to title) ───────────────────────────────────────
@@ -242,5 +308,10 @@ export default defineConfig({
       light: "github-light",
       dark: "github-dark",
     },
+  },
+
+  // ── Sitemap ───────────────────────────────────────────────────────────────
+  sitemap: {
+    hostname: "https://fulll.github.io/github-code-search/",
   },
 });

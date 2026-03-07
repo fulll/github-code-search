@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@latest/schema.json",
-  "ignore": ["docs/**"],
-  "ignoreDependencies": ["bun-types", "mermaid", "vitepress-mermaid-renderer"],
+  "ignore": ["docs/**", "scripts/**"],
+  "ignoreDependencies": ["bun-types", "mermaid", "vitepress-mermaid-renderer", "@resvg/resvg-js"],
   "ignoreBinaries": ["bats"]
 }

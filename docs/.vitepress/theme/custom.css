@@ -297,17 +297,7 @@ body::before {
   );
 }
 
-/* ── Footer (black — fulll.fr style) ─────────────────────────────────────── */
+/* ── Footer — default VitePress footer hidden (replaced by RichFooter.vue) ── */
 .VPFooter {
-  border-top: none !important;
-  background: #111 !important;
-}
-
-.VPFooter .message,
-.VPFooter .copyright {
-  color: rgba(255, 255, 255, 0.55) !important;
-}
-
-.dark .VPFooter {
-  background: #0f0f0f !important;
+  display: none !important;
 }
