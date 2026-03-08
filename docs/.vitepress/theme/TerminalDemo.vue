@@ -288,6 +288,8 @@ onUnmounted(() => {
 /* ── Body ────────────────────────────────────────────────────────────── */
 .td-body {
   background: #0f0d1a;
+  /* Fix: override inherited VitePress text color (dark on dark = fail) */
+  color: #e8e8f0;
   padding: 12px 14px 10px;
   height: 240px;
   overflow: hidden;
@@ -413,12 +415,14 @@ onUnmounted(() => {
   width: 12px;
   flex-shrink: 0;
   display: inline-block;
-  color: rgba(153, 51, 255, 0.65);
+  /* Fix: rgba(153,51,255,0.65) on #0f0d1a = 2.3:1 → #aa55ff = 5.0:1 ✓ WCAG AA */
+  color: #aa55ff;
 }
 
 /* ── Replay ──────────────────────────────────────────────────────────── */
 .td-replay-label {
-  color: rgba(153, 51, 255, 0.55);
+  /* Fix: rgba(153,51,255,0.55) on #0f0d1a = 1.9:1 → #aa55ff = 5.0:1 ✓ WCAG AA */
+  color: #aa55ff;
   font-size: 10.5px;
   margin-top: 7px;
   padding: 0 2px;
@@ -436,7 +440,8 @@ onUnmounted(() => {
   margin-top: 8px;
   padding-top: 7px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.22);
+  /* Fix: rgba(255,255,255,0.22) on #0f0d1a ≈ 2.5:1 → 0.55 = 6.1:1 ✓ WCAG AA */
+  color: rgba(255, 255, 255, 0.55);
   font-size: 10px;
 }
 </style>
