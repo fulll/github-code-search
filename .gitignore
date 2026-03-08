@@ -3,7 +3,12 @@ dist/
 coverage/
 .env
 *.local
+
+# pa11y accessibility testing results
 a11y-report.json
+
+# Lighthouse CI
+.lighthouseci/
 
 # VitePress
 docs/.vitepress/cache
