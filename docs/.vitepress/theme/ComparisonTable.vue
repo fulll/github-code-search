@@ -80,15 +80,18 @@ const ROWS: Row[] = [
         <strong>org-wide code audits and interactive triage</strong>.
       </p>
       <table class="ct-table">
+        <caption class="sr-only">
+          Feature comparison between gh search code and github-code-search
+        </caption>
         <thead>
           <tr>
-            <th class="ct-th-feature"></th>
-            <th class="ct-th-tool">
+            <th class="ct-th-feature" scope="col" aria-label="Feature"></th>
+            <th class="ct-th-tool" scope="col">
               <div class="ct-tool-header">
                 <span class="ct-tool-name ct-tool-alt">gh search code</span>
               </div>
             </th>
-            <th class="ct-th-tool">
+            <th class="ct-th-tool" scope="col">
               <div class="ct-tool-header">
                 <span class="ct-tool-name ct-tool-brand">github-code-search</span>
                 <span class="ct-badge">Purpose-built</span>
@@ -132,12 +135,12 @@ const ROWS: Row[] = [
               </span>
             </td>
             <td class="ct-cell">
-              <span v-if="row.gh" class="ct-check">✓</span>
-              <span v-else class="ct-cross">✗</span>
+              <span v-if="row.gh" class="ct-check" aria-label="Yes">✓</span>
+              <span v-else class="ct-cross" aria-label="No">✗</span>
             </td>
             <td class="ct-cell">
-              <span v-if="row.gcs" class="ct-check">✓</span>
-              <span v-else class="ct-cross">✗</span>
+              <span v-if="row.gcs" class="ct-check" aria-label="Yes">✓</span>
+              <span v-else class="ct-cross" aria-label="No">✗</span>
             </td>
           </tr>
         </tbody>
@@ -248,7 +251,8 @@ thead tr {
 }
 
 .ct-tool-alt {
-  color: var(--vp-c-text-3);
+  /* Fix: var(--vp-c-text-3) = 2.87:1, below WCAG AA 4.5:1. text-2 ≥ 5.4:1. */
+  color: var(--vp-c-text-2);
 }
 
 .ct-tool-brand {
@@ -323,7 +327,8 @@ thead tr {
 .ct-feature-desc {
   font-size: 13px;
   font-weight: 400;
-  color: var(--vp-c-text-3);
+  /* Fix: var(--vp-c-text-3) ≈ 2.87:1, below WCAG AA. text-1 ensures ≥4.5:1. */
+  color: var(--vp-c-text-1);
   line-height: 1.45;
 }
 

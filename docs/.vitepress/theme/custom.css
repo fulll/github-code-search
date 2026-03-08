@@ -301,3 +301,56 @@ body::before {
 .VPFooter {
   display: none !important;
 }
+
+/* ── Accessibility utilities ─────────────────────────────────────────────── */
+
+/**
+ * Visually hidden but accessible to screen readers.
+ * Use on text that provides context only needed by AT (e.g. "(opens in a new tab)").
+ */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/**
+ * Global focus-visible ring — ensures keyboard users always see a visible
+ * focus indicator on interactive elements, satisfying WCAG 2.4.11 (AA).
+ * Individual components may override with more context-appropriate styling.
+ */
+:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 2px;
+}
+
+/* ── Shiki light-theme contrast overrides (WCAG 2.1 AA) ─────────────────── */
+/*
+ * The default github-light Shiki theme ships three token colours that fail
+ * WCAG AA 4.5:1 against a white/near-white code-block background:
+ *   #D73A49 — operators/keywords  → 4.24 : 1
+ *   #6A737D — comments            → 4.46 : 1
+ *   #22863A — strings/YAML keys   → 4.28 : 1
+ *
+ * We use github-light-high-contrast as the primary Shiki theme (config.mts),
+ * which resolves these at the source.  The attribute-selector rules below are a
+ * belt-and-suspenders fallback for any residual inline-style occurrences.
+ */
+html:not(.dark) .vp-doc pre code span[style*="--shiki-light:#D73A49"] {
+  /* red operators — was 4.24:1, now ≥4.5:1 */
+  color: #b91c1c !important;
+}
+html:not(.dark) .vp-doc pre code span[style*="--shiki-light:#6A737D"] {
+  /* comment grey — was 4.46:1, now ≥4.5:1 */
+  color: #596069 !important;
+}
+html:not(.dark) .vp-doc pre code span[style*="--shiki-light:#22863A"] {
+  /* green strings/YAML keys — was 4.28:1, now ≥4.5:1 */
+  color: #155e27 !important;
+}

@@ -43,8 +43,10 @@
     "knip": "knip",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
+    "docs:build:a11y": "VITEPRESS_HOSTNAME=http://localhost:4173 vitepress build docs",
     "docs:build:og": "bun scripts/generate-og.ts",
-    "docs:preview": "vitepress preview docs"
+    "docs:preview": "vitepress preview docs",
+    "docs:a11y": "bunx pa11y-ci --config .pa11yci.json --sitemap http://localhost:4173/github-code-search/sitemap.xml"
   },
   "dependencies": {
     "commander": "^14.0.3",

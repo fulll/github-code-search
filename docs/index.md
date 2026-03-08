@@ -7,7 +7,7 @@ hero:
   tagline: Search up to 1,000 results across every repo. Group by team. Triage interactively. Export to Markdown or JSON.
   image:
     src: /logo.svg
-    alt: github-code-search
+    alt: ""
   actions:
     - theme: brand
       text: Get Started

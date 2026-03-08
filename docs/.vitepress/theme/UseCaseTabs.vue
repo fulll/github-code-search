@@ -54,6 +54,7 @@ const USE_CASES: UseCase[] = [
 
 const active = ref(0);
 const copied = ref(false);
+const tabRefs = ref<HTMLButtonElement[]>([]);
 
 async function copyCommand() {
   try {
@@ -66,21 +67,47 @@ async function copyCommand() {
     // clipboard unavailable
   }
 }
+
+/** ARIA tabs keyboard pattern (WAI-ARIA 1.1 §3.22) */
+function handleTabKeydown(e: KeyboardEvent, i: number) {
+  let next: number | null = null;
+  if (e.key === "ArrowRight") {
+    next = (i + 1) % USE_CASES.length;
+  } else if (e.key === "ArrowLeft") {
+    next = (i - 1 + USE_CASES.length) % USE_CASES.length;
+  } else if (e.key === "Home") {
+    e.preventDefault();
+    next = 0;
+  } else if (e.key === "End") {
+    e.preventDefault();
+    next = USE_CASES.length - 1;
+  }
+  if (next !== null) {
+    e.preventDefault();
+    active.value = next;
+    tabRefs.value[next]?.focus();
+  }
+}
 </script>
 
 <template>
-  <section class="uc-section">
-    <h2 class="uc-title">Use cases</h2>
+  <section class="uc-section" aria-labelledby="uc-heading">
+    <h2 id="uc-heading" class="uc-title">Use cases</h2>
 
-    <div class="uc-pills" role="tablist">
+    <div class="uc-pills" role="tablist" :aria-label="'Use cases'">
       <button
         v-for="(uc, i) in USE_CASES"
         :key="uc.id"
+        :id="`uc-tab-${uc.id}`"
+        :ref="(el) => (tabRefs[i] = el as HTMLButtonElement)"
         class="uc-pill"
         :class="{ active: active === i }"
         role="tab"
         :aria-selected="active === i"
+        :aria-controls="`uc-panel-${uc.id}`"
+        :tabindex="active === i ? 0 : -1"
         @click="active = i"
+        @keydown="handleTabKeydown($event, i)"
       >
         {{ uc.label }}
       </button>
@@ -88,7 +115,14 @@ async function copyCommand() {
 
     <div class="uc-panel-wrap">
       <transition name="uc-fade" mode="out-in">
-        <div :key="active" class="uc-panel" role="tabpanel">
+        <div
+          :key="active"
+          :id="`uc-panel-${USE_CASES[active].id}`"
+          class="uc-panel"
+          role="tabpanel"
+          :aria-labelledby="`uc-tab-${USE_CASES[active].id}`"
+          tabindex="0"
+        >
           <p class="uc-headline">{{ USE_CASES[active].headline }}</p>
           <p class="uc-desc">{{ USE_CASES[active].description }}</p>
 
@@ -180,6 +214,11 @@ async function copyCommand() {
   outline: none;
 }
 
+.uc-pill:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 3px;
+}
+
 .uc-pill:hover {
   border-color: var(--vp-c-brand-1);
   color: var(--vp-c-brand-1);
@@ -202,6 +241,12 @@ async function copyCommand() {
 /* ── Panel wrapper (fixe la hauteur pour éviter le saut) ──────────────── */
 .uc-panel-wrap {
   min-height: 280px;
+}
+
+.uc-panel:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: -2px;
+  border-radius: 14px;
 }
 
 /* ── Panel ─────────────────────────────────────────────────────────────── */
@@ -335,6 +380,11 @@ async function copyCommand() {
     color 0.15s,
     border-color 0.15s;
   outline: none;
+}
+
+.uc-copy-btn:focus-visible {
+  outline: 2px solid #cc88ff;
+  outline-offset: 2px;
 }
 
 .uc-copy-btn:hover {

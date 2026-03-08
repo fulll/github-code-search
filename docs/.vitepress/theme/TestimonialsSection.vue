@@ -1,7 +1,7 @@
 <template>
-  <section class="ts-section">
+  <section class="ts-section" aria-labelledby="ts-heading">
     <div class="ts-header">
-      <h2 class="ts-title">What people say</h2>
+      <h2 id="ts-heading" class="ts-title">What people say</h2>
       <p class="ts-subtitle">Trusted by engineering teams who live in the terminal.</p>
     </div>
 
@@ -43,8 +43,9 @@
           href="https://github.com/fulll/github-code-search/discussions"
           target="_blank"
           rel="noopener noreferrer"
+          aria-label="Share your story (opens in a new tab)"
         >
-          <span>Share your story</span>
+          <span aria-hidden="true">Share your story</span>
           <svg
             class="ts-cta-arrow"
             aria-hidden="true"
@@ -90,7 +91,7 @@ const testimonials = [
     name: "DevOps Lead",
     role: "Infrastructure team · 30+ repos",
     initials: "DL",
-    color: "#CC88FF",
+    color: "#8833cc",
   },
 ];
 </script>
@@ -217,7 +218,8 @@ const testimonials = [
 
 .ts-role {
   font-size: 11.5px;
-  color: var(--vp-c-text-3);
+  /* Fix: var(--vp-c-text-3) = 2.87:1, below WCAG AA. text-2 ≥ 5.4:1. */
+  color: var(--vp-c-text-2);
 }
 
 /* ── CTA card ──────────────────────────────────────────────────────────── */
