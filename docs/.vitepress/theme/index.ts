@@ -1,4 +1,4 @@
-import { h, nextTick, watch } from "vue";
+import { h, nextTick, onMounted, watch } from "vue";
 import type { App } from "vue";
 import type { Theme } from "vitepress";
 import DefaultTheme from "vitepress/theme";
@@ -26,6 +26,17 @@ export default {
     app.component("HowItWorks", HowItWorks);
     app.component("VersionBadge", VersionBadge);
     app.component("TestimonialsSection", TestimonialsSection);
+  },
+  setup() {
+    // Fix: DocSearch button has aria-label="Search" but its visible text includes
+    // the keyboard-shortcut keys ("⌘ K"), which triggers a label-content-name-
+    // mismatch accessibility failure. Marking the keys container aria-hidden hides
+    // it from assistive technology so the button's accessible name ("Search") and
+    // its visible label agree.
+    onMounted(() => {
+      const keys = document.querySelector<HTMLElement>(".DocSearch-Button-Keys");
+      if (keys) keys.setAttribute("aria-hidden", "true");
+    });
   },
   Layout: () => {
     const { isDark, frontmatter } = useData();

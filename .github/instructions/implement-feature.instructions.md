@@ -5,6 +5,8 @@ excludeAgent: "code-review"
 
 # Implement feature — instructions for Copilot coding agent
 
+> **Skill reference:** for the full architectural layer map, type-first design patterns, CLI option conventions, render sub-module extension playbook and test strategies read `.github/skills/feature.md` first.
+
 Follow these steps when implementing a new feature in this repository.
 
 ## 1. Understand the task scope before writing code

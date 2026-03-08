@@ -5,6 +5,8 @@ excludeAgent: "code-review"
 
 # Release — instructions for Copilot coding agent
 
+> **Skill reference:** for the semver decision guide, CD pipeline mechanics, binary targets, blog post format reference and versioned docs snapshot details read `.github/skills/release.md` first.
+
 Follow these steps when cutting a new release of `github-code-search`.
 
 ## 1. Determine the version bump

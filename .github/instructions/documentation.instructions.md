@@ -4,6 +4,8 @@ applyTo: "docs/**"
 
 # Documentation — instructions for Copilot coding agent
 
+> **Skill reference:** for deep domain knowledge (VitePress theme architecture, CSS variables, accessibility patterns, responsive patterns, full validation commands) read `.github/skills/documentation.md` first.
+
 Follow these conventions when writing or editing pages in the `docs/` directory.
 
 ## 1. Tool & rendering pipeline
@@ -93,9 +95,20 @@ docs/
 Before opening a PR for any docs change:
 
 ```bash
-bun run docs:build   # must complete without errors
-bun run format:check # oxfmt — no formatting diff
+bun run docs:build           # must complete without errors or dead-link warnings
+bun run format:check         # oxfmt — no formatting diff
 ```
 
 - All internal links must resolve (VitePress reports dead links on build).
 - No new `bun run knip` violations (docs/\*\* is excluded but `package.json` changes are not).
+
+If the PR modifies any Vue component, CSS, or page layout, also run the accessibility and responsive suites:
+
+```bash
+bun run docs:build:a11y
+bun run docs:preview -- --port 4173 &
+bun run docs:a11y            # pa11y-ci WCAG 2.1 AA — must report 0 errors
+bun run docs:test:responsive # Playwright — 20/20 tests green (4 viewports × 5 pages)
+```
+
+See `.github/skills/documentation.md` for pa11y configuration details, WCAG contrast rules, accessible component patterns, and responsive breakpoint guidance.

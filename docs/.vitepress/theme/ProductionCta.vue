@@ -1,5 +1,5 @@
 <template>
-  <div class="cta-banner">
+  <section class="cta-banner" aria-labelledby="cta-banner-title">
     <span class="cta-icon" aria-hidden="true">
       <!-- Rocket SVG — fusée avec flamme pulsée + cycling couleur brand -->
       <svg
@@ -33,7 +33,7 @@
       </svg>
     </span>
     <div class="cta-body">
-      <h3 class="cta-title">Used in production?</h3>
+      <h3 id="cta-banner-title" class="cta-title">Used in production?</h3>
       <p class="cta-text">
         Using <code>github-code-search</code> at your organisation? Share your experience, use cases
         or feedback — your input shapes the roadmap.
@@ -44,10 +44,26 @@
       href="https://github.com/fulll/github-code-search/discussions"
       target="_blank"
       rel="noopener noreferrer"
+      aria-label="Share your story (opens in a new tab)"
     >
-      Share your story ↗
+      <span>Share your story</span>
+      <svg
+        class="cta-btn-arrow"
+        aria-hidden="true"
+        xmlns="http://www.w3.org/2000/svg"
+        width="13"
+        height="13"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M7 17L17 7M7 7h10v10" />
+      </svg>
     </a>
-  </div>
+  </section>
 </template>
 
 <style scoped>
@@ -60,6 +76,12 @@
   border-radius: 14px;
   border: 1px solid rgba(153, 51, 255, 0.25);
   background: linear-gradient(135deg, rgba(153, 51, 255, 0.06) 0%, rgba(255, 204, 51, 0.05) 100%);
+}
+
+.cta-btn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px rgba(153, 51, 255, 0.5);
 }
 
 .dark .cta-banner {
@@ -133,7 +155,7 @@
 
 .cta-text {
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.65;
   color: var(--vp-c-text-2);
 }
@@ -149,7 +171,9 @@
 /* ── Button ────────────────────────────────────────────────────────────── */
 .cta-btn {
   flex-shrink: 0;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   padding: 10px 22px;
   border-radius: 9999px;
   background: linear-gradient(135deg, #9933ff 0%, #7a1fd4 100%);
@@ -163,6 +187,10 @@
     box-shadow 0.2s,
     transform 0.18s,
     background 0.2s;
+}
+
+.cta-btn-arrow {
+  flex-shrink: 0;
 }
 
 .cta-btn:hover {

@@ -15,7 +15,9 @@
  */
 
 /* ── Fonts ───────────────────────────────────────────────────────────────── */
-@import url("https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap");
+/* Google Fonts is loaded via a non-blocking <link> in config.mts head
+ * (media="print" + onload swap) to avoid render-blocking.
+ * The @import is intentionally absent here. */
 
 :root {
   --vp-font-family-base: "Poppins", "Arial", sans-serif;
@@ -272,12 +274,65 @@ body::before {
 }
 
 /* ── Navigation bar ──────────────────────────────────────────────────────── */
+/*
+ * Glass tint effect: override --vp-nav-bg-color (used by VitePress on .wrapper,
+ * .content and .content-body internally) to a semi-transparent value, then apply
+ * backdrop-filter on .VPNavBar so the page content scrolling underneath bleeds
+ * through the blur layer.
+ *
+ * Light: white 72 % opacity · Dark: #1b1b1f 72 % opacity.
+ * The .divider element carries --vp-c-divider which is already semi-transparent, no fix needed.
+ */
 .VPNavBar {
+  --vp-nav-bg-color: rgba(255, 255, 255, 0.72);
   border-bottom: 1px solid rgba(153, 51, 255, 0.12) !important;
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
 }
 
 .dark .VPNavBar {
+  --vp-nav-bg-color: rgba(27, 27, 31, 0.72);
   border-bottom-color: rgba(204, 136, 255, 0.1) !important;
+}
+
+/*
+ * At ≤960px (tablet portrait/landscape transition) the navbar flex layout
+ * overflows at exactly 768px: `.VPNavBarMenu` items and `.VPNavBarExtra` both
+ * extend beyond the right edge of the viewport, producing a real page-level
+ * horizontal scrollbar (confirmed in browser at 768px).
+ *
+ * Fix: force hamburger mode at ≤960px — hide the desktop menu items and the
+ * extra social-links flyout, show the hamburger button instead.
+ * VitePress's own CSS only triggers hamburger at < 768px, which is the root
+ * cause of the overflow at exactly 768px.
+ */
+@media (max-width: 960px) {
+  /*
+   * At ≤960px the desktop nav links and social-links flyout overflow the
+   * viewport at exactly 768px (tablet portrait). Hide them and show the
+   * hamburger button instead.
+   *
+   * VitePress hides .VPNavBarHamburger at ≥768px and .VPNavScreen at ≥768px
+   * via its own media queries — we override both here so the hamburger is
+   * fully functional at 768–960px as it is at <768px.
+   */
+  .VPNavBarMenu,
+  .VPNavBarExtra {
+    display: none !important;
+  }
+
+  /* Show the hamburger toggle button */
+  .VPNavBarHamburger {
+    display: flex !important;
+  }
+}
+
+/* VitePress hides the full-screen nav overlay at ≥768px — unlock it so the
+ * hamburger button we show at 768–960px can actually open the menu. */
+@media (min-width: 768px) and (max-width: 960px) {
+  .VPNavScreen {
+    display: block !important;
+  }
 }
 
 /* ── Doc pages background (non-home) ──────────────────────────────────────── */
@@ -300,4 +355,133 @@ body::before {
 /* ── Footer — default VitePress footer hidden (replaced by RichFooter.vue) ── */
 .VPFooter {
   display: none !important;
+}
+
+/* ── Responsive — prevent horizontal overflow at any viewport size ────────── */
+/*
+ * Mobile-first overflow containment.
+ * Without this, any element whose computed width exceeds the viewport (fixed px
+ * widths, table cells with `white-space:nowrap`, long code strings, …) creates
+ * a page-level horizontal scroll bar.  Applying `overflow-x: hidden` here acts
+ * as the final safety net; individual components still fix their own overflow
+ * so that content is never silently clipped.
+ */
+.VPHome,
+.VPHero,
+.VPHomeContent {
+  overflow-x: hidden;
+}
+
+/*
+ * Pre / code blocks — guarantee they scroll internally rather than pushing the
+ * page wider.  VitePress sets this on `.vp-doc pre` but not on custom-component
+ * terminal blocks, so we cover both here.
+ */
+pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* ── Accessibility utilities ─────────────────────────────────────────────── */
+
+/**
+ * Visually hidden but accessible to screen readers.
+ * Use on text that provides context only needed by AT (e.g. "(opens in a new tab)").
+ */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/**
+ * Global focus-visible ring — ensures keyboard users always see a visible
+ * focus indicator on interactive elements, satisfying WCAG 2.4.11 (AA).
+ * Individual components may override with more context-appropriate styling.
+ */
+:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 2px;
+}
+
+/* ── Shiki contrast overrides (WCAG 2.1 AA) ─────────────────────────────── */
+/*
+ * Light mode — github-light-high-contrast still emits a few tokens that fall
+ * below 4.5:1 against VitePress's off-white code-block background:
+ *   #D73A49 — operators/keywords  → 4.24 : 1
+ *   #6A737D — comments            → 4.46 : 1
+ *   #22863A — strings/YAML keys   → 4.28 : 1
+ *   #66707B — muted/comment variant → 3.75 : 1
+ */
+html:not(.dark) .vp-doc pre code span[style*="--shiki-light:#D73A49"] {
+  /* red operators — was 4.24:1, now ≥4.5:1 */
+  color: #b91c1c !important;
+}
+html:not(.dark) .vp-doc pre code span[style*="--shiki-light:#6A737D"] {
+  /* comment grey — was 4.46:1, now ≥4.5:1 */
+  color: #596069 !important;
+}
+html:not(.dark) .vp-doc pre code span[style*="--shiki-light:#22863A"] {
+  /* green strings/YAML keys — was 4.28:1, now ≥4.5:1 */
+  color: #155e27 !important;
+}
+html:not(.dark) .vp-doc pre code span[style*="--shiki-light:#66707B"] {
+  /* muted comment variant — was 3.75:1, now 5.78:1 */
+  color: #57606a !important;
+}
+
+/*
+ * Dark mode — github-dark emits #6A737D for comment tokens.
+ * Against VitePress dark code-block background (#161618) this is only 3.75:1.
+ * Fix: #8b949e gives 5.87:1 on #161618.
+ */
+html.dark .vp-doc pre code span[style*="--shiki-dark:#6A737D"] {
+  /* dark-mode comment grey — was 3.75:1, now 5.87:1 */
+  color: #8b949e !important;
+}
+
+/* ── Code-block language label (span.lang) ───────────────────────────────── */
+/*
+ * VitePress default --vp-code-lang-color:
+ *   dark mode  rgba(235,235,245,.38) → ~3.5:1 on dark code-block bg (#1e1e20)
+ *   light mode rgba(60,60,67,.40)    → ~4.0:1 on light code-block bg (#f6f8fa)
+ * Both fail WCAG AA 4.5:1.
+ * Fix: override to solid values passing 4.5:1 on their respective bg.
+ */
+html.dark .vp-doc div[class*="language-"] > span.lang,
+html.dark .vp-doc .vp-code-group div[class*="language-"] > span.lang {
+  /* 7.3:1 on VitePress dark code-block bg (~#1e1e20) */
+  color: rgba(235, 235, 245, 0.65) !important;
+}
+
+html:not(.dark) .vp-doc div[class*="language-"] > span.lang,
+html:not(.dark) .vp-doc .vp-code-group div[class*="language-"] > span.lang {
+  /* 4.8:1 on VitePress light code-block bg (~#f6f8fa) */
+  color: rgba(60, 60, 67, 0.82) !important;
+}
+
+/* ── Inline code in tables — explicit solid colours ──────────────────────── */
+/*
+ * VitePress renders inline <code> with CSS variable backgrounds
+ * (--vp-code-bg = rgba(27,31,35,.05)) layered on top of table-row backgrounds
+ * (--vp-c-bg-soft). Lighthouse cannot resolve chained CSS variables to compute
+ * a contrast ratio, so it flags these elements with score=null and fails the
+ * audit. Fix: provide explicit solid colours that Lighthouse can evaluate.
+ *
+ * Light mode:  #3b607e on #f3f4f5 → 5.5:1  ✅  (WCAG AA: ≥4.5:1)
+ * Dark  mode:  #c9d1d9 on #2d333b → 7.0:1  ✅
+ */
+html:not(.dark) .vp-doc table code {
+  background-color: #f3f4f5;
+  color: #3b607e;
+}
+html.dark .vp-doc table code {
+  background-color: #2d333b;
+  color: #c9d1d9;
 }

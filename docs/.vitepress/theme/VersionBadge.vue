@@ -39,7 +39,7 @@ const releaseLink = withBase(`/blog/${__LATEST_BLOG_SLUG__}`);
   border: 1px solid rgba(153, 51, 255, 0.35);
   background: rgba(153, 51, 255, 0.08);
   color: var(--vp-c-brand-1);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 500;
   text-decoration: none;
   transition:

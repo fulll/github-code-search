@@ -64,7 +64,8 @@ function colorDesc(s: string): string {
       const exampleMatch = line.match(/^(\s*Example:\s*)(.+)$/);
       if (exampleMatch) return pc.dim(exampleMatch[1]) + pc.italic(exampleMatch[2]);
       if (/^\s+(e\.g\.|repoA|myorg\/|squad-|chapter-)/.test(line)) return pc.dim(line);
-      return line;
+      // Colorize any remaining bare URL (http/https) anywhere in the line
+      return line.replace(/(https?:\/\/\S+)/g, (url) => pc.cyan(pc.underline(url)));
     })
     .join("\n");
 }
@@ -354,7 +355,7 @@ program
       const { refreshCompletions } = await import("./src/upgrade.ts");
       const refreshedPath = await refreshCompletions(detectShell(), undefined, opts.debug);
       if (refreshedPath) {
-        process.stdout.write(`✓ Shell completions refreshed at ${refreshedPath}\n`);
+        process.stdout.write(`✓ Shell completions installed/refreshed at ${refreshedPath}\n`);
       }
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : String(e);

@@ -73,6 +73,31 @@ export default defineConfig({
 
   // ── Head ───────────────────────────────────────────────────────────────────
   head: [
+    // ── Eco-design: Google Fonts — non-blocking load ────────────────────────
+    // 1. preconnect: establishes DNS+TCP+TLS early (eliminates ~200 ms RTT)
+    // 2. preload as="style": fetches the CSS at high priority without blocking render
+    // 3. media="print" + onload: loads as print (non-blocking), switches to "all"
+    //    once downloaded — the classic "loadCSS" pattern
+    // The @import in custom.css is removed; the <link> below replaces it.
+    ["link", { rel: "preconnect", href: "https://fonts.googleapis.com" }],
+    ["link", { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "" }],
+    [
+      "link",
+      {
+        rel: "preload",
+        href: "https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap",
+        as: "style",
+      },
+    ],
+    [
+      "link",
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap",
+        media: "print",
+        onload: "this.media='all'",
+      },
+    ],
     // Favicons — fulll brand assets
     [
       "link",
@@ -119,7 +144,13 @@ export default defineConfig({
         content: "https://fulll.github.io/github-code-search/social-preview.png",
       },
     ],
-    ["meta", { property: "og:url", content: "https://fulll.github.io/github-code-search/" }],
+    [
+      "meta",
+      {
+        property: "og:url",
+        content: "https://fulll.github.io/github-code-search/",
+      },
+    ],
     // ── Twitter Card ────────────────────────────────────────────────────────
     ["meta", { name: "twitter:card", content: "summary_large_image" }],
     ["meta", { name: "twitter:title", content: "github-code-search" }],
@@ -154,20 +185,84 @@ export default defineConfig({
         async buildStart() {
           const { Resvg } = await import("@resvg/resvg-js");
           const { readFileSync, writeFileSync } = await import("node:fs");
-          const { fileURLToPath } = await import("node:url");
           const svgPath = fileURLToPath(new URL("../public/social-preview.svg", import.meta.url));
           const pngPath = fileURLToPath(new URL("../public/social-preview.png", import.meta.url));
           const svg = readFileSync(svgPath, "utf-8");
-          const resvg = new Resvg(svg, { fitTo: { mode: "width", value: 1200 } });
+          const resvg = new Resvg(svg, {
+            fitTo: { mode: "width", value: 1200 },
+          });
           writeFileSync(pngPath, resvg.render().asPng());
         },
       },
     ],
+    // ── Chunk splitting ──────────────────────────────────────────────────────
+    // Four async chunk groups — all loaded lazily via vitepress-mermaid-renderer,
+    // so none affect initial page load. Target: keep every chunk under 500 kB.
+    //
+    // Approximate minified sizes (actual, measured):
+    //   mermaid        ~1 769 kB  (mermaid core + d3, circular-dep locked together)
+    //   mermaid-graph    ~442 kB  (cytoscape core)
+    //   mermaid-layout   ~201 kB  (cytoscape-fcose + cytoscape-cose-bilkent)
+    //   mermaid-utils    ~163 kB  (lodash-es, khroma, dayjs, roughjs, …)
+    //   katex            ~261 kB  (own chunk, handled by vitepress-mermaid-renderer)
+    //
+    // mermaid+d3 is the one inescapable large chunk (~1 769 kB). The 1 800 kB
+    // limit silences the Rollup warning for that known bundle without masking
+    // real bloat in any other chunk (next largest is mermaid-graph at ~442 kB).
+    build: {
+      chunkSizeWarningLimit: 1800,
+      rollupOptions: {
+        output: {
+          manualChunks(id: string) {
+            // cytoscape-fcose + cytoscape-cose-bilkent: layout algorithm extensions
+            // (~200 kB combined). Must be checked before the bare "cytoscape" catch.
+            if (
+              id.includes("node_modules/cytoscape-fcose") ||
+              id.includes("node_modules/cytoscape-cose-bilkent")
+            )
+              return "mermaid-layout";
+
+            // cytoscape core only (~440 kB minified).
+            // The layout extensions above import from core but not vice-versa.
+            if (id.includes("node_modules/cytoscape")) return "mermaid-graph";
+
+            // Pure utility libraries consumed by mermaid — no circular deps
+            // back into mermaid or d3, safe to split.
+            if (
+              id.includes("node_modules/lodash-es") ||
+              id.includes("node_modules/khroma") ||
+              id.includes("node_modules/dayjs") ||
+              id.includes("node_modules/roughjs") ||
+              id.includes("node_modules/dompurify") ||
+              id.includes("node_modules/stylis") ||
+              id.includes("node_modules/ts-dedent") ||
+              id.includes("node_modules/uuid") ||
+              id.includes("node_modules/marked") ||
+              id.includes("node_modules/@braintree/sanitize-url") ||
+              id.includes("node_modules/@iconify")
+            )
+              return "mermaid-utils";
+
+            // Mermaid core + d3 sub-tree must stay co-located: they share
+            // circular dependencies that Rollup cannot untangle further.
+            if (
+              id.includes("node_modules/mermaid") ||
+              id.includes("node_modules/vitepress-mermaid-renderer") ||
+              id.includes("node_modules/d3") ||
+              id.includes("node_modules/dagre-d3-es") ||
+              id.includes("node_modules/internmap") ||
+              id.includes("node_modules/robust-predicates")
+            )
+              return "mermaid";
+          },
+        },
+      },
+    },
   },
 
   themeConfig: {
     // ── Logo (top-left, next to title) ───────────────────────────────────────
-    logo: "/logo.svg",
+    logo: { src: "/logo.svg", width: 24, height: 24 },
 
     // ── Nav ──────────────────────────────────────────────────────────────────
     nav: [
@@ -197,7 +292,7 @@ export default defineConfig({
       // the next main deploy re-builds this config and picks up the change automatically.
       // (vitepress-plugin-versions was evaluated but not adopted — see issue #30.)
       {
-        text: `${versionsData[0].text} ▾`,
+        text: versionsData[0].text,
         items: [
           ...versionsData.map((v: { text: string; link: string }) => ({
             text: v.text,
@@ -305,13 +400,19 @@ export default defineConfig({
   // ── Markdown ──────────────────────────────────────────────────────────────
   markdown: {
     theme: {
-      light: "github-light",
+      // github-light-high-contrast fixes WCAG AA contrast for Shiki tokens
+      // (github-light has #D73A49 4.24:1, #6A737D 4.46:1, #22863A 4.28:1 — all below 4.5:1)
+      light: "github-light-high-contrast",
       dark: "github-dark",
     },
   },
 
   // ── Sitemap ───────────────────────────────────────────────────────────────
+  // VITEPRESS_HOSTNAME overrides the default for local/CI a11y audits:
+  //   VITEPRESS_HOSTNAME=http://localhost:4173 vitepress build docs
+  // → sitemap.xml contains localhost URLs that pa11y-ci can reach directly.
   sitemap: {
-    hostname: "https://fulll.github.io/github-code-search/",
+    hostname:
+      (process.env.VITEPRESS_HOSTNAME ?? "https://fulll.github.io") + "/github-code-search/",
   },
 });

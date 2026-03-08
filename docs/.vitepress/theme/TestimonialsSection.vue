@@ -1,7 +1,7 @@
 <template>
-  <section class="ts-section">
+  <section class="ts-section" aria-labelledby="ts-heading">
     <div class="ts-header">
-      <h2 class="ts-title">What people say</h2>
+      <h2 id="ts-heading" class="ts-title">What people say</h2>
       <p class="ts-subtitle">Trusted by engineering teams who live in the terminal.</p>
     </div>
 
@@ -43,8 +43,24 @@
           href="https://github.com/fulll/github-code-search/discussions"
           target="_blank"
           rel="noopener noreferrer"
+          aria-label="Share your story (opens in a new tab)"
         >
-          Share your story →
+          <span aria-hidden="true">Share your story</span>
+          <svg
+            class="ts-cta-arrow"
+            aria-hidden="true"
+            xmlns="http://www.w3.org/2000/svg"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M7 17L17 7M7 7h10v10" />
+          </svg>
         </a>
       </div>
     </div>
@@ -75,7 +91,7 @@ const testimonials = [
     name: "DevOps Lead",
     role: "Infrastructure team · 30+ repos",
     initials: "DL",
-    color: "#CC88FF",
+    color: "#8833cc",
   },
 ];
 </script>
@@ -132,12 +148,19 @@ const testimonials = [
   gap: 20px;
   transition:
     transform 0.18s,
-    box-shadow 0.18s;
+    box-shadow 0.18s,
+    border-color 0.18s;
 }
 
 .ts-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(153, 51, 255, 0.1);
+  box-shadow: 0 6px 24px rgba(153, 51, 255, 0.14);
+  border-color: rgba(153, 51, 255, 0.32);
+}
+
+.dark .ts-card:hover {
+  border-color: rgba(204, 136, 255, 0.3);
+  box-shadow: 0 6px 28px rgba(153, 51, 255, 0.2);
 }
 
 /* ── Quote ─────────────────────────────────────────────────────────────── */
@@ -195,7 +218,8 @@ const testimonials = [
 
 .ts-role {
   font-size: 11.5px;
-  color: var(--vp-c-text-3);
+  /* Fix: var(--vp-c-text-3) = 2.87:1, below WCAG AA. text-2 ≥ 5.4:1. */
+  color: var(--vp-c-text-2);
 }
 
 /* ── CTA card ──────────────────────────────────────────────────────────── */
@@ -226,19 +250,35 @@ const testimonials = [
 }
 
 .ts-cta-btn {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 8px 18px;
   border-radius: 8px;
   background: var(--vp-c-brand-1);
-  color: #fff;
+  color: #fff !important;
   font-size: 13px;
   font-weight: 600;
-  text-decoration: none;
-  transition: background 0.15s;
+  text-decoration: none !important;
+  transition:
+    background 0.15s,
+    box-shadow 0.15s;
+}
+
+/* Fix: dark-mode brand-1 (#cc88ff) gives only 2.46:1 with white text.
+ * Explicit #9933ff (4.92:1) is used in dark mode. */
+.dark .ts-cta-btn {
+  background: #9933ff;
 }
 
 .ts-cta-btn:hover {
   background: #7a1fd4;
+  color: #fff !important;
+  box-shadow: 0 4px 16px rgba(153, 51, 255, 0.35);
+}
+
+.ts-cta-arrow {
+  flex-shrink: 0;
 }
 
 /* ── Responsive ────────────────────────────────────────────────────────── */

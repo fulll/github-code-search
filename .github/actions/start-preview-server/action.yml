@@ -1,0 +1,51 @@
+# Reusable composite action — Start VitePress preview server
+#
+# Starts `bun run docs:preview` in the background and polls until the server
+# responds (or fails after a configurable timeout). Reused by a11y.yaml,
+# responsive.yaml, and any future workflow that needs a running docs preview.
+#
+# Usage:
+#   - name: Start VitePress preview server
+#     uses: ./.github/actions/start-preview-server
+#     # (optionally) with:
+#     #   port: "4173"
+#     #   base: "/github-code-search/"
+#     #   timeout: "60"
+name: "Start VitePress preview server"
+description: >
+  Starts `bun run docs:preview` in the background on a given port and polls
+  until the server responds — or fails after a configurable timeout.
+
+inputs:
+  port:
+    description: TCP port the preview server should listen on.
+    default: "4173"
+  base:
+    description: Base URL path to poll when checking readiness.
+    default: "/github-code-search/"
+  timeout:
+    description: Maximum number of seconds to wait for the server to be ready.
+    default: "60"
+
+runs:
+  using: composite
+  steps:
+    - name: Start VitePress preview
+      shell: bash
+      run: bun run docs:preview -- --port ${{ inputs.port }} &
+
+    - name: Wait for preview server to be ready
+      shell: bash
+      run: |
+        URL="http://localhost:${{ inputs.port }}${{ inputs.base }}"
+        echo "Waiting for ${URL} …"
+        DEADLINE=$(( $(date +%s) + ${{ inputs.timeout }} ))
+        until curl -sf "${URL}" > /dev/null 2>&1; do
+          if [ "$(date +%s)" -ge "${DEADLINE}" ]; then
+            echo "::error::Preview server did not respond within ${{ inputs.timeout }} s on ${URL}."
+            exit 1
+          fi
+          echo "… retrying in 2 s"
+          sleep 2
+        done
+        echo "Preview server is ready."
