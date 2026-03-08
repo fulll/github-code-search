@@ -12,27 +12,19 @@
 #   1. Build the docs with `bun run docs:build:a11y` (sets VITEPRESS_HOSTNAME=
 #      http://localhost:4173 so the generated sitemap.xml contains localhost
 #      URLs that pa11y-ci can reach directly)
-#   2. Start `vitepress preview` in the background (serves on port 4173)
-#   3. Wait until the server is accepting connections
-#   4. Run pa11y-ci configured in .pa11yci.json (WCAG 2.1 AA, errors only)
+#   2. Start `vitepress preview` via the shared composite action
+#   3. Run pa11y-ci configured in .pa11yci.json (WCAG 2.1 AA, errors only)
 #
 # Chrome: Ubuntu-latest ships google-chrome-stable. We skip Puppeteer's own
 # Chromium download (PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=1) and point directly to
-# the system Chrome via PUPPETEER_EXECUTABLE_PATH at runtime. This cuts ~200 MB
-# from every CI run.
+# the system Chrome via PUPPETEER_EXECUTABLE_PATH at runtime (~200 MB saved).
 name: Accessibility audit (WCAG 2.1 AA)
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "docs/**"
-      - ".github/workflows/a11y.yml"
-      - ".pa11yci.json"
   pull_request:
     paths:
       - "docs/**"
-      - ".github/workflows/a11y.yml"
+      - ".github/workflows/a11y.yaml"
       - ".pa11yci.json"
   workflow_dispatch:
 
@@ -48,6 +40,9 @@ jobs:
   audit:
     name: WCAG 2.1 AA pages audit
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
       - name: Checkout
@@ -64,25 +59,9 @@ jobs:
       - name: Build docs (a11y — sitemap will use localhost URLs)
         run: bun run docs:build:a11y
 
-      # Start VitePress preview in the background; base URL: /github-code-search/
-      # --port 4173 matches the URLs in .pa11yci.json
+      # Shared composite action: starts preview server + waits until ready.
       - name: Start VitePress preview server
-        run: bun run docs:preview -- --port 4173 &
-
-      # Poll until the preview server responds (max 60 s = 30 × 2 s).
-      - name: Wait for preview server to be ready
-        run: |
-          echo "Waiting for VitePress preview on http://localhost:4173/github-code-search/ …"
-          for i in $(seq 1 30); do
-            if curl -sf http://localhost:4173/github-code-search/ > /dev/null 2>&1; then
-              echo "Server ready after $((i * 2)) seconds."
-              exit 0
-            fi
-            echo "Attempt $i/30 — retrying in 2 s …"
-            sleep 2
-          done
-          echo "ERROR: preview server did not start within 60 seconds." >&2
-          exit 1
+        uses: ./.github/actions/start-preview-server
 
       # Run the audit. The env vars tell Puppeteer (used by pa11y) to use the
       # pre-installed system Chrome instead of downloading a Chromium binary.
@@ -96,7 +75,7 @@ jobs:
       # easy to inspect without re-running the workflow.
       - name: Upload audit report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: pa11y-ci-report
           path: a11y-report.json

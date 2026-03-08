@@ -12,6 +12,10 @@ on:
       - "scripts/responsive.pw.ts"
       - ".github/workflows/responsive.yaml"
 
+concurrency:
+  group: responsive-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -34,30 +38,13 @@ jobs:
         run: bun run docs:build:a11y
 
       # Install only the Chromium browser — keeps the job fast (~150 MB vs 700 MB).
+      # Uses the Playwright binary from the installed devDependency (no bunx).
       - name: Install Playwright (Chromium only)
-        run: bunx playwright install --with-deps chromium
+        run: ./node_modules/.bin/playwright install --with-deps chromium
 
-      # Start the preview server in the background on port 4173.
-      - name: Start VitePress preview
-        run: bun run docs:preview -- --port 4173 &
-
-      # Give the server a moment to be ready.
-      - name: Wait for preview server
-        run: |
-          READY=0
-          for i in $(seq 1 10); do
-            if curl -s http://localhost:4173/github-code-search/ > /dev/null; then
-              echo "Server ready"
-              READY=1
-              break
-            fi
-            echo "Waiting ($i/10)…"
-            sleep 2
-          done
-          if [ "$READY" -ne 1 ]; then
-            echo "Preview server failed to become ready after 10 attempts."
-            exit 1
-          fi
+      # Shared composite action: starts preview server + waits until ready.
+      - name: Start VitePress preview server
+        uses: ./.github/actions/start-preview-server
 
       - name: Run responsive tests
         run: bun run docs:test:responsive
@@ -68,7 +55,7 @@ jobs:
       # screenshots can be inspected without having to run locally.
       - name: Upload Playwright report
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: playwright-report
           path: playwright-report/
