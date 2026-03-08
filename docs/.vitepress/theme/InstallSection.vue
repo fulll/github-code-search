@@ -37,9 +37,9 @@ function copySearch() {
 </script>
 
 <template>
-  <section class="is-section">
+  <section class="is-section" aria-labelledby="install-section-title">
     <div class="is-header">
-      <h2 class="is-title">Get up and running in 30 seconds</h2>
+      <h2 id="install-section-title" class="is-title">Get up and running in 30 seconds</h2>
       <p class="is-subtitle">
         One command. Auto-detects your OS and architecture.<br />
         Works on macOS, Linux, and Windows (Git Bash / MSYS2).
@@ -70,15 +70,15 @@ function copySearch() {
     <div class="is-steps">
       <!-- Step 1: Install -->
       <div class="is-step">
-        <div class="is-step-num">1</div>
+        <div class="is-step-num" aria-hidden="true">1</div>
         <div class="is-step-body">
-          <p class="is-step-label">Install the binary</p>
+          <h3 class="is-step-label">Install the binary</h3>
           <div class="is-terminal">
             <div class="is-terminal-bar">
-              <span class="is-dot is-dot-red"></span>
-              <span class="is-dot is-dot-yellow"></span>
-              <span class="is-dot is-dot-green"></span>
-              <span class="is-terminal-title">bash</span>
+              <span class="is-dot is-dot-red" aria-hidden="true"></span>
+              <span class="is-dot is-dot-yellow" aria-hidden="true"></span>
+              <span class="is-dot is-dot-green" aria-hidden="true"></span>
+              <span class="is-terminal-title" aria-hidden="true">bash</span>
               <button
                 class="is-copy-btn"
                 :class="{ copied: copiedInstall }"
@@ -113,9 +113,9 @@ function copySearch() {
 
       <!-- Step 2: Export token -->
       <div class="is-step">
-        <div class="is-step-num">2</div>
+        <div class="is-step-num" aria-hidden="true">2</div>
         <div class="is-step-body">
-          <p class="is-step-label">Export your GitHub token</p>
+          <h3 class="is-step-label">Export your GitHub token</h3>
           <div class="is-token-hint">
             <svg
               class="is-info-icon"
@@ -142,10 +142,10 @@ function copySearch() {
           </div>
           <div class="is-terminal">
             <div class="is-terminal-bar">
-              <span class="is-dot is-dot-red"></span>
-              <span class="is-dot is-dot-yellow"></span>
-              <span class="is-dot is-dot-green"></span>
-              <span class="is-terminal-title">bash</span>
+              <span class="is-dot is-dot-red" aria-hidden="true"></span>
+              <span class="is-dot is-dot-yellow" aria-hidden="true"></span>
+              <span class="is-dot is-dot-green" aria-hidden="true"></span>
+              <span class="is-terminal-title" aria-hidden="true">bash</span>
             </div>
             <pre
               class="is-code"
@@ -158,15 +158,15 @@ function copySearch() {
 
       <!-- Step 3: Run -->
       <div class="is-step">
-        <div class="is-step-num">3</div>
+        <div class="is-step-num" aria-hidden="true">3</div>
         <div class="is-step-body">
-          <p class="is-step-label">Run your first search</p>
+          <h3 class="is-step-label">Run your first search</h3>
           <div class="is-terminal">
             <div class="is-terminal-bar">
-              <span class="is-dot is-dot-red"></span>
-              <span class="is-dot is-dot-yellow"></span>
-              <span class="is-dot is-dot-green"></span>
-              <span class="is-terminal-title">bash</span>
+              <span class="is-dot is-dot-red" aria-hidden="true"></span>
+              <span class="is-dot is-dot-yellow" aria-hidden="true"></span>
+              <span class="is-dot is-dot-green" aria-hidden="true"></span>
+              <span class="is-terminal-title" aria-hidden="true">bash</span>
               <button
                 class="is-copy-btn"
                 :class="{ copied: copiedVerify }"
@@ -433,6 +433,11 @@ function copySearch() {
   outline: none;
 }
 
+.is-copy-btn:focus-visible {
+  outline: 2px solid #cc88ff;
+  outline-offset: 2px;
+}
+
 .is-copy-btn:hover {
   background: rgba(153, 51, 255, 0.2);
   border-color: rgba(153, 51, 255, 0.4);
@@ -530,6 +535,10 @@ function copySearch() {
     font-size: 22px;
   }
 
+  .is-subtitle {
+    font-size: 14px;
+  }
+
   .is-step-num {
     width: 32px;
     height: 32px;
@@ -540,8 +549,21 @@ function copySearch() {
     margin-left: 15px;
   }
 
+  /* Terminal blocks: ensure they never overflow the section */
+  .is-terminal {
+    max-width: 100%;
+  }
+
   .is-code {
     font-size: 11.5px;
+    /* long commands scroll horizontally inside the terminal block */
+    overflow-x: auto;
+  }
+
+  .is-code code {
+    /* wrap on very small screens as fallback for users who prefer no scroll */
+    white-space: pre-wrap;
+    word-break: break-all;
   }
 }
 </style>

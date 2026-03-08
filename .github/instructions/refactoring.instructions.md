@@ -5,6 +5,8 @@ excludeAgent: "code-review"
 
 # Refactoring — instructions for Copilot coding agent
 
+> **Skill reference:** for architectural invariants, safe rename playbook, module extraction patterns, characterisation test strategy and `knip` output interpretation read `.github/skills/refactoring.md` first.
+
 Follow these steps when refactoring existing code in this repository.
 
 ## 1. Define the goal and scope

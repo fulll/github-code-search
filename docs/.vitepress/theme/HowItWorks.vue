@@ -1,7 +1,7 @@
 <template>
-  <section class="hiw-section">
+  <section class="hiw-section" aria-labelledby="hiw-heading">
     <div class="hiw-header">
-      <h2 class="hiw-title">How it works</h2>
+      <h2 id="hiw-heading" class="hiw-title">How it works</h2>
       <p class="hiw-subtitle">From query to structured output in three steps.</p>
     </div>
 
@@ -229,17 +229,17 @@
 
 .hiw-step-badge {
   display: inline-block;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--vp-c-brand-1);
-  margin-bottom: 4px;
+  margin-bottom: 5px;
 }
 
 .hiw-step-title {
-  margin: 0 0 6px;
-  font-size: 17px;
+  margin: 0 0 8px;
+  font-size: 18px;
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--vp-c-text-1);
@@ -249,8 +249,8 @@
 
 .hiw-step-desc {
   margin: 0;
-  font-size: 14px;
-  line-height: 1.7;
+  font-size: 15px;
+  line-height: 1.75;
   color: var(--vp-c-text-2);
 }
 
@@ -284,11 +284,11 @@ kbd {
   }
 
   .hiw-step-title {
-    font-size: 15px;
+    font-size: 16px;
   }
 
   .hiw-step-desc {
-    font-size: 13px;
+    font-size: 14px;
   }
 }
 </style>

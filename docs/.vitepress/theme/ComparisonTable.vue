@@ -80,17 +80,26 @@ const ROWS: Row[] = [
         <strong>org-wide code audits and interactive triage</strong>.
       </p>
       <table class="ct-table">
+        <caption class="sr-only">
+          Feature comparison between gh search code and github-code-search
+        </caption>
         <thead>
           <tr>
-            <th class="ct-th-feature"></th>
-            <th class="ct-th-tool">
+            <th class="ct-th-feature" scope="col" aria-label="Feature"></th>
+            <th class="ct-th-tool" scope="col">
               <div class="ct-tool-header">
-                <span class="ct-tool-name ct-tool-alt">gh search code</span>
+                <span class="ct-tool-name ct-tool-alt">
+                  <span class="ct-name-long">gh search code</span>
+                  <span class="ct-name-short">gh search</span>
+                </span>
               </div>
             </th>
-            <th class="ct-th-tool">
+            <th class="ct-th-tool" scope="col">
               <div class="ct-tool-header">
-                <span class="ct-tool-name ct-tool-brand">github-code-search</span>
+                <span class="ct-tool-name ct-tool-brand">
+                  <span class="ct-name-long">github-code-search</span>
+                  <span class="ct-name-short">gcs</span>
+                </span>
                 <span class="ct-badge">Purpose-built</span>
               </div>
             </th>
@@ -132,12 +141,20 @@ const ROWS: Row[] = [
               </span>
             </td>
             <td class="ct-cell">
-              <span v-if="row.gh" class="ct-check">✓</span>
-              <span v-else class="ct-cross">✗</span>
+              <span v-if="row.gh" class="ct-check" role="img" aria-label="Yes"
+                ><span aria-hidden="true">✓</span></span
+              >
+              <span v-else class="ct-cross" role="img" aria-label="No"
+                ><span aria-hidden="true">✗</span></span
+              >
             </td>
             <td class="ct-cell">
-              <span v-if="row.gcs" class="ct-check">✓</span>
-              <span v-else class="ct-cross">✗</span>
+              <span v-if="row.gcs" class="ct-check" role="img" aria-label="Yes"
+                ><span aria-hidden="true">✓</span></span
+              >
+              <span v-else class="ct-cross" role="img" aria-label="No"
+                ><span aria-hidden="true">✗</span></span
+              >
             </td>
           </tr>
         </tbody>
@@ -248,7 +265,8 @@ thead tr {
 }
 
 .ct-tool-alt {
-  color: var(--vp-c-text-3);
+  /* Fix: var(--vp-c-text-3) = 2.87:1, below WCAG AA 4.5:1. text-2 ≥ 5.4:1. */
+  color: var(--vp-c-text-2);
 }
 
 .ct-tool-brand {
@@ -323,7 +341,8 @@ thead tr {
 .ct-feature-desc {
   font-size: 13px;
   font-weight: 400;
-  color: var(--vp-c-text-3);
+  /* Fix: var(--vp-c-text-3) ≈ 2.87:1, below WCAG AA. text-1 ensures ≥4.5:1. */
+  color: var(--vp-c-text-1);
   line-height: 1.45;
 }
 
@@ -370,29 +389,68 @@ thead tr {
   color: #ef4444;
 }
 
+/* Short/long label switching — long shown by default, short on mobile */
+.ct-name-short {
+  display: none;
+}
+
 /* ── Responsive ────────────────────────────────────────────────────────── */
+
+/*
+ * ≤ 640 px — keep both tool columns but use abbreviated headers, drop badges
+ * and descriptions, tighten padding.
+ * Inspired by bun.sh's feature comparison table: 3 columns (feature + 2 tools)
+ * always visible, even on 360 px — tool headers very short, icons centred.
+ */
 @media (max-width: 640px) {
+  /* Switch to abbreviated column headers */
+  .ct-name-long {
+    display: none;
+  }
+  .ct-name-short {
+    display: inline;
+  }
+
+  /* Feature col narrower, tool cols equal */
   .ct-th-feature {
-    width: 55%;
-    padding: 14px 14px;
+    width: 56%;
+    padding: 10px 12px;
   }
 
   .ct-th-tool {
-    width: 22.5%;
-    padding: 14px 8px;
+    width: 22%;
+    padding: 10px 4px;
   }
 
   .ct-feature {
-    padding: 12px 14px;
+    padding: 10px 12px;
     font-size: 13px;
+  }
+
+  .ct-cell {
+    padding: 10px 4px;
   }
 
   .ct-tool-name {
     font-size: 11px;
+    font-weight: 700;
   }
 
   .ct-badge {
     display: none;
+  }
+
+  /* Hide descriptions — feature title alone is sufficient at small sizes */
+  .ct-feature-desc {
+    display: none;
+  }
+
+  /* Slightly smaller icons so they fit the narrow cells */
+  .ct-check,
+  .ct-cross {
+    width: 22px;
+    height: 22px;
+    font-size: 11px;
   }
 }
 </style>

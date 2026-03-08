@@ -280,6 +280,46 @@ body::before {
   border-bottom-color: rgba(204, 136, 255, 0.1) !important;
 }
 
+/*
+ * At ≤960px (tablet portrait/landscape transition) the navbar flex layout
+ * overflows at exactly 768px: `.VPNavBarMenu` items and `.VPNavBarExtra` both
+ * extend beyond the right edge of the viewport, producing a real page-level
+ * horizontal scrollbar (confirmed in browser at 768px).
+ *
+ * Fix: force hamburger mode at ≤960px — hide the desktop menu items and the
+ * extra social-links flyout, show the hamburger button instead.
+ * VitePress's own CSS only triggers hamburger at < 768px, which is the root
+ * cause of the overflow at exactly 768px.
+ */
+@media (max-width: 960px) {
+  /*
+   * At ≤960px the desktop nav links and social-links flyout overflow the
+   * viewport at exactly 768px (tablet portrait). Hide them and show the
+   * hamburger button instead.
+   *
+   * VitePress hides .VPNavBarHamburger at ≥768px and .VPNavScreen at ≥768px
+   * via its own media queries — we override both here so the hamburger is
+   * fully functional at 768–960px as it is at <768px.
+   */
+  .VPNavBarMenu,
+  .VPNavBarExtra {
+    display: none !important;
+  }
+
+  /* Show the hamburger toggle button */
+  .VPNavBarHamburger {
+    display: flex !important;
+  }
+}
+
+/* VitePress hides the full-screen nav overlay at ≥768px — unlock it so the
+ * hamburger button we show at 768–960px can actually open the menu. */
+@media (min-width: 768px) and (max-width: 960px) {
+  .VPNavScreen {
+    display: block !important;
+  }
+}
+
 /* ── Doc pages background (non-home) ──────────────────────────────────────── */
 .VPDoc {
   background: radial-gradient(
@@ -300,4 +340,82 @@ body::before {
 /* ── Footer — default VitePress footer hidden (replaced by RichFooter.vue) ── */
 .VPFooter {
   display: none !important;
+}
+
+/* ── Responsive — prevent horizontal overflow at any viewport size ────────── */
+/*
+ * Mobile-first overflow containment.
+ * Without this, any element whose computed width exceeds the viewport (fixed px
+ * widths, table cells with `white-space:nowrap`, long code strings, …) creates
+ * a page-level horizontal scroll bar.  Applying `overflow-x: hidden` here acts
+ * as the final safety net; individual components still fix their own overflow
+ * so that content is never silently clipped.
+ */
+.VPHome,
+.VPHero,
+.VPHomeContent {
+  overflow-x: hidden;
+}
+
+/*
+ * Pre / code blocks — guarantee they scroll internally rather than pushing the
+ * page wider.  VitePress sets this on `.vp-doc pre` but not on custom-component
+ * terminal blocks, so we cover both here.
+ */
+pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* ── Accessibility utilities ─────────────────────────────────────────────── */
+
+/**
+ * Visually hidden but accessible to screen readers.
+ * Use on text that provides context only needed by AT (e.g. "(opens in a new tab)").
+ */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/**
+ * Global focus-visible ring — ensures keyboard users always see a visible
+ * focus indicator on interactive elements, satisfying WCAG 2.4.11 (AA).
+ * Individual components may override with more context-appropriate styling.
+ */
+:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 2px;
+}
+
+/* ── Shiki light-theme contrast overrides (WCAG 2.1 AA) ─────────────────── */
+/*
+ * The default github-light Shiki theme ships three token colours that fail
+ * WCAG AA 4.5:1 against a white/near-white code-block background:
+ *   #D73A49 — operators/keywords  → 4.24 : 1
+ *   #6A737D — comments            → 4.46 : 1
+ *   #22863A — strings/YAML keys   → 4.28 : 1
+ *
+ * We use github-light-high-contrast as the primary Shiki theme (config.mts),
+ * which resolves these at the source.  The attribute-selector rules below are a
+ * belt-and-suspenders fallback for any residual inline-style occurrences.
+ */
+html:not(.dark) .vp-doc pre code span[style*="--shiki-light:#D73A49"] {
+  /* red operators — was 4.24:1, now ≥4.5:1 */
+  color: #b91c1c !important;
+}
+html:not(.dark) .vp-doc pre code span[style*="--shiki-light:#6A737D"] {
+  /* comment grey — was 4.46:1, now ≥4.5:1 */
+  color: #596069 !important;
+}
+html:not(.dark) .vp-doc pre code span[style*="--shiki-light:#22863A"] {
+  /* green strings/YAML keys — was 4.28:1, now ≥4.5:1 */
+  color: #155e27 !important;
 }

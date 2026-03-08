@@ -54,6 +54,7 @@ const USE_CASES: UseCase[] = [
 
 const active = ref(0);
 const copied = ref(false);
+const tabRefs = ref<HTMLButtonElement[]>([]);
 
 async function copyCommand() {
   try {
@@ -66,21 +67,51 @@ async function copyCommand() {
     // clipboard unavailable
   }
 }
+
+/** ARIA tabs keyboard pattern (WAI-ARIA 1.1 §3.22) */
+function handleTabKeydown(e: KeyboardEvent, i: number) {
+  let next: number | null = null;
+  if (e.key === "ArrowRight") {
+    next = (i + 1) % USE_CASES.length;
+  } else if (e.key === "ArrowLeft") {
+    next = (i - 1 + USE_CASES.length) % USE_CASES.length;
+  } else if (e.key === "Home") {
+    e.preventDefault();
+    next = 0;
+  } else if (e.key === "End") {
+    e.preventDefault();
+    next = USE_CASES.length - 1;
+  }
+  if (next !== null) {
+    e.preventDefault();
+    active.value = next;
+    tabRefs.value[next]?.focus();
+  }
+}
 </script>
 
 <template>
-  <section class="uc-section">
-    <h2 class="uc-title">Use cases</h2>
+  <section class="uc-section" aria-labelledby="uc-heading">
+    <h2 id="uc-heading" class="uc-title">Use cases</h2>
 
-    <div class="uc-pills" role="tablist">
+    <div class="uc-pills" role="tablist" :aria-label="'Use cases'">
       <button
         v-for="(uc, i) in USE_CASES"
         :key="uc.id"
+        :id="`uc-tab-${uc.id}`"
+        :ref="
+          (el) => {
+            if (el) tabRefs.value[i] = el as HTMLButtonElement;
+          }
+        "
         class="uc-pill"
         :class="{ active: active === i }"
         role="tab"
         :aria-selected="active === i"
+        :aria-controls="`uc-panel-${uc.id}`"
+        :tabindex="active === i ? 0 : -1"
         @click="active = i"
+        @keydown="handleTabKeydown($event, i)"
       >
         {{ uc.label }}
       </button>
@@ -88,7 +119,14 @@ async function copyCommand() {
 
     <div class="uc-panel-wrap">
       <transition name="uc-fade" mode="out-in">
-        <div :key="active" class="uc-panel" role="tabpanel">
+        <div
+          :key="active"
+          :id="`uc-panel-${USE_CASES[active].id}`"
+          class="uc-panel"
+          role="tabpanel"
+          :aria-labelledby="`uc-tab-${USE_CASES[active].id}`"
+          tabindex="0"
+        >
           <p class="uc-headline">{{ USE_CASES[active].headline }}</p>
           <p class="uc-desc">{{ USE_CASES[active].description }}</p>
 
@@ -180,6 +218,11 @@ async function copyCommand() {
   outline: none;
 }
 
+.uc-pill:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 3px;
+}
+
 .uc-pill:hover {
   border-color: var(--vp-c-brand-1);
   color: var(--vp-c-brand-1);
@@ -202,6 +245,12 @@ async function copyCommand() {
 /* ── Panel wrapper (fixe la hauteur pour éviter le saut) ──────────────── */
 .uc-panel-wrap {
   min-height: 280px;
+}
+
+.uc-panel:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: -2px;
+  border-radius: 14px;
 }
 
 /* ── Panel ─────────────────────────────────────────────────────────────── */
@@ -337,6 +386,11 @@ async function copyCommand() {
   outline: none;
 }
 
+.uc-copy-btn:focus-visible {
+  outline: 2px solid #cc88ff;
+  outline-offset: 2px;
+}
+
 .uc-copy-btn:hover {
   background: rgba(153, 51, 255, 0.2);
   border-color: rgba(153, 51, 255, 0.4);
@@ -371,24 +425,53 @@ async function copyCommand() {
 /* ── Responsive ────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .uc-panel {
-    padding: 20px 18px;
+    padding: 18px 14px;
   }
 
   .uc-pill {
-    font-size: 14px;
-    padding: 7px 14px;
+    font-size: 13px;
+    padding: 6px 12px;
   }
 
   .uc-title {
-    font-size: 24px;
+    font-size: 22px;
+    margin: 0 0 24px;
   }
 
   .uc-headline {
-    font-size: 17px;
+    font-size: 16px;
+  }
+
+  .uc-desc {
+    /* Reduce the left border indent so text gets more room */
+    padding-left: 10px;
+    font-size: 14px;
   }
 
   .uc-panel-wrap {
-    min-height: 320px;
+    min-height: 0; /* let content dictate height on mobile */
+  }
+
+  /*
+   * The terminal block must not overflow .uc-panel.
+   * `overflow: hidden` on .uc-terminal clips the rounded corners,
+   * but we also need `overflow-x: auto` on the body so the command
+   * can be scrolled within its container rather than pushing the page wider.
+   */
+  .uc-terminal {
+    max-width: 100%;
+  }
+
+  .uc-terminal-body {
+    overflow-x: auto;
+  }
+
+  .uc-code {
+    font-size: 12px;
+    padding: 14px 14px;
+    /* long commands scroll horizontally inside the block */
+    white-space: pre;
+    overflow-x: auto;
   }
 }
 </style>

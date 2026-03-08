@@ -5,6 +5,8 @@ excludeAgent: "code-review"
 
 # Bug fixing — instructions for Copilot coding agent
 
+> **Skill reference:** for the extended symptom → module diagnostic table, test-first patterns and minimal fix principles read `.github/skills/bug-fixing.md` first.
+
 Follow these steps when fixing a bug in this repository.
 
 ## 1. Reproduce the bug before writing any fix

@@ -43,21 +43,25 @@
     "knip": "knip",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
+    "docs:build:a11y": "VITEPRESS_HOSTNAME=http://localhost:4173 vitepress build docs",
     "docs:build:og": "bun scripts/generate-og.ts",
-    "docs:preview": "vitepress preview docs"
+    "docs:preview": "vitepress preview docs",
+    "docs:a11y": "bunx pa11y-ci --config .pa11yci.json --sitemap http://localhost:4173${VITEPRESS_BASE:-/github-code-search/}sitemap.xml",
+    "docs:test:responsive": "bunx playwright test"
   },
   "dependencies": {
     "commander": "^14.0.3",
     "picocolors": "^1.1.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@resvg/resvg-js": "^2.6.2",
     "bun-types": "^1.3.10",
-    "knip": "^5.84.1",
+    "knip": "^5.86.0",
     "mermaid": "^11.0.0",
     "oxfmt": "^0.36.0",
     "oxlint": "^1.51.0",
     "vitepress": "^1.6.3",
-    "vitepress-mermaid-renderer": "^1.1.11"
+    "vitepress-mermaid-renderer": "^1.1.18"
   }
 }

@@ -119,7 +119,13 @@ export default defineConfig({
         content: "https://fulll.github.io/github-code-search/social-preview.png",
       },
     ],
-    ["meta", { property: "og:url", content: "https://fulll.github.io/github-code-search/" }],
+    [
+      "meta",
+      {
+        property: "og:url",
+        content: "https://fulll.github.io/github-code-search/",
+      },
+    ],
     // ── Twitter Card ────────────────────────────────────────────────────────
     ["meta", { name: "twitter:card", content: "summary_large_image" }],
     ["meta", { name: "twitter:title", content: "github-code-search" }],
@@ -154,15 +160,43 @@ export default defineConfig({
         async buildStart() {
           const { Resvg } = await import("@resvg/resvg-js");
           const { readFileSync, writeFileSync } = await import("node:fs");
-          const { fileURLToPath } = await import("node:url");
           const svgPath = fileURLToPath(new URL("../public/social-preview.svg", import.meta.url));
           const pngPath = fileURLToPath(new URL("../public/social-preview.png", import.meta.url));
           const svg = readFileSync(svgPath, "utf-8");
-          const resvg = new Resvg(svg, { fitTo: { mode: "width", value: 1200 } });
+          const resvg = new Resvg(svg, {
+            fitTo: { mode: "width", value: 1200 },
+          });
           writeFileSync(pngPath, resvg.render().asPng());
         },
       },
     ],
+    // ── Chunk splitting ──────────────────────────────────────────────────────
+    // Mermaid alone is >900 kB minified; split it + the d3 sub-tree into
+    // dedicated async chunks to eliminate the Rollup 500 kB warning and
+    // improve long-term caching. No generic vendor catch-all — VitePress
+    // internals (mark.js etc.) need Rollup's default resolution.
+    build: {
+      // Mermaid (bundled with d3) is legitimately large (~2.4 MB minified).
+      // 2500 kB threshold avoids the Rollup warning without masking real bloat
+      // on other chunks (next largest is katex at ~260 kB).
+      chunkSizeWarningLimit: 2500,
+      rollupOptions: {
+        output: {
+          manualChunks(id: string) {
+            // Mermaid + d3 must be co-located (circular dependency between them).
+            if (
+              id.includes("node_modules/mermaid") ||
+              id.includes("node_modules/vitepress-mermaid-renderer") ||
+              id.includes("node_modules/d3") ||
+              id.includes("node_modules/dagre-d3-es") ||
+              id.includes("node_modules/internmap") ||
+              id.includes("node_modules/robust-predicates")
+            )
+              return "mermaid";
+          },
+        },
+      },
+    },
   },
 
   themeConfig: {
@@ -305,13 +339,19 @@ export default defineConfig({
   // ── Markdown ──────────────────────────────────────────────────────────────
   markdown: {
     theme: {
-      light: "github-light",
+      // github-light-high-contrast fixes WCAG AA contrast for Shiki tokens
+      // (github-light has #D73A49 4.24:1, #6A737D 4.46:1, #22863A 4.28:1 — all below 4.5:1)
+      light: "github-light-high-contrast",
       dark: "github-dark",
     },
   },
 
   // ── Sitemap ───────────────────────────────────────────────────────────────
+  // VITEPRESS_HOSTNAME overrides the default for local/CI a11y audits:
+  //   VITEPRESS_HOSTNAME=http://localhost:4173 vitepress build docs
+  // → sitemap.xml contains localhost URLs that pa11y-ci can reach directly.
   sitemap: {
-    hostname: "https://fulll.github.io/github-code-search/",
+    hostname:
+      (process.env.VITEPRESS_HOSTNAME ?? "https://fulll.github.io") + "/github-code-search/",
   },
 });

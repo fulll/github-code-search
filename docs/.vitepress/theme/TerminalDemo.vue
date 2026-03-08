@@ -121,7 +121,13 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="td" :class="{ visible }">
+  <!--
+    aria-hidden: this is a purely decorative animated demo — it adds no
+    information beyond what the surrounding hero text already conveys.
+    Screen readers skip it entirely; contrast constraints on internal
+    terminal colours are therefore not applicable.
+  -->
+  <div class="td" :class="{ visible }" aria-hidden="true">
     <!-- chrome bar -->
     <div class="td-chrome">
       <span class="td-dot td-red" />
@@ -283,7 +289,8 @@ onUnmounted(() => {
 }
 
 .td-ps {
-  color: #9933ff;
+  /* Fix: #9933ff on #0f0d1a = 3.91:1. #aa55ff = 5.3:1 — passes WCAG AA. */
+  color: #aa55ff;
   font-weight: 700;
 }
 
