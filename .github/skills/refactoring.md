@@ -9,14 +9,14 @@ This skill complements `.github/instructions/refactoring.instructions.md`.
 
 These constraints are non-negotiable. Any refactoring that would violate them must be restructured:
 
-| Invariant                                                            | Why                                                        |
-| -------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Invariant                                                                                 | Why                                                                       |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | Pure functions in `aggregate.ts`, `group.ts`, `output.ts`, `render/` have no side effects | Makes them deterministically unit-testable; any I/O breaks the test suite |
-| All network I/O lives exclusively in `src/api.ts`                   | Single audit surface for rate limits, auth, retry logic    |
-| All TTY I/O lives exclusively in `src/tui.ts`                       | Enables headless (`--output-type`) usage without a TTY     |
-| `src/types.ts` is the single source of truth for shared interfaces  | Prevents type drift across modules                         |
-| `src/render.ts` is the façade — consumers never import from `render/` directly | Allows internal restructuring without changing import sites |
-| `src/api-utils.ts` and `src/cache.ts` are used only by `src/api.ts` | Keeps side-effectful helpers bounded                       |
+| All network I/O lives exclusively in `src/api.ts`                                         | Single audit surface for rate limits, auth, retry logic                   |
+| All TTY I/O lives exclusively in `src/tui.ts`                                             | Enables headless (`--output-type`) usage without a TTY                    |
+| `src/types.ts` is the single source of truth for shared interfaces                        | Prevents type drift across modules                                        |
+| `src/render.ts` is the façade — consumers never import from `render/` directly            | Allows internal restructuring without changing import sites               |
+| `src/api-utils.ts` and `src/cache.ts` are used only by `src/api.ts`                       | Keeps side-effectful helpers bounded                                      |
 
 ---
 
@@ -34,6 +34,7 @@ Before renaming an exported symbol:
    ```
 
 **Particularly common re-exports in `render.ts`:**
+
 ```typescript
 export { buildRows, rowTerminalLines, isCursorVisible } from "./render/rows.ts";
 export { buildFilterStats } from "./render/filter.ts";
@@ -100,11 +101,11 @@ If a type needs to be split or renamed:
 bun run knip
 ```
 
-| Output line                 | Meaning and fix                                                |
-| --------------------------- | -------------------------------------------------------------- |
-| `Unused export 'foo'`       | `foo` is exported but never imported — remove the export or the dead code |
-| `Unused file 'src/foo.ts'`  | File is not imported anywhere — check if it was intentionally removed from re-exports |
-| `Unlisted dependency`       | A package is used but not in `package.json` — add it          |
+| Output line                | Meaning and fix                                                                       |
+| -------------------------- | ------------------------------------------------------------------------------------- |
+| `Unused export 'foo'`      | `foo` is exported but never imported — remove the export or the dead code             |
+| `Unused file 'src/foo.ts'` | File is not imported anywhere — check if it was intentionally removed from re-exports |
+| `Unlisted dependency`      | A package is used but not in `package.json` — add it                                  |
 
 `knip.json` configures the project entry points and ignore lists. Check it before concluding a false positive.
 

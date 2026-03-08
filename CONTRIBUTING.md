@@ -131,28 +131,28 @@ This project ships a two-layer system to guide AI coding agents (GitHub Copilot,
 Step-by-step workflow files applied automatically by Copilot based on the task type.
 Each file covers **one task type** — ordered numbered steps, PR conventions, validation checklist.
 
-| File                            | Applied to                      | When                                  |
-| ------------------------------- | ------------------------------- | ------------------------------------- |
-| `bug-fixing.instructions.md`    | All files (`**`)                | Fixing a bug                          |
-| `implement-feature.instructions.md` | All files (`**`)            | Implementing a new feature            |
-| `refactoring.instructions.md`   | All files (`**`)                | Refactoring existing code             |
-| `release.instructions.md`       | All files (`**`)                | Cutting a release                     |
-| `documentation.instructions.md` | `docs/**` only                  | Writing or editing documentation      |
+| File                                | Applied to       | When                             |
+| ----------------------------------- | ---------------- | -------------------------------- |
+| `bug-fixing.instructions.md`        | All files (`**`) | Fixing a bug                     |
+| `implement-feature.instructions.md` | All files (`**`) | Implementing a new feature       |
+| `refactoring.instructions.md`       | All files (`**`) | Refactoring existing code        |
+| `release.instructions.md`           | All files (`**`) | Cutting a release                |
+| `documentation.instructions.md`     | `docs/**` only   | Writing or editing documentation |
 
 ### Skills (`.github/skills/`)
 
 Deep domain-knowledge files — **read these for reference**, not for step-by-step guidance.
 Skills provide patterns, checklists, architectural details and examples that are too large for instruction files.
 
-| File                    | Domain                                                                  |
-| ----------------------- | ----------------------------------------------------------------------- |
-| `bug-fixing.md`         | Extended symptom→module table, test-first patterns, minimal fix rules  |
-| `feature.md`            | Layer map, type-first design, CLI options, render sub-module extension  |
-| `refactoring.md`        | Architectural invariants, safe rename playbook, knip output guide       |
-| `release.md`            | Semver guide, CD pipeline mechanics, blog post format, CHANGELOG rules  |
-| `documentation.md`      | VitePress theme API, CSS variables, WCAG patterns, responsive patterns  |
+| File               | Domain                                                                 |
+| ------------------ | ---------------------------------------------------------------------- |
+| `bug-fixing.md`    | Extended symptom→module table, test-first patterns, minimal fix rules  |
+| `feature.md`       | Layer map, type-first design, CLI options, render sub-module extension |
+| `refactoring.md`   | Architectural invariants, safe rename playbook, knip output guide      |
+| `release.md`       | Semver guide, CD pipeline mechanics, blog post format, CHANGELOG rules |
+| `documentation.md` | VitePress theme API, CSS variables, WCAG patterns, responsive patterns |
 
-**How they fit together:** instruction files say *what steps to follow*; skill files say *what to know deeply*. Instructions reference their companion skill via a `> Skill reference:` note at the top.
+**How they fit together:** instruction files say _what steps to follow_; skill files say _what to know deeply_. Instructions reference their companion skill via a `> Skill reference:` note at the top.
 
 ## Reporting bugs
 

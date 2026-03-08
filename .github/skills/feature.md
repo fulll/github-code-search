@@ -45,6 +45,7 @@ When a new feature introduces shared data structures, define `src/types.ts` firs
 3. Implement pure functions next, then the I/O layer last.
 
 **Extending an existing interface:**
+
 ```typescript
 // src/types.ts — before
 export interface CodeMatch {
@@ -56,7 +57,7 @@ export interface CodeMatch {
 export interface CodeMatch {
   path: string;
   textMatches: TextMatch[];
-  language?: string;   // new field — optional keeps consumers backward-compatible
+  language?: string; // new field — optional keeps consumers backward-compatible
 }
 ```
 
@@ -67,11 +68,11 @@ export interface CodeMatch {
 Options are registered in `github-code-search.ts` via Commander:
 
 ```typescript
-program
-  .option("--my-flag <value>", "Description of the flag")
+program.option("--my-flag <value>", "Description of the flag");
 ```
 
 Conventions:
+
 - Use `kebab-case` for multi-word flags: `--exclude-repositories`, not `--excludeRepositories`.
 - Document new options in `README.md` (the options table + examples section).
 - If the option requires a new GitHub token scope, document it in `README.md` and `AGENTS.md`.
@@ -92,15 +93,16 @@ Conventions:
 
 ## Test patterns for new features
 
-| Module type                   | Test strategy                                                          |
-| ----------------------------- | ---------------------------------------------------------------------- |
-| Pure function in `src/`       | Co-located `*.test.ts`, full unit coverage, no mocks                  |
-| `api-utils.ts` helper         | Mock `globalThis.fetch` — `globalThis.fetch = async () => ...`        |
-| `cache.ts` helper             | Set `GITHUB_CODE_SEARCH_CACHE_DIR` env var to `os.tmpdir()` in tests  |
+| Module type                   | Test strategy                                                        |
+| ----------------------------- | -------------------------------------------------------------------- |
+| Pure function in `src/`       | Co-located `*.test.ts`, full unit coverage, no mocks                 |
+| `api-utils.ts` helper         | Mock `globalThis.fetch` — `globalThis.fetch = async () => ...`       |
+| `cache.ts` helper             | Set `GITHUB_CODE_SEARCH_CACHE_DIR` env var to `os.tmpdir()` in tests |
 | `completions.ts` helper       | Unset `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `ZDOTDIR` in `beforeEach`  |
-| Side-effectful (`api`, `tui`) | Not unit-tested — document manual repro in PR description              |
+| Side-effectful (`api`, `tui`) | Not unit-tested — document manual repro in PR description            |
 
 **Edge cases to always cover:**
+
 - Empty array inputs
 - `undefined` / `null` optional fields
 - Strings with special characters (slashes, colons, Unicode)

@@ -7,28 +7,28 @@ This skill complements `.github/instructions/bug-fixing.instructions.md`.
 
 ## Symptom → module diagnostic table
 
-| Symptom                                             | Primary suspect                        | Secondary suspect             |
-| --------------------------------------------------- | -------------------------------------- | ----------------------------- |
-| Results missing or duplicated                       | `src/aggregate.ts`                     | `src/api.ts` (pagination)     |
-| Wrong repository grouping                           | `src/group.ts`                         | `src/aggregate.ts`            |
-| `--exclude-repositories` / `--exclude-extracts` not working | `src/aggregate.ts`             | `github-code-search.ts` (parsing) |
-| Markdown output malformed                           | `src/output.ts`                        | —                             |
-| JSON output missing fields or wrong shape           | `src/output.ts`                        | `src/types.ts` (interface)    |
-| Syntax highlighting wrong colour / wrong language   | `src/render/highlight.ts`              | —                             |
-| Row navigation skips or wraps incorrectly           | `src/render/rows.ts`                   | `src/tui.ts` (key handler)    |
-| Select-all / select-none inconsistent               | `src/render/selection.ts`              | `src/tui.ts`                  |
-| Filter count / stats incorrect                      | `src/render/filter.ts`, `src/render/summary.ts` | —                   |
-| Path filter (`/regex/`) doesn't match expected      | `src/render/filter-match.ts`           | `src/tui.ts` (filter state)   |
-| API returns 0 results or stops paginating           | `src/api.ts`                           | `src/api-utils.ts`            |
-| Rate limit hit / 429 not retried                    | `src/api-utils.ts` (`fetchWithRetry`)  | —                             |
-| TUI shows blank screen or wrong row                 | `src/tui.ts`                           | `src/render/rows.ts`          |
-| Help overlay doesn't appear / has wrong keys        | `src/render.ts` (`renderHelpOverlay`)  | `src/tui.ts`                  |
-| Upgrade fails or replaces wrong binary              | `src/upgrade.ts`                       | —                             |
-| Completion script wrong content                     | `src/completions.ts`                   | —                             |
-| Completion file written to wrong path               | `src/completions.ts` (`getCompletionFilePath`) | env vars (`XDG_*`, `ZDOTDIR`) |
-| Completion not refreshed after upgrade              | `src/upgrade.ts` (`refreshCompletions`) | —                            |
-| `--version` shows wrong info                        | `build.ts` (SHA injection)             | —                             |
-| CLI option ignored or parsed wrong                  | `github-code-search.ts`               | `src/types.ts` (`OutputType`) |
+| Symptom                                                     | Primary suspect                                 | Secondary suspect                 |
+| ----------------------------------------------------------- | ----------------------------------------------- | --------------------------------- |
+| Results missing or duplicated                               | `src/aggregate.ts`                              | `src/api.ts` (pagination)         |
+| Wrong repository grouping                                   | `src/group.ts`                                  | `src/aggregate.ts`                |
+| `--exclude-repositories` / `--exclude-extracts` not working | `src/aggregate.ts`                              | `github-code-search.ts` (parsing) |
+| Markdown output malformed                                   | `src/output.ts`                                 | —                                 |
+| JSON output missing fields or wrong shape                   | `src/output.ts`                                 | `src/types.ts` (interface)        |
+| Syntax highlighting wrong colour / wrong language           | `src/render/highlight.ts`                       | —                                 |
+| Row navigation skips or wraps incorrectly                   | `src/render/rows.ts`                            | `src/tui.ts` (key handler)        |
+| Select-all / select-none inconsistent                       | `src/render/selection.ts`                       | `src/tui.ts`                      |
+| Filter count / stats incorrect                              | `src/render/filter.ts`, `src/render/summary.ts` | —                                 |
+| Path filter (`/regex/`) doesn't match expected              | `src/render/filter-match.ts`                    | `src/tui.ts` (filter state)       |
+| API returns 0 results or stops paginating                   | `src/api.ts`                                    | `src/api-utils.ts`                |
+| Rate limit hit / 429 not retried                            | `src/api-utils.ts` (`fetchWithRetry`)           | —                                 |
+| TUI shows blank screen or wrong row                         | `src/tui.ts`                                    | `src/render/rows.ts`              |
+| Help overlay doesn't appear / has wrong keys                | `src/render.ts` (`renderHelpOverlay`)           | `src/tui.ts`                      |
+| Upgrade fails or replaces wrong binary                      | `src/upgrade.ts`                                | —                                 |
+| Completion script wrong content                             | `src/completions.ts`                            | —                                 |
+| Completion file written to wrong path                       | `src/completions.ts` (`getCompletionFilePath`)  | env vars (`XDG_*`, `ZDOTDIR`)     |
+| Completion not refreshed after upgrade                      | `src/upgrade.ts` (`refreshCompletions`)         | —                                 |
+| `--version` shows wrong info                                | `build.ts` (SHA injection)                      | —                                 |
+| CLI option ignored or parsed wrong                          | `github-code-search.ts`                         | `src/types.ts` (`OutputType`)     |
 
 ---
 
@@ -50,18 +50,16 @@ If the report is missing items 1 or 3, read the relevant module(s) to hypothesis
 
 ## Test-first patterns for bugs
 
-### Pure function bug (aggregate, group, output, render/*)
+### Pure function bug (aggregate, group, output, render/\*)
 
 ```typescript
 // src/aggregate.test.ts
 describe("applyFiltersAndExclusions — bug #N", () => {
   it("excludes org-prefixed repo names correctly", () => {
     const result = applyFiltersAndExclusions(matches, {
-      excludeRepositories: ["acme/my-repo"],  // the previously broken form
+      excludeRepositories: ["acme/my-repo"], // the previously broken form
     });
-    expect(result).not.toContainEqual(
-      expect.objectContaining({ repo: "acme/my-repo" }),
-    );
+    expect(result).not.toContainEqual(expect.objectContaining({ repo: "acme/my-repo" }));
   });
 });
 ```
@@ -95,6 +93,7 @@ Document manual repro steps in the PR description:
 
 ```markdown
 ## Steps to reproduce (before fix)
+
 1. `GITHUB_TOKEN=... github-code-search query "foo" --org acme`
 2. Press `↓` past the last result
 3. Expected: cursor stays on last row / Expected: wraps to first row

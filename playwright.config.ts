@@ -3,7 +3,7 @@
  *
  * Run:  bun run docs:test:responsive
  *
- * Tests live in scripts/responsive.spec.ts.
+ * Tests live in scripts/responsive.pw.ts.
  * They require a running VitePress preview server (bun run docs:preview).
  * In CI the server is started by the responsive.yml workflow.
  */

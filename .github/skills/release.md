@@ -7,13 +7,14 @@ This skill complements `.github/instructions/release.instructions.md`.
 
 ## Semver decision guide
 
-| Change type                                           | Bump    | Example       |
-| ----------------------------------------------------- | ------- | ------------- |
-| Bug fix only — no new behaviour, no public API change | `patch` | 1.2.4 → 1.2.5 |
+| Change type                                                                    | Bump    | Example       |
+| ------------------------------------------------------------------------------ | ------- | ------------- |
+| Bug fix only — no new behaviour, no public API change                          | `patch` | 1.2.4 → 1.2.5 |
 | New feature — backward-compatible (new flag, new output field, new subcommand) | `minor` | 1.2.4 → 1.3.0 |
-| Breaking change — CLI flag removed/renamed, output field removed | `major` | 1.2.4 → 2.0.0 |
+| Breaking change — CLI flag removed/renamed, output field removed               | `major` | 1.2.4 → 2.0.0 |
 
 **Edge cases:**
+
 - Adding a new optional CLI flag → `minor`
 - Changing default behaviour of an existing flag → `minor` if clearly additive, `major` if output changes
 - Fixing a bug that causes output to change (e.g. wrong grouping) → `patch` — it was already broken
@@ -27,14 +28,14 @@ Pushing `vX.Y.Z` triggers the release pipeline automatically:
 
 1. **Build step** — compiles 6 self-contained binaries:
 
-   | Target               | Output filename                                  |
-   | -------------------- | ------------------------------------------------ |
-   | `bun-linux-x64`      | `github-code-search-linux-x64`                   |
-   | `bun-linux-x64-baseline` | `github-code-search-linux-x64-baseline`      |
-   | `bun-linux-arm64`    | `github-code-search-linux-arm64`                 |
-   | `bun-darwin-x64`     | `github-code-search-darwin-x64`                  |
-   | `bun-darwin-arm64`   | `github-code-search-darwin-arm64`                |
-   | `bun-windows-x64`    | `github-code-search-windows-x64.exe`             |
+   | Target                   | Output filename                         |
+   | ------------------------ | --------------------------------------- |
+   | `bun-linux-x64`          | `github-code-search-linux-x64`          |
+   | `bun-linux-x64-baseline` | `github-code-search-linux-x64-baseline` |
+   | `bun-linux-arm64`        | `github-code-search-linux-arm64`        |
+   | `bun-darwin-x64`         | `github-code-search-darwin-x64`         |
+   | `bun-darwin-arm64`       | `github-code-search-darwin-arm64`       |
+   | `bun-windows-x64`        | `github-code-search-windows-x64.exe`    |
 
 2. **GitHub Release** — created automatically with `generate_release_notes: true` (titles from merged PR + commits since last tag). **Do not create it manually.**
 
@@ -57,6 +58,7 @@ Pushing `vX.Y.Z` triggers the release pipeline automatically:
 Required for **minor** and **major** releases. Optional for patch (GitHub Release body is sufficient for patch).
 
 **Front-matter:**
+
 ```yaml
 ---
 title: "github-code-search v1.9.0"
@@ -66,10 +68,12 @@ date: YYYY-MM-DD
 ```
 
 **Structure:**
-```markdown
+
+````markdown
 ## Highlights
 
 ### <Feature group 1>
+
 <!-- One paragraph + code example if applicable -->
 
 ### <Feature group 2>
@@ -79,9 +83,11 @@ date: YYYY-MM-DD
 ```bash
 github-code-search upgrade
 ```
+````
 
 Full release notes: [GitHub Releases](https://github.com/fulll/github-code-search/releases/tag/v1.9.0)
-```
+
+````
 
 **Reference posts to study:**
 - `docs/blog/release-v1-3-0.md` — feature-focused minor release
@@ -94,7 +100,7 @@ Full release notes: [GitHub Releases](https://github.com/fulll/github-code-searc
 
 ```markdown
 | [v1.9.0](https://fulll.github.io/github-code-search/blog/release-v1-9-0) | One-line summary |
-```
+````
 
 Rule: never leave a row with `_pending_` when tagging.
 
@@ -103,6 +109,7 @@ Rule: never leave a row with `_pending_` when tagging.
 ## Versioned docs snapshot (major only)
 
 When pushing `vX.0.0`, the `docs.yml → snapshot` job:
+
 1. Runs `bun run docs:build` with `VITEPRESS_BASE=/github-code-search/vX/`.
 2. Publishes to `gh-pages` branch under `/vX/`.
 3. Prepends `{ "text": "vX (latest)", "link": "/github-code-search/vX/" }` to `docs/public/versions.json`.
