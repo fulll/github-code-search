@@ -196,18 +196,22 @@ const year = new Date().getFullYear();
 .rf-legal {
   margin: 0;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.3);
+  /* Fix: rgba(.30) = ~2.8:1 on #111 → rgba(.52) = 5.5:1 ✓ WCAG AA */
+  color: rgba(255, 255, 255, 0.52);
   line-height: 1.6;
 }
 
 .rf-legal a {
-  color: rgba(255, 255, 255, 0.4);
-  text-decoration: none;
+  /* Fix: rgba(.40) = ~4.1:1 on #111 → rgba(.65) = 7.0:1 ✓ WCAG AA
+   * Added underline so link is distinguishable without relying solely on color */
+  color: rgba(255, 255, 255, 0.65);
+  text-decoration: underline;
+  text-underline-offset: 2px;
   transition: color 0.15s;
 }
 
 .rf-legal a:hover {
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 /* ── Link columns ──────────────────────────────────────────────────────── */
@@ -217,7 +221,8 @@ const year = new Date().getFullYear();
   font-weight: 600;
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.35);
+  /* Fix: rgba(.35) = ~3.4:1 on #111 → rgba(.55) = 6.5:1 ✓ WCAG AA */
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .rf-links {

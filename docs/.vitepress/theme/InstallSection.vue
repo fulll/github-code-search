@@ -379,7 +379,8 @@ function copySearch() {
   text-align: center;
   font-size: 11px;
   font-family: var(--vp-font-family-mono);
-  color: rgba(255, 255, 255, 0.35);
+  /* Fix: rgba(.35) = ~3.1:1 on #1a1a26 → rgba(.55) = 6.4:1 ✓ WCAG AA */
+  color: rgba(255, 255, 255, 0.55);
   letter-spacing: 0.04em;
 }
 

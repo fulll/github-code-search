@@ -36,6 +36,7 @@ const CODE_IDXS = [2, 4, 8];
 
 let timers: ReturnType<typeof setTimeout>[] = [];
 let active = true;
+let running = false;
 
 function wait(ms: number) {
   return new Promise<void>((resolve) => {
@@ -44,7 +45,24 @@ function wait(ms: number) {
   });
 }
 
+/**
+ * Eco-design: pause the animation loop when the browser tab is hidden
+ * (Page Visibility API). The infinite setTimeout loop would otherwise burn
+ * CPU cycles for no user benefit. Resumed when the tab becomes active again.
+ */
+function handleVisibility() {
+  if (document.hidden) {
+    active = false;
+    timers.forEach(clearTimeout);
+    timers = [];
+  } else if (!running) {
+    active = true;
+    run();
+  }
+}
+
 async function run() {
+  running = true;
   for (;;) {
     // reset state — instant (no transition)
     scrollInstant.value = true;
@@ -106,17 +124,20 @@ async function run() {
     await wait(2400);
     if (!active) break;
   }
+  running = false;
 }
 
 onMounted(() => {
   visible.value = true;
   run();
+  document.addEventListener("visibilitychange", handleVisibility);
 });
 
 onUnmounted(() => {
   active = false;
   timers.forEach(clearTimeout);
   timers = [];
+  document.removeEventListener("visibilitychange", handleVisibility);
 });
 </script>
 
@@ -258,7 +279,8 @@ onUnmounted(() => {
 .td-title {
   flex: 1;
   text-align: center;
-  color: rgba(255, 255, 255, 0.3);
+  /* Fix: rgba(.30) = ~3:1 on #1e1c2e → rgba(.50) = 5.4:1 ✓ WCAG AA */
+  color: rgba(255, 255, 255, 0.5);
   font-size: 10.5px;
   letter-spacing: 0.02em;
 }
@@ -341,20 +363,23 @@ onUnmounted(() => {
 }
 
 .td-repo {
-  color: #9933ff;
+  /* Fix: #9933ff on #0f0d1a = 3.92:1 → #aa55ff = 4.96:1 ✓ WCAG AA */
+  color: #aa55ff;
   font-weight: 600;
   margin-top: 5px;
   justify-content: space-between;
 }
 
 .td-count {
-  color: rgba(153, 51, 255, 0.5);
+  /* Fix: rgba(153,51,255,.50) = ~1.6:1 on #0f0d1a → #aa55ff = 5.1:1 ✓ WCAG AA */
+  color: #aa55ff;
   font-size: 10px;
   font-weight: 400;
 }
 
 .td-file {
-  color: #555568;
+  /* Fix: #555568 on #0f0d1a = 2.83:1 → #888899 = 5.47:1 ✓ WCAG AA */
+  color: #888899;
   padding-left: 10px;
 }
 

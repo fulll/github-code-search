@@ -199,6 +199,13 @@ const ROWS: Row[] = [
   border-radius: 4px;
 }
 
+/* Fix: brand-1 (#9933ff) on yellow brand-soft blended with card-bg = ~4.2:1 (fails)
+ * brand-2 (#7a1fd4) on white bg = 7.0:1 ✓ WCAG AA (light mode only) */
+html:not(.dark) .ct-intro code {
+  color: var(--vp-c-brand-2);
+  background: rgba(122, 31, 212, 0.08);
+}
+
 .ct-intro a {
   color: var(--vp-c-brand-1);
   text-decoration: underline;
@@ -255,7 +262,8 @@ thead tr {
   padding: 2px 8px;
   border-radius: 9999px;
   background: rgba(153, 51, 255, 0.12);
-  color: var(--vp-c-brand-1);
+  /* Fix: brand-1 (#9933ff) on soft purple bg = ~3.6:1 → brand-2 (#7a1fd4) = 5.2:1 ✓ WCAG AA */
+  color: var(--vp-c-brand-2);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.04em;

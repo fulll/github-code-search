@@ -73,6 +73,31 @@ export default defineConfig({
 
   // ── Head ───────────────────────────────────────────────────────────────────
   head: [
+    // ── Eco-design: Google Fonts — non-blocking load ────────────────────────
+    // 1. preconnect: establishes DNS+TCP+TLS early (eliminates ~200 ms RTT)
+    // 2. preload as="style": fetches the CSS at high priority without blocking render
+    // 3. media="print" + onload: loads as print (non-blocking), switches to "all"
+    //    once downloaded — the classic "loadCSS" pattern
+    // The @import in custom.css is removed; the <link> below replaces it.
+    ["link", { rel: "preconnect", href: "https://fonts.googleapis.com" }],
+    ["link", { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "" }],
+    [
+      "link",
+      {
+        rel: "preload",
+        href: "https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap",
+        as: "style",
+      },
+    ],
+    [
+      "link",
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap",
+        media: "print",
+        onload: "this.media='all'",
+      },
+    ],
     // Favicons — fulll brand assets
     [
       "link",
@@ -237,7 +262,7 @@ export default defineConfig({
 
   themeConfig: {
     // ── Logo (top-left, next to title) ───────────────────────────────────────
-    logo: "/logo.svg",
+    logo: { src: "/logo.svg", width: 24, height: 24 },
 
     // ── Nav ──────────────────────────────────────────────────────────────────
     nav: [
@@ -267,7 +292,7 @@ export default defineConfig({
       // the next main deploy re-builds this config and picks up the change automatically.
       // (vitepress-plugin-versions was evaluated but not adopted — see issue #30.)
       {
-        text: `${versionsData[0].text} ▾`,
+        text: versionsData[0].text,
         items: [
           ...versionsData.map((v: { text: string; link: string }) => ({
             text: v.text,
