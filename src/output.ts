@@ -108,7 +108,7 @@ export function buildReplayDetails(
   const shellCmd = raw.replace(/^# Replay:\n/, "");
   return [
     "<details>",
-    "<summary>[github-code-search](https://fulll.github.io/github-code-search/) replay command</summary>",
+    '<summary><a href="https://fulll.github.io/github-code-search/">github-code-search</a> replay command</summary>',
     "",
     "```bash",
     shellCmd,

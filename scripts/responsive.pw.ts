@@ -74,10 +74,13 @@ interface OverflowHit {
  *     the overflow is consumed inside that scroll container, not the page.
  *  2. Any ancestor is `position: fixed`: fixed containers are isolated from
  *     the page scroll. Their children can overflow the container but NEVER add
- *     to the document's horizontal scroll width (e.g. VitePress sticky navbar
- *     flyout menus at narrow-tablet breakpoints).
+ *     to the document's horizontal scroll width.
  *  3. The element itself is `position: fixed` (same reasoning).
- *  4. The element is invisible (`visibility: hidden` covers closed VitePress
+ *  4. The element (or an ancestor) matches a known VitePress nav class
+ *     (.VPNav, .VPNavBar, .VPLocalNav, .VPFlyout): these use `position: sticky`
+ *     and their flyout menus can temporarily exceed the viewport without
+ *     representing a real page-level overflow regression.
+ *  5. The element is invisible (`visibility: hidden` covers closed VitePress
  *     flyout panels that stay in the DOM but are not rendered).
  */
 async function findOverflowingElements(page: Page): Promise<OverflowHit[]> {
@@ -92,10 +95,12 @@ async function findOverflowingElements(page: Page): Promise<OverflowHit[]> {
         const s = window.getComputedStyle(parent);
         // Non-visible overflow-x: overflow absorbed by this scroll container
         if (s.overflowX !== "visible") return true;
-        // Fixed or sticky ancestor: children live in a separate layer and
+        // Fixed ancestor: children live in a separate stacking context and
         // can never contribute to the document horizontal scroll width.
-        // VitePress uses position:sticky (not fixed) for .VPNav/.VPNavBar.
-        if (s.position === "fixed" || s.position === "sticky") return true;
+        if (s.position === "fixed") return true;
+        // VitePress nav elements (sticky) — flyout menus can temporarily
+        // exceed the viewport; skip them by class to avoid false positives.
+        if (parent.matches(".VPNav, .VPNavBar, .VPLocalNav, .VPFlyout")) return true;
         parent = parent.parentElement;
       }
       return false;
@@ -103,8 +108,10 @@ async function findOverflowingElements(page: Page): Promise<OverflowHit[]> {
 
     for (const el of document.querySelectorAll("body *")) {
       const s = window.getComputedStyle(el);
-      // Skip the element itself if fixed or sticky (same isolation rule)
-      if (s.position === "fixed" || s.position === "sticky") continue;
+      // Skip fixed elements (isolated stacking context)
+      if (s.position === "fixed") continue;
+      // Skip VitePress nav containers (sticky, known flyout false positives)
+      if ((el as Element).closest(".VPNav, .VPNavBar, .VPLocalNav, .VPFlyout")) continue;
       // Skip invisible elements (closed VitePress flyout panels, etc.)
       if (s.visibility === "hidden" || s.display === "none") continue;
 

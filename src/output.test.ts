@@ -190,7 +190,7 @@ describe("buildReplayDetails", () => {
     const out = buildReplayDetails(groups, QUERY, ORG, new Set(), new Set());
     expect(out).toContain("<details>");
     expect(out).toContain(
-      "<summary>[github-code-search](https://fulll.github.io/github-code-search/) replay command</summary>",
+      '<summary><a href="https://fulll.github.io/github-code-search/">github-code-search</a> replay command</summary>',
     );
     expect(out).toContain("```bash");
     expect(out).toContain("</details>");
@@ -296,7 +296,7 @@ describe("buildMarkdownOutput", () => {
     const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set());
     expect(out).toContain("<details>");
     expect(out).toContain(
-      "<summary>[github-code-search](https://fulll.github.io/github-code-search/) replay command</summary>",
+      '<summary><a href="https://fulll.github.io/github-code-search/">github-code-search</a> replay command</summary>',
     );
     expect(out).toContain("```bash");
     expect(out).toContain("</details>");
@@ -314,7 +314,7 @@ describe("buildMarkdownOutput", () => {
     const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set(), "repo-only");
     expect(out).toContain("<details>");
     expect(out).toContain(
-      "<summary>[github-code-search](https://fulll.github.io/github-code-search/) replay command</summary>",
+      '<summary><a href="https://fulll.github.io/github-code-search/">github-code-search</a> replay command</summary>',
     );
   });
 
@@ -324,7 +324,7 @@ describe("buildMarkdownOutput", () => {
     expect(out).toContain("myorg/repoA\nmyorg/repoB\n");
     expect(out).toContain("<details>");
     expect(out).toContain(
-      "<summary>[github-code-search](https://fulll.github.io/github-code-search/) replay command</summary>",
+      '<summary><a href="https://fulll.github.io/github-code-search/">github-code-search</a> replay command</summary>',
     );
   });
 

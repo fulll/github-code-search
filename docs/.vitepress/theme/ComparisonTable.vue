@@ -108,31 +108,8 @@ const ROWS: Row[] = [
         <tbody>
           <tr v-for="row in ROWS" :key="row.feature" class="ct-row">
             <td class="ct-feature">
-              <a
-                v-if="row.docLink"
-                :href="row.docLink"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="ct-feature-link"
-              >
-                <span class="ct-feature-title">
-                  {{ row.feature }}
-                  <svg
-                    class="ct-ext-icon"
-                    aria-hidden="true"
-                    width="11"
-                    height="11"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <line x1="7" y1="17" x2="17" y2="7" />
-                    <polyline points="7 7 17 7 17 17" />
-                  </svg>
-                </span>
+              <a v-if="row.docLink" :href="row.docLink" class="ct-feature-link">
+                <span class="ct-feature-title">{{ row.feature }}</span>
                 <span class="ct-feature-desc">{{ row.desc }}</span>
               </a>
               <span v-else class="ct-feature-plain">
@@ -348,16 +325,6 @@ thead tr {
 
 .ct-feature-link:hover .ct-feature-desc {
   color: var(--vp-c-text-2);
-}
-
-.ct-ext-icon {
-  opacity: 0.35;
-  flex-shrink: 0;
-  transition: opacity 0.15s;
-}
-
-.ct-feature-link:hover .ct-ext-icon {
-  opacity: 0.75;
 }
 
 .ct-cell {

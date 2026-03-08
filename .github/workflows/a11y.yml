@@ -43,6 +43,9 @@ concurrency:
   group: a11y-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   audit:
     name: WCAG 2.1 AA pages audit

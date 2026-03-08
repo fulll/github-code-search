@@ -1,8 +1,1 @@
-{
-  "chat.tools.terminal.autoApprove": {
-    "/^git checkout -b feat/promotion-polish && git add -A && git diff --cached --stat$/": {
-      "approve": true,
-      "matchCommandLine": true
-    }
-  }
-}
+{}
