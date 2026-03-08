@@ -8,3 +8,8 @@ a11y-report.json
 # VitePress
 docs/.vitepress/cache
 docs/.vitepress/dist
+
+# Playwright
+test-results/
+playwright-report/
+.playwright/
