@@ -44,6 +44,7 @@
       href="https://github.com/fulll/github-code-search/discussions"
       target="_blank"
       rel="noopener noreferrer"
+      aria-label="Share your story (opens in a new tab)"
     >
       <span>Share your story</span>
       <svg
@@ -216,11 +217,5 @@
     align-self: stretch;
     text-align: center;
   }
-}
-
-.cta-btn:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: 3px;
-  box-shadow: 0 0 0 4px rgba(153, 51, 255, 0.5);
 }
 </style>

@@ -160,7 +160,6 @@ export default defineConfig({
         async buildStart() {
           const { Resvg } = await import("@resvg/resvg-js");
           const { readFileSync, writeFileSync } = await import("node:fs");
-          const { fileURLToPath } = await import("node:url");
           const svgPath = fileURLToPath(new URL("../public/social-preview.svg", import.meta.url));
           const pngPath = fileURLToPath(new URL("../public/social-preview.png", import.meta.url));
           const svg = readFileSync(svgPath, "utf-8");

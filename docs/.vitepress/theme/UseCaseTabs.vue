@@ -421,24 +421,53 @@ function handleTabKeydown(e: KeyboardEvent, i: number) {
 /* ── Responsive ────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .uc-panel {
-    padding: 20px 18px;
+    padding: 18px 14px;
   }
 
   .uc-pill {
-    font-size: 14px;
-    padding: 7px 14px;
+    font-size: 13px;
+    padding: 6px 12px;
   }
 
   .uc-title {
-    font-size: 24px;
+    font-size: 22px;
+    margin: 0 0 24px;
   }
 
   .uc-headline {
-    font-size: 17px;
+    font-size: 16px;
+  }
+
+  .uc-desc {
+    /* Reduce the left border indent so text gets more room */
+    padding-left: 10px;
+    font-size: 14px;
   }
 
   .uc-panel-wrap {
-    min-height: 320px;
+    min-height: 0; /* let content dictate height on mobile */
+  }
+
+  /*
+   * The terminal block must not overflow .uc-panel.
+   * `overflow: hidden` on .uc-terminal clips the rounded corners,
+   * but we also need `overflow-x: auto` on the body so the command
+   * can be scrolled within its container rather than pushing the page wider.
+   */
+  .uc-terminal {
+    max-width: 100%;
+  }
+
+  .uc-terminal-body {
+    overflow-x: auto;
+  }
+
+  .uc-code {
+    font-size: 12px;
+    padding: 14px 14px;
+    /* long commands scroll horizontally inside the block */
+    white-space: pre;
+    overflow-x: auto;
   }
 }
 </style>

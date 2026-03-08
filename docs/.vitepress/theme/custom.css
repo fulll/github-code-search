@@ -280,6 +280,46 @@ body::before {
   border-bottom-color: rgba(204, 136, 255, 0.1) !important;
 }
 
+/*
+ * At ≤960px (tablet portrait/landscape transition) the navbar flex layout
+ * overflows at exactly 768px: `.VPNavBarMenu` items and `.VPNavBarExtra` both
+ * extend beyond the right edge of the viewport, producing a real page-level
+ * horizontal scrollbar (confirmed in browser at 768px).
+ *
+ * Fix: force hamburger mode at ≤960px — hide the desktop menu items and the
+ * extra social-links flyout, show the hamburger button instead.
+ * VitePress's own CSS only triggers hamburger at < 768px, which is the root
+ * cause of the overflow at exactly 768px.
+ */
+@media (max-width: 960px) {
+  /*
+   * At ≤960px the desktop nav links and social-links flyout overflow the
+   * viewport at exactly 768px (tablet portrait). Hide them and show the
+   * hamburger button instead.
+   *
+   * VitePress hides .VPNavBarHamburger at ≥768px and .VPNavScreen at ≥768px
+   * via its own media queries — we override both here so the hamburger is
+   * fully functional at 768–960px as it is at <768px.
+   */
+  .VPNavBarMenu,
+  .VPNavBarExtra {
+    display: none !important;
+  }
+
+  /* Show the hamburger toggle button */
+  .VPNavBarHamburger {
+    display: flex !important;
+  }
+}
+
+/* VitePress hides the full-screen nav overlay at ≥768px — unlock it so the
+ * hamburger button we show at 768–960px can actually open the menu. */
+@media (min-width: 768px) and (max-width: 960px) {
+  .VPNavScreen {
+    display: block !important;
+  }
+}
+
 /* ── Doc pages background (non-home) ──────────────────────────────────────── */
 .VPDoc {
   background: radial-gradient(
@@ -300,6 +340,31 @@ body::before {
 /* ── Footer — default VitePress footer hidden (replaced by RichFooter.vue) ── */
 .VPFooter {
   display: none !important;
+}
+
+/* ── Responsive — prevent horizontal overflow at any viewport size ────────── */
+/*
+ * Mobile-first overflow containment.
+ * Without this, any element whose computed width exceeds the viewport (fixed px
+ * widths, table cells with `white-space:nowrap`, long code strings, …) creates
+ * a page-level horizontal scroll bar.  Applying `overflow-x: hidden` here acts
+ * as the final safety net; individual components still fix their own overflow
+ * so that content is never silently clipped.
+ */
+.VPHome,
+.VPHero,
+.VPHomeContent {
+  overflow-x: hidden;
+}
+
+/*
+ * Pre / code blocks — guarantee they scroll internally rather than pushing the
+ * page wider.  VitePress sets this on `.vp-doc pre` but not on custom-component
+ * terminal blocks, so we cover both here.
+ */
+pre {
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 /* ── Accessibility utilities ─────────────────────────────────────────────── */

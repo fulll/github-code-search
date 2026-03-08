@@ -535,6 +535,10 @@ function copySearch() {
     font-size: 22px;
   }
 
+  .is-subtitle {
+    font-size: 14px;
+  }
+
   .is-step-num {
     width: 32px;
     height: 32px;
@@ -545,8 +549,21 @@ function copySearch() {
     margin-left: 15px;
   }
 
+  /* Terminal blocks: ensure they never overflow the section */
+  .is-terminal {
+    max-width: 100%;
+  }
+
   .is-code {
     font-size: 11.5px;
+    /* long commands scroll horizontally inside the terminal block */
+    overflow-x: auto;
+  }
+
+  .is-code code {
+    /* wrap on very small screens as fallback for users who prefer no scroll */
+    white-space: pre-wrap;
+    word-break: break-all;
   }
 }
 </style>
