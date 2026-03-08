@@ -141,12 +141,20 @@ const ROWS: Row[] = [
               </span>
             </td>
             <td class="ct-cell">
-              <span v-if="row.gh" class="ct-check" aria-label="Yes">✓</span>
-              <span v-else class="ct-cross" aria-label="No">✗</span>
+              <span v-if="row.gh" class="ct-check" role="img" aria-label="Yes"
+                ><span aria-hidden="true">✓</span></span
+              >
+              <span v-else class="ct-cross" role="img" aria-label="No"
+                ><span aria-hidden="true">✗</span></span
+              >
             </td>
             <td class="ct-cell">
-              <span v-if="row.gcs" class="ct-check" aria-label="Yes">✓</span>
-              <span v-else class="ct-cross" aria-label="No">✗</span>
+              <span v-if="row.gcs" class="ct-check" role="img" aria-label="Yes"
+                ><span aria-hidden="true">✓</span></span
+              >
+              <span v-else class="ct-cross" role="img" aria-label="No"
+                ><span aria-hidden="true">✗</span></span
+              >
             </td>
           </tr>
         </tbody>

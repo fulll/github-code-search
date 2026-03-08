@@ -99,7 +99,11 @@ function handleTabKeydown(e: KeyboardEvent, i: number) {
         v-for="(uc, i) in USE_CASES"
         :key="uc.id"
         :id="`uc-tab-${uc.id}`"
-        :ref="(el) => (tabRefs[i] = el as HTMLButtonElement)"
+        :ref="
+          (el) => {
+            if (el) tabRefs.value[i] = el as HTMLButtonElement;
+          }
+        "
         class="uc-pill"
         :class="{ active: active === i }"
         role="tab"

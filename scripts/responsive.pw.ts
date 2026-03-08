@@ -3,7 +3,7 @@
  *
  * For each (viewport × page) pair the test:
  *  1. Sets the viewport size.
- *  2. Loads the page and waits for network idle.
+ *  2. Loads the page and waits for DOMContentLoaded.
  *  3. Asserts no element bleeds past the right edge of the viewport in a way
  *     that would cause a PAGE-LEVEL horizontal scrollbar.
  *
@@ -26,13 +26,16 @@ const VIEWPORTS = [
 ] as const;
 
 // ── Pages to test ──────────────────────────────────────────────────────────
+// Derive base from VITEPRESS_BASE so these tests work for versioned/snapshot
+// builds (e.g. bun run docs:test:responsive with VITEPRESS_BASE=/github-code-search/v2/).
+const BASE = process.env["VITEPRESS_BASE"] ?? "/github-code-search/";
 const PATHS = [
-  "/github-code-search/",
-  "/github-code-search/getting-started/installation/",
-  "/github-code-search/getting-started/first-search/",
-  "/github-code-search/reference/cli-options/",
-  "/github-code-search/usage/interactive-mode/",
-] as const;
+  BASE,
+  `${BASE}getting-started/installation/`,
+  `${BASE}getting-started/first-search/`,
+  `${BASE}reference/cli-options/`,
+  `${BASE}usage/interactive-mode/`,
+];
 
 // ── Screenshot helper ──────────────────────────────────────────────────────
 

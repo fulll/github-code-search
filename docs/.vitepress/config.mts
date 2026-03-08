@@ -186,7 +186,7 @@ export default defineConfig({
             // Mermaid + d3 must be co-located (circular dependency between them).
             if (
               id.includes("node_modules/mermaid") ||
-              id.includes("node_modules/vitepress-plugin-mermaid") ||
+              id.includes("node_modules/vitepress-mermaid-renderer") ||
               id.includes("node_modules/d3") ||
               id.includes("node_modules/dagre-d3-es") ||
               id.includes("node_modules/internmap") ||
