@@ -108,7 +108,7 @@ const ROWS: Row[] = [
         <tbody>
           <tr v-for="row in ROWS" :key="row.feature" class="ct-row">
             <td class="ct-feature">
-              <a v-if="row.docLink" :href="row.docLink" class="ct-feature-link">
+              <a v-if="row.docLink" :href="withBase(row.docLink)" class="ct-feature-link">
                 <span class="ct-feature-title">{{ row.feature }}</span>
                 <span class="ct-feature-desc">{{ row.desc }}</span>
               </a>
