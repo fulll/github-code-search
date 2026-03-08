@@ -21,8 +21,6 @@
 # the system Chrome via PUPPETEER_EXECUTABLE_PATH at runtime. This cuts ~200 MB
 # from every CI run.
 name: Accessibility audit (WCAG 2.1 AA)
-permissions:
-  contents: read
 
 on:
   push:
