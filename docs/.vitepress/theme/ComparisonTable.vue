@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { withBase } from "vitepress";
+
 interface Row {
   feature: string;
   desc: string;
@@ -13,56 +15,56 @@ const ROWS: Row[] = [
     desc: "One block per repo instead of a flat list — fold or unfold at a glance.",
     gh: false,
     gcs: true,
-    docLink: "/github-code-search/usage/interactive-mode",
+    docLink: "/usage/interactive-mode",
   },
   {
     feature: "Interactive TUI \u2014 navigate, select, filter",
     desc: "Arrow-key navigation, path-based filter and live selection without leaving the terminal.",
     gh: false,
     gcs: true,
-    docLink: "/github-code-search/usage/interactive-mode",
+    docLink: "/usage/interactive-mode",
   },
   {
     feature: "Fine-grained extract selection",
     desc: "Cherry-pick individual code extracts; deselected items become \u2014exclude flags automatically.",
     gh: false,
     gcs: true,
-    docLink: "/github-code-search/usage/interactive-mode",
+    docLink: "/usage/interactive-mode",
   },
   {
     feature: "Markdown / JSON output",
     desc: "Export clean Markdown checklists or machine-readable JSON ready for CI scripts.",
     gh: false,
     gcs: true,
-    docLink: "/github-code-search/usage/output-formats",
+    docLink: "/usage/output-formats",
   },
   {
     feature: "Replay / CI command",
     desc: "Every session produces a one-liner to reproduce the exact output headlessly in CI.",
     gh: false,
     gcs: true,
-    docLink: "/github-code-search/usage/non-interactive-mode",
+    docLink: "/usage/non-interactive-mode",
   },
   {
     feature: "Team-prefix grouping",
     desc: "Cluster repos by GitHub team prefix (squad-, chapter-) for org-wide triage.",
     gh: false,
     gcs: true,
-    docLink: "/github-code-search/usage/team-grouping",
+    docLink: "/usage/team-grouping",
   },
   {
     feature: "Syntax highlighting in terminal",
     desc: "Language-aware token colouring rendered in the TUI \u2014 no browser needed.",
     gh: false,
     gcs: true,
-    docLink: "/github-code-search/usage/interactive-mode",
+    docLink: "/usage/interactive-mode",
   },
   {
     feature: "Pagination (up to 1\u202f000 results)",
     desc: "Both tools auto-paginate the GitHub search API \u2014 up to 1\u202f000 results per query.",
     gh: true,
     gcs: true,
-    docLink: "/github-code-search/reference/github-api-limits",
+    docLink: "/reference/github-api-limits",
   },
 ];
 </script>
