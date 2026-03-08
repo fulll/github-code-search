@@ -189,7 +189,9 @@ describe("buildReplayDetails", () => {
     const groups = [makeGroup("myorg/repoA", ["a.ts"])];
     const out = buildReplayDetails(groups, QUERY, ORG, new Set(), new Set());
     expect(out).toContain("<details>");
-    expect(out).toContain("<summary>replay command</summary>");
+    expect(out).toContain(
+      "<summary>[github-code-search](https://fulll.github.io/github-code-search/) replay command</summary>",
+    );
     expect(out).toContain("```bash");
     expect(out).toContain("</details>");
   });
@@ -293,7 +295,9 @@ describe("buildMarkdownOutput", () => {
     const groups = [makeGroup("myorg/repoA", ["a.ts"])];
     const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set());
     expect(out).toContain("<details>");
-    expect(out).toContain("<summary>replay command</summary>");
+    expect(out).toContain(
+      "<summary>[github-code-search](https://fulll.github.io/github-code-search/) replay command</summary>",
+    );
     expect(out).toContain("```bash");
     expect(out).toContain("</details>");
   });
@@ -309,7 +313,9 @@ describe("buildMarkdownOutput", () => {
     const groups = [makeGroup("myorg/repoA", ["src/foo.ts"])];
     const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set(), "repo-only");
     expect(out).toContain("<details>");
-    expect(out).toContain("<summary>replay command</summary>");
+    expect(out).toContain(
+      "<summary>[github-code-search](https://fulll.github.io/github-code-search/) replay command</summary>",
+    );
   });
 
   it("repo-only mode returns newline-terminated list of repo names followed by replay", () => {
@@ -317,7 +323,9 @@ describe("buildMarkdownOutput", () => {
     const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set(), "repo-only");
     expect(out).toContain("myorg/repoA\nmyorg/repoB\n");
     expect(out).toContain("<details>");
-    expect(out).toContain("<summary>replay command</summary>");
+    expect(out).toContain(
+      "<summary>[github-code-search](https://fulll.github.io/github-code-search/) replay command</summary>",
+    );
   });
 
   it("repo-only mode returns empty string when no groups are selected", () => {

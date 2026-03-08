@@ -45,7 +45,22 @@
       target="_blank"
       rel="noopener noreferrer"
     >
-      Share your story ↗
+      <span>Share your story</span>
+      <svg
+        class="cta-btn-arrow"
+        aria-hidden="true"
+        xmlns="http://www.w3.org/2000/svg"
+        width="13"
+        height="13"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M7 17L17 7M7 7h10v10" />
+      </svg>
     </a>
   </div>
 </template>
@@ -133,7 +148,7 @@
 
 .cta-text {
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.65;
   color: var(--vp-c-text-2);
 }
@@ -149,7 +164,9 @@
 /* ── Button ────────────────────────────────────────────────────────────── */
 .cta-btn {
   flex-shrink: 0;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   padding: 10px 22px;
   border-radius: 9999px;
   background: linear-gradient(135deg, #9933ff 0%, #7a1fd4 100%);
@@ -163,6 +180,10 @@
     box-shadow 0.2s,
     transform 0.18s,
     background 0.2s;
+}
+
+.cta-btn-arrow {
+  flex-shrink: 0;
 }
 
 .cta-btn:hover {

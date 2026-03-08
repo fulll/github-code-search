@@ -232,7 +232,7 @@ function copySearch() {
 
 .is-subtitle {
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
   color: var(--vp-c-text-2);
   line-height: 1.65;
 }
@@ -284,7 +284,7 @@ function copySearch() {
 
 .is-step-label {
   margin: 8px 0 10px;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--vp-c-text-1);
 }

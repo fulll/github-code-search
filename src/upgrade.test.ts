@@ -369,7 +369,10 @@ describe("performUpgrade — download path", () => {
 
   /** Returns a release mock + matching asset name for the current platform. */
   function mockReleaseAndDownload(downloadResponse: Response): void {
-    const platformMap: Record<string, string> = { darwin: "macos", win32: "windows" };
+    const platformMap: Record<string, string> = {
+      darwin: "macos",
+      win32: "windows",
+    };
     const p = platformMap[process.platform] ?? process.platform;
     const suffix = p === "windows" ? ".exe" : "";
     const assetName = `github-code-search-${p}-${process.arch}${suffix}`;
@@ -410,7 +413,10 @@ describe("performUpgrade — download path", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (Bun as any).write = async () => 3;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (Bun as any).spawnSync = () => ({ exitCode: 0, stderr: { toString: () => "" } });
+    (Bun as any).spawnSync = () => ({
+      exitCode: 0,
+      stderr: { toString: () => "" },
+    });
 
     const stdoutWrites: string[] = [];
     const origWrite = process.stdout.write.bind(process.stdout);
@@ -456,11 +462,13 @@ describe("refreshCompletions", () => {
     expect(await refreshCompletions(null)).toBeNull();
   });
 
-  it("returns null when the completion file does not exist (never installed)", async () => {
+  it("creates the file even if it did not already exist", async () => {
     const tmp = await mkdtemp(join(tmpdir(), "gcs-test-"));
     try {
       const result = await refreshCompletions("fish", tmp);
-      expect(result).toBeNull();
+      const dir = join(tmp, ".config", "fish", "completions");
+      expect(result).toBe(join(dir, "github-code-search.fish"));
+      expect(existsSync(join(dir, "github-code-search.fish"))).toBe(true);
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }
@@ -534,7 +542,7 @@ describe("refreshCompletions", () => {
     try {
       await refreshCompletions("bash", tmp, true);
       expect(
-        stdoutWrites.some((s) => s.includes("[debug]") && s.includes("skipping refresh")),
+        stdoutWrites.some((s) => s.includes("[debug]") && s.includes("installing completions")),
       ).toBe(true);
     } finally {
       process.stdout.write = origWrite;
@@ -557,7 +565,7 @@ describe("refreshCompletions", () => {
 
       await refreshCompletions("fish", tmp, true);
       expect(
-        stdoutWrites.some((s) => s.includes("[debug]") && s.includes("refreshed completions")),
+        stdoutWrites.some((s) => s.includes("[debug]") && s.includes("refreshing completions")),
       ).toBe(true);
     } finally {
       process.stdout.write = origWrite;
@@ -565,12 +573,12 @@ describe("refreshCompletions", () => {
     }
   });
 
-  it("does not create the file if it did not already exist", async () => {
+  it("creates the file even if it did not already exist (always installs)", async () => {
     const tmp = await mkdtemp(join(tmpdir(), "gcs-test-"));
     try {
       await refreshCompletions("fish", tmp);
       const dir = join(tmp, ".config", "fish", "completions");
-      expect(existsSync(join(dir, "github-code-search.fish"))).toBe(false);
+      expect(existsSync(join(dir, "github-code-search.fish"))).toBe(true);
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

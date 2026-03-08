@@ -1,7 +1,12 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import pc from "picocolors";
 import { generateCompletion, getCompletionFilePath } from "./completions.ts";
 import type { Shell } from "./completions.ts";
+
+/** Renders a hyperlink in cyan+underline when stdout is a TTY, plain otherwise. */
+const upgradeLink = (url: string): string =>
+  process.stdout.isTTY ? pc.cyan(pc.underline(url)) : url;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -221,16 +226,16 @@ export async function performUpgrade(
       `Welcome to github-code-search ${latestVersion}!`,
       ``,
       `What's new in ${latestVersion}:`,
-      `  ${blogPostUrl(latestVersion)}`,
+      `  ${upgradeLink(blogPostUrl(latestVersion))}`,
       ``,
       `Release notes:`,
-      `  ${release.html_url}`,
+      `  ${upgradeLink(release.html_url)}`,
       ``,
       `Commit log:`,
-      `  https://github.com/fulll/github-code-search/compare/${currentVersion.startsWith("v") ? currentVersion : `v${currentVersion}`}...${latestVersion}`,
+      `  ${upgradeLink(`https://github.com/fulll/github-code-search/compare/${currentVersion.startsWith("v") ? currentVersion : `v${currentVersion}`}...${latestVersion}`)}`,
       ``,
       `Report a bug:`,
-      `  https://github.com/fulll/github-code-search/issues/new`,
+      `  ${upgradeLink("https://github.com/fulll/github-code-search/issues/new")}`,
       ``,
       `Run \`github-code-search --help\` to explore all options.`,
       ``,
@@ -274,15 +279,18 @@ export async function refreshCompletions(
   const opts = homeDir ? { homeDir } : {};
   const filePath = getCompletionFilePath(shell, opts);
 
-  if (!existsSync(filePath)) {
-    if (debug)
-      process.stdout.write(`[debug] no existing completions at ${filePath}, skipping refresh\n`);
-    return null;
+  const alreadyExists = existsSync(filePath);
+  if (debug) {
+    process.stdout.write(
+      alreadyExists
+        ? `[debug] refreshing completions at ${filePath}\n`
+        : `[debug] installing completions at ${filePath}\n`,
+    );
   }
 
   const script = generateCompletion(shell);
   mkdirSync(dirname(filePath), { recursive: true });
   await Bun.write(filePath, script);
-  if (debug) process.stdout.write(`[debug] refreshed completions at ${filePath}\n`);
+  if (debug) process.stdout.write(`[debug] completions written at ${filePath}\n`);
   return filePath;
 }

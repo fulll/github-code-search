@@ -108,7 +108,24 @@
             >
           </li>
           <li>
-            <a href="https://fulll.fr" target="_blank" rel="noopener noreferrer"> fulll.fr ↗ </a>
+            <a href="https://fulll.fr" target="_blank" rel="noopener noreferrer">
+              fulll.fr
+              <svg
+                class="rf-ext-arrow"
+                aria-hidden="true"
+                xmlns="http://www.w3.org/2000/svg"
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M7 17L17 7M7 7h10v10" />
+              </svg>
+            </a>
           </li>
         </ul>
       </div>
@@ -226,6 +243,11 @@ const year = new Date().getFullYear();
   height: 14px;
   flex-shrink: 0;
   opacity: 0.7;
+}
+
+.rf-ext-arrow {
+  flex-shrink: 0;
+  opacity: 0.6;
 }
 
 /* ── Responsive ────────────────────────────────────────────────────────── */

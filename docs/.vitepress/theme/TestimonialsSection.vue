@@ -44,7 +44,22 @@
           target="_blank"
           rel="noopener noreferrer"
         >
-          Share your story →
+          <span>Share your story</span>
+          <svg
+            class="ts-cta-arrow"
+            aria-hidden="true"
+            xmlns="http://www.w3.org/2000/svg"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M7 17L17 7M7 7h10v10" />
+          </svg>
         </a>
       </div>
     </div>
@@ -132,12 +147,19 @@ const testimonials = [
   gap: 20px;
   transition:
     transform 0.18s,
-    box-shadow 0.18s;
+    box-shadow 0.18s,
+    border-color 0.18s;
 }
 
 .ts-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(153, 51, 255, 0.1);
+  box-shadow: 0 6px 24px rgba(153, 51, 255, 0.14);
+  border-color: rgba(153, 51, 255, 0.32);
+}
+
+.dark .ts-card:hover {
+  border-color: rgba(204, 136, 255, 0.3);
+  box-shadow: 0 6px 28px rgba(153, 51, 255, 0.2);
 }
 
 /* ── Quote ─────────────────────────────────────────────────────────────── */
@@ -226,19 +248,29 @@ const testimonials = [
 }
 
 .ts-cta-btn {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 8px 18px;
   border-radius: 8px;
   background: var(--vp-c-brand-1);
-  color: #fff;
+  color: #fff !important;
   font-size: 13px;
   font-weight: 600;
-  text-decoration: none;
-  transition: background 0.15s;
+  text-decoration: none !important;
+  transition:
+    background 0.15s,
+    box-shadow 0.15s;
 }
 
 .ts-cta-btn:hover {
   background: #7a1fd4;
+  color: #fff !important;
+  box-shadow: 0 4px 16px rgba(153, 51, 255, 0.35);
+}
+
+.ts-cta-arrow {
+  flex-shrink: 0;
 }
 
 /* ── Responsive ────────────────────────────────────────────────────────── */

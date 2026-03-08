@@ -1,19 +1,69 @@
 <script setup lang="ts">
 interface Row {
   feature: string;
+  desc: string;
   gh: boolean;
   gcs: boolean;
+  docLink?: string;
 }
 
 const ROWS: Row[] = [
-  { feature: "Results grouped by repository", gh: false, gcs: true },
-  { feature: "Interactive TUI — navigate, select, filter", gh: false, gcs: true },
-  { feature: "Fine-grained extract selection", gh: false, gcs: true },
-  { feature: "Markdown / JSON output", gh: false, gcs: true },
-  { feature: "Replay / CI command", gh: false, gcs: true },
-  { feature: "Team-prefix grouping", gh: false, gcs: true },
-  { feature: "Syntax highlighting in terminal", gh: false, gcs: true },
-  { feature: "Pagination (up to 1 000 results)", gh: true, gcs: true },
+  {
+    feature: "Results grouped by repository",
+    desc: "One block per repo instead of a flat list — fold or unfold at a glance.",
+    gh: false,
+    gcs: true,
+    docLink: "/github-code-search/usage/interactive-mode",
+  },
+  {
+    feature: "Interactive TUI \u2014 navigate, select, filter",
+    desc: "Arrow-key navigation, path-based filter and live selection without leaving the terminal.",
+    gh: false,
+    gcs: true,
+    docLink: "/github-code-search/usage/interactive-mode",
+  },
+  {
+    feature: "Fine-grained extract selection",
+    desc: "Cherry-pick individual code extracts; deselected items become \u2014exclude flags automatically.",
+    gh: false,
+    gcs: true,
+    docLink: "/github-code-search/usage/interactive-mode",
+  },
+  {
+    feature: "Markdown / JSON output",
+    desc: "Export clean Markdown checklists or machine-readable JSON ready for CI scripts.",
+    gh: false,
+    gcs: true,
+    docLink: "/github-code-search/usage/output-formats",
+  },
+  {
+    feature: "Replay / CI command",
+    desc: "Every session produces a one-liner to reproduce the exact output headlessly in CI.",
+    gh: false,
+    gcs: true,
+    docLink: "/github-code-search/usage/non-interactive-mode",
+  },
+  {
+    feature: "Team-prefix grouping",
+    desc: "Cluster repos by GitHub team prefix (squad-, chapter-) for org-wide triage.",
+    gh: false,
+    gcs: true,
+    docLink: "/github-code-search/usage/team-grouping",
+  },
+  {
+    feature: "Syntax highlighting in terminal",
+    desc: "Language-aware token colouring rendered in the TUI \u2014 no browser needed.",
+    gh: false,
+    gcs: true,
+    docLink: "/github-code-search/usage/interactive-mode",
+  },
+  {
+    feature: "Pagination (up to 1\u202f000 results)",
+    desc: "Both tools auto-paginate the GitHub search API \u2014 up to 1\u202f000 results per query.",
+    gh: true,
+    gcs: true,
+    docLink: "/github-code-search/reference/github-api-limits",
+  },
 ];
 </script>
 
@@ -48,7 +98,39 @@ const ROWS: Row[] = [
         </thead>
         <tbody>
           <tr v-for="row in ROWS" :key="row.feature" class="ct-row">
-            <td class="ct-feature">{{ row.feature }}</td>
+            <td class="ct-feature">
+              <a
+                v-if="row.docLink"
+                :href="row.docLink"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="ct-feature-link"
+              >
+                <span class="ct-feature-title">
+                  {{ row.feature }}
+                  <svg
+                    class="ct-ext-icon"
+                    aria-hidden="true"
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <line x1="7" y1="17" x2="17" y2="7" />
+                    <polyline points="7 7 17 7 17 17" />
+                  </svg>
+                </span>
+                <span class="ct-feature-desc">{{ row.desc }}</span>
+              </a>
+              <span v-else class="ct-feature-plain">
+                <span class="ct-feature-title">{{ row.feature }}</span>
+                <span class="ct-feature-desc">{{ row.desc }}</span>
+              </span>
+            </td>
             <td class="ct-cell">
               <span v-if="row.gh" class="ct-check">✓</span>
               <span v-else class="ct-cross">✗</span>
@@ -109,7 +191,7 @@ const ROWS: Row[] = [
 .ct-intro {
   margin: 0;
   padding: 20px 24px 18px;
-  font-size: 14px;
+  font-size: 15.5px;
   line-height: 1.7;
   color: var(--vp-c-text-2);
   border-bottom: 1px solid var(--vp-c-divider);
@@ -160,7 +242,7 @@ thead tr {
 }
 
 .ct-tool-name {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -210,10 +292,53 @@ thead tr {
 }
 
 .ct-feature {
-  padding: 14px 24px;
-  font-size: 14px;
+  padding: 12px 24px;
+  font-size: 15px;
   color: var(--vp-c-text-1);
   line-height: 1.5;
+}
+
+.ct-feature-link,
+.ct-feature-plain {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: var(--vp-c-text-1);
+  text-decoration: none;
+}
+
+.ct-feature-link:hover {
+  color: var(--vp-c-text-1);
+}
+
+.ct-feature-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 15px;
+  font-weight: 600;
+  color: inherit;
+}
+
+.ct-feature-desc {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--vp-c-text-3);
+  line-height: 1.45;
+}
+
+.ct-feature-link:hover .ct-feature-desc {
+  color: var(--vp-c-text-2);
+}
+
+.ct-ext-icon {
+  opacity: 0.35;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+
+.ct-feature-link:hover .ct-ext-icon {
+  opacity: 0.75;
 }
 
 .ct-cell {
