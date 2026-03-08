@@ -12,6 +12,9 @@ on:
       - "scripts/responsive.pw.ts"
       - ".github/workflows/responsive.yaml"
 
+permissions:
+  contents: read
+
 jobs:
   responsive:
     name: No horizontal scroll (mobile viewports)
