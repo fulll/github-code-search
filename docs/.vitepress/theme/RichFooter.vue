@@ -108,7 +108,12 @@
             >
           </li>
           <li>
-            <a href="https://fulll.fr" target="_blank" rel="noopener noreferrer">
+            <a
+              href="https://fulll.fr"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="fulll.fr (opens in a new tab)"
+            >
               fulll.fr
               <svg
                 class="rf-ext-arrow"

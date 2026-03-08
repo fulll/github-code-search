@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { withBase } from "vitepress";
 
 const CURL_CMD =
   "curl -fsSL https://raw.githubusercontent.com/fulll/github-code-search/main/install.sh | bash";
@@ -72,7 +73,7 @@ function copySearch() {
       <div class="is-step">
         <div class="is-step-num" aria-hidden="true">1</div>
         <div class="is-step-body">
-          <h3 class="is-step-label">Install the binary</h3>
+          <h3 class="is-step-label"><span class="sr-only">Step 1: </span>Install the binary</h3>
           <div class="is-terminal">
             <div class="is-terminal-bar">
               <span class="is-dot is-dot-red" aria-hidden="true"></span>
@@ -115,7 +116,9 @@ function copySearch() {
       <div class="is-step">
         <div class="is-step-num" aria-hidden="true">2</div>
         <div class="is-step-body">
-          <h3 class="is-step-label">Export your GitHub token</h3>
+          <h3 class="is-step-label">
+            <span class="sr-only">Step 2: </span>Export your GitHub token
+          </h3>
           <div class="is-token-hint">
             <svg
               class="is-info-icon"
@@ -160,7 +163,7 @@ function copySearch() {
       <div class="is-step">
         <div class="is-step-num" aria-hidden="true">3</div>
         <div class="is-step-body">
-          <h3 class="is-step-label">Run your first search</h3>
+          <h3 class="is-step-label"><span class="sr-only">Step 3: </span>Run your first search</h3>
           <div class="is-terminal">
             <div class="is-terminal-bar">
               <span class="is-dot is-dot-red" aria-hidden="true"></span>
@@ -201,7 +204,7 @@ function copySearch() {
     </div>
 
     <div class="is-footer">
-      <a href="/github-code-search/getting-started/installation" class="is-link-full">
+      <a :href="withBase('/getting-started/installation/')" class="is-link-full">
         Full installation guide →
       </a>
     </div>

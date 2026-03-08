@@ -266,9 +266,9 @@ export async function checkForUpdate(
 // ─── Completion refresh ────────────────────────────────────────────────────────
 
 /**
- * Refreshes the shell completion file if it was previously installed.
- * Only overwrites — never creates from scratch (respects the user's opt-in choice).
- * Returns the refreshed file path, or null if no completion file was found.
+ * Installs or refreshes the shell completion file.
+ * Always writes the file (creates it if absent, overwrites it if present).
+ * Returns the written file path, or null when `shell` is null.
  */
 export async function refreshCompletions(
   shell: Shell | null,

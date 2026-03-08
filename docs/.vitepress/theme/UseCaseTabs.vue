@@ -234,6 +234,9 @@ function handleTabKeydown(e: KeyboardEvent, i: number) {
 }
 
 .dark .uc-pill.active {
+  /* Fix: dark-mode brand-1 (#cc88ff) gives only 2.46:1 with white text.
+   * Use #9933ff (4.92:1) to satisfy WCAG AA. */
+  background: #9933ff;
   color: #fff;
   box-shadow: 0 4px 18px rgba(204, 136, 255, 0.3);
 }

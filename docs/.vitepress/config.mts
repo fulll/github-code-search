@@ -171,19 +171,55 @@ export default defineConfig({
       },
     ],
     // ── Chunk splitting ──────────────────────────────────────────────────────
-    // Mermaid alone is >900 kB minified; split it + the d3 sub-tree into
-    // dedicated async chunks to eliminate the Rollup 500 kB warning and
-    // improve long-term caching. No generic vendor catch-all — VitePress
-    // internals (mark.js etc.) need Rollup's default resolution.
+    // Four async chunk groups — all loaded lazily via vitepress-mermaid-renderer,
+    // so none affect initial page load. Target: keep every chunk under 500 kB.
+    //
+    // Approximate minified sizes (actual, measured):
+    //   mermaid        ~1 769 kB  (mermaid core + d3, circular-dep locked together)
+    //   mermaid-graph    ~442 kB  (cytoscape core)
+    //   mermaid-layout   ~201 kB  (cytoscape-fcose + cytoscape-cose-bilkent)
+    //   mermaid-utils    ~163 kB  (lodash-es, khroma, dayjs, roughjs, …)
+    //   katex            ~261 kB  (own chunk, handled by vitepress-mermaid-renderer)
+    //
+    // mermaid+d3 is the one inescapable large chunk (~1 769 kB). The 1 800 kB
+    // limit silences the Rollup warning for that known bundle without masking
+    // real bloat in any other chunk (next largest is mermaid-graph at ~442 kB).
     build: {
-      // Mermaid (bundled with d3) is legitimately large (~2.4 MB minified).
-      // 2500 kB threshold avoids the Rollup warning without masking real bloat
-      // on other chunks (next largest is katex at ~260 kB).
-      chunkSizeWarningLimit: 2500,
+      chunkSizeWarningLimit: 1800,
       rollupOptions: {
         output: {
           manualChunks(id: string) {
-            // Mermaid + d3 must be co-located (circular dependency between them).
+            // cytoscape-fcose + cytoscape-cose-bilkent: layout algorithm extensions
+            // (~200 kB combined). Must be checked before the bare "cytoscape" catch.
+            if (
+              id.includes("node_modules/cytoscape-fcose") ||
+              id.includes("node_modules/cytoscape-cose-bilkent")
+            )
+              return "mermaid-layout";
+
+            // cytoscape core only (~440 kB minified).
+            // The layout extensions above import from core but not vice-versa.
+            if (id.includes("node_modules/cytoscape")) return "mermaid-graph";
+
+            // Pure utility libraries consumed by mermaid — no circular deps
+            // back into mermaid or d3, safe to split.
+            if (
+              id.includes("node_modules/lodash-es") ||
+              id.includes("node_modules/khroma") ||
+              id.includes("node_modules/dayjs") ||
+              id.includes("node_modules/roughjs") ||
+              id.includes("node_modules/dompurify") ||
+              id.includes("node_modules/stylis") ||
+              id.includes("node_modules/ts-dedent") ||
+              id.includes("node_modules/uuid") ||
+              id.includes("node_modules/marked") ||
+              id.includes("node_modules/@braintree/sanitize-url") ||
+              id.includes("node_modules/@iconify")
+            )
+              return "mermaid-utils";
+
+            // Mermaid core + d3 sub-tree must stay co-located: they share
+            // circular dependencies that Rollup cannot untangle further.
             if (
               id.includes("node_modules/mermaid") ||
               id.includes("node_modules/vitepress-mermaid-renderer") ||

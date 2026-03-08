@@ -395,17 +395,14 @@ pre {
   outline-offset: 2px;
 }
 
-/* ── Shiki light-theme contrast overrides (WCAG 2.1 AA) ─────────────────── */
+/* ── Shiki contrast overrides (WCAG 2.1 AA) ─────────────────────────────── */
 /*
- * The default github-light Shiki theme ships three token colours that fail
- * WCAG AA 4.5:1 against a white/near-white code-block background:
+ * Light mode — github-light-high-contrast still emits a few tokens that fall
+ * below 4.5:1 against VitePress's off-white code-block background:
  *   #D73A49 — operators/keywords  → 4.24 : 1
  *   #6A737D — comments            → 4.46 : 1
  *   #22863A — strings/YAML keys   → 4.28 : 1
- *
- * We use github-light-high-contrast as the primary Shiki theme (config.mts),
- * which resolves these at the source.  The attribute-selector rules below are a
- * belt-and-suspenders fallback for any residual inline-style occurrences.
+ *   #66707B — muted/comment variant → 3.75 : 1
  */
 html:not(.dark) .vp-doc pre code span[style*="--shiki-light:#D73A49"] {
   /* red operators — was 4.24:1, now ≥4.5:1 */
@@ -418,4 +415,18 @@ html:not(.dark) .vp-doc pre code span[style*="--shiki-light:#6A737D"] {
 html:not(.dark) .vp-doc pre code span[style*="--shiki-light:#22863A"] {
   /* green strings/YAML keys — was 4.28:1, now ≥4.5:1 */
   color: #155e27 !important;
+}
+html:not(.dark) .vp-doc pre code span[style*="--shiki-light:#66707B"] {
+  /* muted comment variant — was 3.75:1, now 5.78:1 */
+  color: #57606a !important;
+}
+
+/*
+ * Dark mode — github-dark emits #6A737D for comment tokens.
+ * Against VitePress dark code-block background (#161618) this is only 3.75:1.
+ * Fix: #8b949e gives 5.87:1 on #161618.
+ */
+html.dark .vp-doc pre code span[style*="--shiki-dark:#6A737D"] {
+  /* dark-mode comment grey — was 3.75:1, now 5.87:1 */
+  color: #8b949e !important;
 }

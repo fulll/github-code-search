@@ -265,6 +265,12 @@ const testimonials = [
     box-shadow 0.15s;
 }
 
+/* Fix: dark-mode brand-1 (#cc88ff) gives only 2.46:1 with white text.
+ * Explicit #9933ff (4.92:1) is used in dark mode. */
+.dark .ts-cta-btn {
+  background: #9933ff;
+}
+
 .ts-cta-btn:hover {
   background: #7a1fd4;
   color: #fff !important;

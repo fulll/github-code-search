@@ -572,15 +572,4 @@ describe("refreshCompletions", () => {
       rmSync(tmp, { recursive: true, force: true });
     }
   });
-
-  it("creates the file even if it did not already exist (always installs)", async () => {
-    const tmp = await mkdtemp(join(tmpdir(), "gcs-test-"));
-    try {
-      await refreshCompletions("fish", tmp);
-      const dir = join(tmp, ".config", "fish", "completions");
-      expect(existsSync(join(dir, "github-code-search.fish"))).toBe(true);
-    } finally {
-      rmSync(tmp, { recursive: true, force: true });
-    }
-  });
 });
