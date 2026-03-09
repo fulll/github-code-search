@@ -544,6 +544,11 @@ describe("buildFetchProgress", () => {
     const stripped = s.replace(/\x1b\[[0-9;]*m/g, "");
     expect(stripped).not.toContain("▓");
   });
+
+  it("does not throw when currentPage exceeds totalPages (out-of-range guard)", () => {
+    // paginatedFetch may request one extra empty page after the 1 000-result cap
+    expect(() => buildFetchProgress(11, 10)).not.toThrow();
+  });
 });
 
 // ─── buildLineResolutionProgress ─────────────────────────────────────────────────
@@ -581,5 +586,9 @@ describe("buildLineResolutionProgress", () => {
     const s = buildLineResolutionProgress(3, 10);
     const stripped = s.replace(/\x1b\[[0-9;]*m/g, "");
     expect(stripped).toContain("Resolving line numbers");
+  });
+
+  it("does not throw when done exceeds total (out-of-range guard)", () => {
+    expect(() => buildLineResolutionProgress(21, 20)).not.toThrow();
   });
 });

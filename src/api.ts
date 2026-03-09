@@ -153,9 +153,16 @@ const PROGRESS_BAR_WIDTH = 20;
  * Pure function — no side effects.
  * \x1b[38;5;129m — bright purple (filled blocks)
  * \x1b[38;5;240m — dark grey (empty blocks)
+ *
+ * `filled` is clamped to [0, PROGRESS_BAR_WIDTH] so callers never produce a
+ * negative repeat count (which would throw a RangeError) — e.g. when
+ * paginatedFetch requests one extra empty page after the 1 000-result cap and
+ * currentPage > totalPages.
  */
-function buildProgressBar(filled: number, empty: number): string {
-  return `\x1b[38;5;129m${"▓".repeat(filled)}\x1b[38;5;240m${"░".repeat(empty)}\x1b[0m`;
+function buildProgressBar(filled: number): string {
+  const clampedFilled = Math.min(Math.max(0, Math.round(filled)), PROGRESS_BAR_WIDTH);
+  const clampedEmpty = PROGRESS_BAR_WIDTH - clampedFilled;
+  return `\x1b[38;5;129m${"▓".repeat(clampedFilled)}\x1b[38;5;240m${"░".repeat(clampedEmpty)}\x1b[0m`;
 }
 
 /**
@@ -166,8 +173,7 @@ function buildProgressBar(filled: number, empty: number): string {
  */
 export function buildFetchProgress(currentPage: number, totalPages: number): string {
   const filled = totalPages > 0 ? Math.round((currentPage / totalPages) * PROGRESS_BAR_WIDTH) : 0;
-  const empty = PROGRESS_BAR_WIDTH - filled;
-  return `\r  Fetching results from GitHub… ${buildProgressBar(filled, empty)}  page ${currentPage}/${totalPages}`;
+  return `\r  Fetching results from GitHub… ${buildProgressBar(filled)}  page ${currentPage}/${totalPages}`;
 }
 
 /**
@@ -178,8 +184,7 @@ export function buildFetchProgress(currentPage: number, totalPages: number): str
  */
 export function buildLineResolutionProgress(done: number, total: number): string {
   const filled = total > 0 ? Math.round((done / total) * PROGRESS_BAR_WIDTH) : 0;
-  const empty = PROGRESS_BAR_WIDTH - filled;
-  return `\r  Resolving line numbers… ${buildProgressBar(filled, empty)}  ${done}/${total}`;
+  return `\r  Resolving line numbers… ${buildProgressBar(filled)}  ${done}/${total}`;
 }
 
 export async function fetchAllResults(
