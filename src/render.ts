@@ -325,7 +325,7 @@ export function renderGroups(
 
   lines.push(
     clipAnsi(
-      `${pc.bgMagenta(pc.bold(" github-code-search "))} ${pc.bold(pc.cyan(query))} ${pc.dim("in")} ${pc.bold(pc.yellow(org))}`,
+      `${pc.bgMagenta(pc.black(pc.bold(" github-code-search ")))} ${pc.bold(pc.cyan(query))} ${pc.dim("in")} ${pc.bold(pc.yellow(org))}`,
       termWidth,
     ),
   );
