@@ -177,10 +177,11 @@ This project follows [Semantic Versioning](https://semver.org/):
 ### Step-by-step
 
 ```bash
-# 1. Bump the version in package.json (pick one)
-bun pm version patch   # bug fix
-bun pm version minor   # new feature
-bun pm version major   # breaking change
+# 1. Bump the version in package.json directly
+#    Do NOT use `bun pm version` — it creates a git commit AND a git tag
+#    automatically, which conflicts with the release workflow below.
+sed -i '' 's/"version": ".*"/"version": "X.Y.Z"/' package.json
+jq -r .version package.json   # verify
 
 # 2. Create the release branch and commit
 git checkout -b release/$(jq -r .version package.json)
@@ -214,6 +215,15 @@ Pushing a **major** tag (`vX.0.0`) additionally triggers **`docs.yml` → snapsh
 3. Prepends the new entry to `docs/public/versions.json` and commits back to `main`.
 
 ### Blog post requirement
+
+> **Always ask the user interactively before writing the blog post.**
+> Do not invent highlights or descriptions from code alone. Ask at minimum:
+>
+> - Which changes should be highlighted?
+> - Is there a one-line description for the front-matter?
+> - Any before/after CLI output examples to include?
+>
+> Only proceed to write `docs/blog/release-v<X-Y-Z>.md` once you have the user's input.
 
 | Release type | Blog post                                                   | Location                          |
 | ------------ | ----------------------------------------------------------- | --------------------------------- |

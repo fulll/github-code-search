@@ -6,6 +6,7 @@ Each release entry covers the motivation, new features, breaking changes (if any
 
 | Version                                                                  | Blog post                                                                                                       |
 | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| [v1.8.2](https://fulll.github.io/github-code-search/blog/release-v1-8-2) | Fix rate-limit errors aborting multi-page searches; auto-wait and retry with live progress                      |
 | [v1.8.1](https://fulll.github.io/github-code-search/blog/release-v1-8-1) | Fix silent hang after pagination bar — concurrency cap + progress bar for line-number resolution                |
 | [v1.8.0](https://fulll.github.io/github-code-search/blog/release-v1-8-0) | Purple TUI theme, fetch progress bar, position indicator, line-anchored file links, Esc to close help           |
 | [v1.7.0](https://fulll.github.io/github-code-search/blog/release-v1-7-0) | Shell completions (bash/zsh/fish) + extended syntax highlighting (PHP, C/C++, Swift, Terraform/HCL, Dockerfile) |

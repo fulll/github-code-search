@@ -21,15 +21,38 @@ This project follows [Semantic Versioning](https://semver.org/):
 
 ## 2. Bump the version
 
+Edit `package.json` directly — **do not use `bun pm version`**.
+
+> `bun pm version` automatically creates a git commit _and_ a git tag in one shot,
+> which conflicts with the release workflow (tag must land on the release branch,
+> not on the current branch, and only after the blog post / CHANGELOG are ready).
+> Undoing that auto-tag with `git tag -d` and `git push --delete` is error-prone.
+
 ```bash
-bun pm version patch   # or minor / major
+# Option A — in-place sed (reliable, no interactive editor needed)
+sed -i '' 's/"version": ".*"/"version": "X.Y.Z"/' package.json
+
+# Option B — edit package.json manually, change the "version" field
 ```
 
-If the working tree is dirty (staged or unstaged changes), `bun pm version` will refuse. In that case bump directly in `package.json`, then commit the version bump as the first commit on the release branch.
+Verify the bump before committing:
+
+```bash
+jq -r .version package.json   # should print X.Y.Z
+```
 
 ## 3. Write the blog post
 
 **Required for minor and major releases. Optional (but encouraged) for patch releases.**
+
+> **Ask the user interactively before writing.** Do not invent highlights or
+> descriptions. Before drafting the post, ask the user:
+>
+> - Which changes should be highlighted?
+> - Is there a one-line description for the front-matter?
+> - Any before/after examples or screenshots to include?
+>
+> Only proceed to write the file once you have the user's input.
 
 1. Create `docs/blog/release-v<X-Y-Z>.md` — use existing posts as format reference:
    - `docs/blog/release-v1-3-0.md` (minor, feature-focused)

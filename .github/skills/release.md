@@ -5,6 +5,34 @@ This skill complements `.github/instructions/release.instructions.md`.
 
 ---
 
+## Version bump — important note
+
+**Never use `bun pm version patch/minor/major` to bump the version.**
+
+Unlike `npm version`, Bun's implementation creates both a git commit _and_ a git
+tag in a single operation. This is incompatible with the release workflow:
+
+- The tag must land on the dedicated `release/X.Y.Z` branch, not on `main`.
+- The blog post and `CHANGELOG.md` must be committed _before_ the version tag is
+  pushed (the CD pipeline reads the tag to build binaries and name the release).
+- Undoing an unwanted auto-tag requires `git tag -d vX.Y.Z` locally and
+  `git push origin --delete vX.Y.Z` on the remote — easy to forget one of the
+  two, which can trigger the CD pipeline prematurely.
+
+**Correct approach:**
+
+```bash
+# Bump directly in package.json
+sed -i '' 's/"version": ".*"/"version": "X.Y.Z"/' package.json
+
+# Verify
+jq -r .version package.json
+```
+
+The git commit and tag are created separately in steps 4 and 5.
+
+---
+
 ## Semver decision guide
 
 | Change type                                                                    | Bump    | Example       |
@@ -56,6 +84,16 @@ Pushing `vX.Y.Z` triggers the release pipeline automatically:
 ## Blog post format
 
 Required for **minor** and **major** releases. Optional for patch (GitHub Release body is sufficient for patch).
+
+> **Always ask the user interactively before writing the blog post.**
+> Do not invent highlights, descriptions or examples from code alone.
+> Ask at minimum:
+>
+> - Which changes deserve a `###` section and why?
+> - Suggested one-line `description` for the front-matter.
+> - Any before/after CLI output or screenshots to illustrate?
+>
+> Then draft the post and show it to the user for approval before committing.
 
 **Front-matter:**
 
