@@ -227,28 +227,31 @@ async function searchAction(
   // Shared promise for concurrent rate-limit hits (e.g. from Promise.all in
   // fetchRepoTeams). If a countdown is already running and covers the required
   // wait, new callers piggyback on it. If a new caller needs a *longer* wait
-  // (different reset timestamps), a fresh countdown replaces the old one so
-  // no caller retries before its required deadline.
+  // A single shared countdown loop: if a new caller needs a longer wait while
+  // the loop is already running, we extend cooldownUntil and the loop picks up
+  // the new deadline on its next tick — no second loop is ever started.
   let activeCooldown: Promise<void> | null = null;
   let cooldownUntil = 0;
 
   /** Shared rate-limit handler used for both the code search and the team fetch. */
   const onRateLimit = (waitMs: number): Promise<void> => {
     const desiredEnd = Date.now() + waitMs;
-    if (activeCooldown !== null && cooldownUntil >= desiredEnd) {
-      // Existing countdown covers the required wait — piggyback on it.
+    if (activeCooldown !== null) {
+      // A loop is already running. Extend the deadline if the new wait is longer;
+      // piggyback in either case — a single loop covers all concurrent callers.
+      if (desiredEnd > cooldownUntil) cooldownUntil = desiredEnd;
       return activeCooldown;
     }
-    // No countdown running, or the new wait extends beyond the current one.
-    // Start a fresh countdown for the longer duration.
+    // No countdown running — start a fresh one.
     cooldownUntil = desiredEnd;
     activeCooldown = (async () => {
-      const totalSeconds = Math.ceil(waitMs / 1_000);
       // Start on a fresh line so the countdown doesn't overwrite the progress bar
       process.stderr.write("\n");
-      for (let s = totalSeconds; s > 0; s--) {
+      while (true) {
+        const remaining = cooldownUntil - Date.now();
+        if (remaining <= 0) break;
         process.stderr.write(
-          `\r  ${pc.yellow("Rate limited")} — resuming in ${formatRetryWait(s * 1_000)}\u2026${" ".repeat(10)}`,
+          `\r  ${pc.yellow("Rate limited")} — resuming in ${formatRetryWait(remaining)}\u2026${" ".repeat(10)}`,
         );
         await new Promise((r) => setTimeout(r, 1_000));
       }

@@ -30,9 +30,10 @@ export function formatRetryWait(ms: number): string {
 }
 
 /**
- * Returns true when the response is a GitHub primary or secondary rate-limit 403.
+ * Returns true when the response is a GitHub rate-limit response.
  *
- * Primary rate limit:   403 + x-ratelimit-remaining: 0
+ * Standard rate limit: 429 Too Many Requests
+ * Primary rate limit:  403 + x-ratelimit-remaining: 0
  * Secondary rate limit: 403 + Retry-After header
  *   (see https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api)
  */
