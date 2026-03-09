@@ -18,6 +18,7 @@ import { resolve } from "node:path";
 import pc from "picocolors";
 import { aggregate, normaliseExtractRef, normaliseRepo } from "./src/aggregate.ts";
 import { fetchAllResults, fetchRepoTeams } from "./src/api.ts";
+import { formatRetryWait } from "./src/api-utils.ts";
 import { buildOutput } from "./src/output.ts";
 import { groupByTeamPrefix, flattenTeamSections } from "./src/group.ts";
 import { checkForUpdate } from "./src/upgrade.ts";
@@ -223,7 +224,47 @@ async function searchAction(
   /** True when running in non-interactive / CI mode */
   const isCI = process.env.CI === "true" || opts.interactive === false;
 
-  const rawMatches = await fetchAllResults(query, org, GITHUB_TOKEN!);
+  // Shared promise for concurrent rate-limit hits (e.g. from Promise.all in
+  // fetchRepoTeams). If a countdown is already running and covers the required
+  // wait, new callers piggyback on it. If a new caller needs a *longer* wait
+  // A single shared countdown loop: if a new caller needs a longer wait while
+  // the loop is already running, we extend cooldownUntil and the loop picks up
+  // the new deadline on its next tick — no second loop is ever started.
+  let activeCooldown: Promise<void> | null = null;
+  let cooldownUntil = 0;
+
+  /** Shared rate-limit handler used for both the code search and the team fetch. */
+  const onRateLimit = (waitMs: number): Promise<void> => {
+    const desiredEnd = Date.now() + waitMs;
+    if (activeCooldown !== null) {
+      // A loop is already running. Extend the deadline if the new wait is longer;
+      // piggyback in either case — a single loop covers all concurrent callers.
+      if (desiredEnd > cooldownUntil) cooldownUntil = desiredEnd;
+      return activeCooldown;
+    }
+    // No countdown running — start a fresh one.
+    cooldownUntil = desiredEnd;
+    activeCooldown = (async () => {
+      // Start on a fresh line so the countdown doesn't overwrite the progress bar
+      process.stderr.write("\n");
+      while (true) {
+        const remaining = cooldownUntil - Date.now();
+        if (remaining <= 0) break;
+        process.stderr.write(
+          `\r  ${pc.yellow("Rate limited")} — resuming in ${formatRetryWait(remaining)}\u2026${" ".repeat(10)}`,
+        );
+        await new Promise((r) => setTimeout(r, 1_000));
+      }
+      // Leave cursor at line start; the next \r progress update will overwrite cleanly
+      process.stderr.write(`\r  ${pc.dim("Rate limited")} — resuming\u2026${" ".repeat(40)}`);
+    })().finally(() => {
+      activeCooldown = null;
+      cooldownUntil = 0;
+    });
+    return activeCooldown;
+  };
+
+  const rawMatches = await fetchAllResults(query, org, GITHUB_TOKEN!, onRateLimit);
   let groups = aggregate(rawMatches, excludedRepos, excludedExtractRefs, includeArchived);
 
   // ─── Team-prefix grouping ─────────────────────────────────────────────────
@@ -233,7 +274,7 @@ async function searchAction(
       .map((p) => p.trim())
       .filter(Boolean);
     if (prefixes.length > 0) {
-      const teamMap = await fetchRepoTeams(org, GITHUB_TOKEN!, prefixes, opts.cache);
+      const teamMap = await fetchRepoTeams(org, GITHUB_TOKEN!, prefixes, opts.cache, onRateLimit);
       // Attach team lists to each group
       for (const g of groups) {
         g.teams = teamMap.get(g.repoFullName) ?? [];

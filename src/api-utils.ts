@@ -30,11 +30,21 @@ export function formatRetryWait(ms: number): string {
 }
 
 /**
- * Returns true when the response is a GitHub primary rate-limit 403
- * (x-ratelimit-remaining is "0").
+ * Returns true when the response is a GitHub rate-limit response.
+ *
+ * Standard rate limit: 429 Too Many Requests
+ * Primary rate limit:  403 + x-ratelimit-remaining: 0
+ * Secondary rate limit: 403 + Retry-After header
+ *   (see https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api)
  */
 function isRateLimitExceeded(res: Response): boolean {
-  return res.status === 403 && res.headers.get("x-ratelimit-remaining") === "0";
+  // 429 Too Many Requests is always a rate-limit response.
+  if (res.status === 429) return true;
+  // 403 is a GitHub-specific rate-limit when accompanied by the right headers.
+  if (res.status !== 403) return false;
+  return (
+    res.headers.get("x-ratelimit-remaining") === "0" || res.headers.get("Retry-After") !== null
+  );
 }
 
 /**
@@ -43,12 +53,15 @@ function isRateLimitExceeded(res: Response): boolean {
  * exponential back-off.
  */
 function getRetryDelayMs(res: Response, attempt: number): number {
-  // x-ratelimit-reset: Unix timestamp (seconds) when the quota refills
+  // x-ratelimit-reset: Unix timestamp (seconds) when the quota refills.
+  // Add a 1 s buffer to guard against clock skew between client and GitHub
+  // servers — without it the first retry can arrive fractionally early and
+  // immediately hit the same limit again.
   const resetHeader = res.headers.get("x-ratelimit-reset");
   if (resetHeader !== null) {
     const resetTime = parseInt(resetHeader, 10);
     if (Number.isFinite(resetTime)) {
-      return Math.max(0, resetTime * 1_000 - Date.now());
+      return Math.max(0, resetTime * 1_000 - Date.now() + 1_000);
     }
   }
   // Retry-After: seconds to wait (used by 429 / secondary rate limits)
@@ -63,24 +76,70 @@ function getRetryDelayMs(res: Response, attempt: number): number {
 }
 
 /**
+ * Sleep for `ms` milliseconds. If `signal` is provided and aborts before the
+ * timer fires, the promise rejects with the signal's abort reason. This makes
+ * the inter-retry delay abort-aware, consistent with the `fetch` call itself.
+ */
+function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    // Extract the handler so it can be removed when the timer fires, preventing
+    // listener accumulation across many retries.
+    const onAbort = () => {
+      clearTimeout(id);
+      reject(signal!.reason ?? new DOMException("Aborted", "AbortError"));
+    };
+    // Attach the listener BEFORE starting the timer so an abort that fires
+    // between the initial check and addEventListener is not missed.
+    signal?.addEventListener("abort", onAbort, { once: true });
+    // Re-check after attaching to close the race window: if the signal was
+    // aborted in between, clean up and reject synchronously.
+    if (signal?.aborted) {
+      signal.removeEventListener("abort", onAbort);
+      reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    const id = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+  });
+}
+
+/**
  * Performs a `fetch` with automatic retry on 429 (rate-limited), 503
- * (server unavailable) and 403 primary rate-limit responses, using
- * exponential backoff with optional `Retry-After` / `x-ratelimit-reset`
- * header support.
+ * (server unavailable) and 403 rate-limit responses (both primary and
+ * secondary), using exponential backoff with optional `Retry-After` /
+ * `x-ratelimit-reset` header support.
  *
  * Non-retryable responses (including successful ones) are returned immediately.
  * After `maxRetries` exhausted the last response is returned — callers must
  * still check `res.ok`.
  *
- * When the computed wait exceeds MAX_AUTO_RETRY_WAIT_MS the function throws a
- * descriptive error so the user isn't silently blocked for minutes.
+ * When the computed wait exceeds MAX_AUTO_RETRY_WAIT_MS:
+ * - Without `onRateLimit`: throws a descriptive error immediately.
+ * - With `onRateLimit`: **awaits** the callback, which **must** sleep for (at
+ *   least) `waitMs` milliseconds — e.g. by showing a countdown timer. A
+ *   callback that returns immediately without sleeping will cause the loop to
+ *   retry at once and exhaust `longWaitAttempts` very quickly.
+ *   These long waits do **not** count against `maxRetries`; a separate
+ *   `longWaitAttempts` counter (also capped at `maxRetries`) prevents infinite
+ *   loops when the rate-limit never clears.
+ *
+ * Short retries (wait ≤ MAX_AUTO_RETRY_WAIT_MS) honour `options.signal` —
+ * aborting during the delay rejects the promise with the signal's abort reason.
  */
 export async function fetchWithRetry(
   url: string,
   options: RequestInit,
   maxRetries = 3,
+  onRateLimit?: (waitMs: number) => Promise<void>,
 ): Promise<Response> {
   let attempt = 0;
+  let longWaitAttempts = 0;
   while (true) {
     const res = await fetch(url, options);
 
@@ -96,18 +155,31 @@ export async function fetchWithRetry(
     const baseDelayMs = getRetryDelayMs(res, attempt);
 
     if (baseDelayMs > MAX_AUTO_RETRY_WAIT_MS) {
-      // Cancel the response body before throwing to allow connection reuse
+      // Cancel the response body before waiting/throwing to allow connection reuse
       await res.body?.cancel();
-      throw new Error(
-        `GitHub API rate limit exceeded. Please retry in ${formatRetryWait(baseDelayMs)}.`,
-      );
+      if (!onRateLimit || longWaitAttempts >= maxRetries) {
+        // Produce an accurate message: 403/429 are rate-limit errors; 503 is a
+        // server backoff that should not be labelled "rate limit exceeded".
+        const messagePrefix = isRateLimitExceeded(res)
+          ? "GitHub API rate limit exceeded."
+          : "GitHub API requested a long backoff before retrying.";
+        throw new Error(`${messagePrefix} Please retry in ${formatRetryWait(baseDelayMs)}.`);
+      }
+      // Fix: await the callback — it owns the sleep so it can show a countdown
+      // and honour an AbortSignal. Long waits do NOT count against maxRetries;
+      // longWaitAttempts (capped at maxRetries) guards against infinite loops.
+      // — see issue #102
+      longWaitAttempts++;
+      await onRateLimit(baseDelayMs);
+      continue; // do NOT increment attempt
     }
 
     // Add ±10 % jitter to avoid thundering-herd on concurrent retries
     const delayMs = baseDelayMs * (0.9 + Math.random() * 0.2);
     // Cancel the response body to allow the connection to be reused
     await res.body?.cancel();
-    await new Promise((r) => setTimeout(r, delayMs));
+    // Honour the caller's AbortSignal during the short wait
+    await abortableDelay(delayMs, options.signal ?? undefined);
     attempt++;
   }
 }
