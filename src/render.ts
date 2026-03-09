@@ -11,7 +11,12 @@ import { applySelectAll, applySelectNone } from "./render/selection.ts";
 
 export { highlightFragment } from "./render/highlight.ts";
 export { buildFilterStats, type FilterStats } from "./render/filter.ts";
-export { rowTerminalLines, buildRows, isCursorVisible } from "./render/rows.ts";
+export {
+  rowTerminalLines,
+  buildRows,
+  isCursorVisible,
+  normalizeScrollOffset,
+} from "./render/rows.ts";
 export {
   buildMatchCountLabel,
   buildSummary,
@@ -468,7 +473,10 @@ export function renderGroups(
   // (≤120 cols) and causes the rendered output to exceed termHeight — see issue #105.
   // The -1 accounts for the "…" appended by highlightFragment when a line is truncated.
   const FRAGMENT_INDENT = INDENT.length * 3; // 6 chars: "      "
-  const fragmentMaxChars = Math.max(20, termWidth - FRAGMENT_INDENT - 1);
+  // Use Math.max(1, …) rather than Math.max(20, …) so that on very narrow terminals
+  // (termWidth < FRAGMENT_INDENT + 1 + 20) the clamped floor of 20 can't exceed the
+  // available width and still cause lines wider than termWidth — see review on #106.
+  const fragmentMaxChars = Math.max(1, termWidth - FRAGMENT_INDENT - 1);
   let usedLines = 0;
 
   for (let i = scrollOffset; i < rows.length; i++) {
@@ -476,22 +484,32 @@ export function renderGroups(
 
     // ── Section header row ────────────────────────────────────────────────
     if (row.type === "section") {
-      // Fix: guard against overflow before rendering — mirrors the non-section check below.
-      // Without this guard a section row that only partly fits (e.g. 1 line remaining but
-      // the section needs 2) is pushed to lines[] before the budget check, causing the
-      // rendered output to exceed viewportHeight by 1 line — see issue #105.
-      if (usedLines + 2 > viewportHeight && usedLines > 0) break;
+      // A section occupies 2 physical lines (blank separator + label) when it
+      // follows other viewport content, but only 1 line (label only) when it
+      // is the very first row rendered.
+      //
+      // The reason: the hints header line ends with a trailing \n. When joined
+      // with `lines.join("\n")`, this already produces 1 blank line before the
+      // first viewport element. If the section also prepends \n (embedded in
+      // the string), we get a *double* blank — 1 extra physical line — which
+      // pushes the footer position indicator off the bottom of the terminal.
+      // See issue #105.
+      const sectionCost = usedLines === 0 ? 1 : 2;
+      if (sectionCost + usedLines > viewportHeight && usedLines > 0) break;
       // Fix: clip section label to termWidth so the label line never wraps.
       // "── " prefix is 3 visible chars + 1 trailing space = 4 chars total.
-      // Without clipping a long team name scrolls the title off the top — see issue #105.
       const SECTION_FIXED = 4; // "── " (3) + trailing " " (1)
       const maxLabelChars = Math.max(4, termWidth - SECTION_FIXED);
       const label =
         row.sectionLabel.length > maxLabelChars
           ? row.sectionLabel.slice(0, maxLabelChars - 1) + "…"
           : row.sectionLabel;
-      lines.push(pc.magenta(pc.bold(`\n── ${label} `)));
-      usedLines += 2; // blank separator line + label line (now guaranteed to fit in 1 physical line)
+      // Emit the blank separator only when there are rows above in the viewport.
+      // The leading \n is no longer embedded in the label string — it is managed
+      // here to keep the line-cost calculation exact.
+      if (usedLines > 0) lines.push("");
+      lines.push(pc.magenta(pc.bold(`── ${label} `)));
+      usedLines += sectionCost;
       if (usedLines >= viewportHeight) break;
       continue;
     }
@@ -544,13 +562,16 @@ export function renderGroups(
       // Active extract row: locSuffix uses bold+white (same as path) for
       // visual homogeneity. Inactive: dim to de-emphasise the coordinates.
       const styledLocSuffix = isCursor ? pc.bold(pc.white(locSuffix)) : pc.dim(locSuffix);
-      // Fix: clip the path to fit within termWidth — account for indent (4 visible chars:
-      // INDENT + checkbox + space) + ACTIVE_BAR_WIDTH when on cursor — see issue #105.
-      const PATH_INDENT = INDENT.length + 1 + 1; // "  " + checkbox + space = 4
-      const maxPathVisible = Math.max(
-        10,
-        termWidth - PATH_INDENT - (isCursor ? ACTIVE_BAR_WIDTH : PATH_INDENT) - locSuffix.length,
-      );
+      // Fix: clip the path to fit within termWidth — use the *actual* visible prefix
+      // width for each render form rather than a shared PATH_INDENT constant.
+      // Active:   ACTIVE_BAR_WIDTH (1) + "  " (2) + checkbox (1) + space (1) = 5
+      // Inactive: "  " (2) + "  " (2) + checkbox (1) + space (1)            = 6
+      // See issue #105 and review on #106 (previous code subtracted PATH_INDENT twice
+      // for inactive rows, over-clipping by 4 chars).
+      const prefixWidth = isCursor
+        ? ACTIVE_BAR_WIDTH + INDENT.length + 1 + 1 // bar + "  " + checkbox + space = 5
+        : INDENT.length * 2 + 1 + 1; // "  " + "  " + checkbox + space = 6
+      const maxPathVisible = Math.max(10, termWidth - prefixWidth - locSuffix.length);
       const rawPath = isCursor
         ? `${highlightText(match.path, "path", (s) => pc.bold(pc.white(s)))}${styledLocSuffix}`
         : `${highlightText(match.path, "path", pc.cyan)}${styledLocSuffix}`;
@@ -588,8 +609,21 @@ export function renderGroups(
     if (usedLines >= viewportHeight) break;
   }
 
+  // Pad the unused viewport space so the position indicator is always fixed at
+  // the bottom of the terminal. Without padding, when the rendered content is
+  // shorter than viewportHeight (e.g. few results, many repos folded, or cursor
+  // near the bottom of the list), the footer floats immediately after the last
+  // item instead of staying at the bottom — see issue #105.
+  // Each pushed "" contributes exactly 1 physical blank line in lines.join("\n").
+  for (let i = usedLines; i < viewportHeight; i++) {
+    lines.push("");
+  }
+
   // Position indicator — uses cursor position so it always updates on every
   // navigation keystroke, regardless of whether scrollOffset changed.
+  // The leading \n produces a blank separator between the viewport content and
+  // the indicator (the separator is the last padding blank when full, or an
+  // explicit extra blank here when viewport is full).
   if (rows.length > 0) {
     lines.push(pc.dim(`\n  ↕ row ${cursor + 1} of ${rows.length}`));
   }

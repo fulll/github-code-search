@@ -7,6 +7,7 @@ import {
   buildFilterStats,
   buildRows,
   isCursorVisible,
+  normalizeScrollOffset,
   renderGroups,
   type FilterStats,
 } from "./render.ts";
@@ -123,6 +124,23 @@ export async function runInteractive(
   // HEADER_LINES (4) + position indicator (2) = 6 fixed lines consumed by renderGroups.
   // filterBarLines (0–2) and the sticky repo line (0–1) are added dynamically below.
   // Use getViewportHeight() for scroll decisions so they match what renderGroups actually renders.
+  //
+  // Precompute a repoIndex→rowIndex map so that getViewportHeight() runs O(1) instead of
+  // O(n) per call. The map is rebuilt lazily whenever the `rows` reference changes — which
+  // happens at most once per keypress (in redraw) — keeping the amortised cost O(n) total
+  // rather than O(n²) when scrolling through large result sets. See review on #106.
+  let _cachedRowsForMap: Row[] | null = null;
+  let _repoRowIndexMap: Map<number, number> = new Map();
+  const getRepoRowIndexMap = (rows: Row[]): Map<number, number> => {
+    if (rows !== _cachedRowsForMap) {
+      _cachedRowsForMap = rows;
+      _repoRowIndexMap = new Map(
+        rows.flatMap((r, i) => (r.type === "repo" ? [[r.repoIndex, i] as [number, number]] : [])),
+      );
+    }
+    return _repoRowIndexMap;
+  };
+
   const getViewportHeight = (rows: Row[]) => {
     let barLines = 0;
     if (filterMode) barLines = 2;
@@ -138,9 +156,7 @@ export async function runInteractive(
     if (scrollOffset > 0) {
       const cursorRow = rows[cursor];
       if (cursorRow?.type === "extract" && cursorRow.repoIndex >= 0) {
-        const repoRowIndex = rows.findIndex(
-          (r) => r.type === "repo" && r.repoIndex === cursorRow.repoIndex,
-        );
+        const repoRowIndex = getRepoRowIndexMap(rows).get(cursorRow.repoIndex) ?? -1;
         if (repoRowIndex >= 0 && repoRowIndex < scrollOffset) {
           stickyHeaderLines = 1;
         }
@@ -176,6 +192,12 @@ export async function runInteractive(
   const redraw = () => {
     const activeFilter = filterMode ? filterInput : filterPath;
     const rows = buildRows(groups, activeFilter, filterTarget, filterRegex);
+    // Normalise scrollOffset downward so the viewport is packed to the bottom.
+    // After a fold/unfold, filter change, or navigation near the end of the
+    // list, the rows visible from scrollOffset onwards can be fewer than
+    // viewportHeight — leaving blank space above the footer even though rows
+    // above scrollOffset could fill it. See issue #105.
+    scrollOffset = normalizeScrollOffset(scrollOffset, rows, groups, getViewportHeight(rows));
     const rendered = renderGroups(groups, cursor, rows, termHeight, scrollOffset, query, org, {
       filterPath,
       filterMode,
