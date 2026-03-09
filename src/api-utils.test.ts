@@ -250,7 +250,7 @@ describe("fetchWithRetry – 403 rate-limit handling", () => {
       return new Response("ok", { status: 200 });
     }) as typeof fetch;
 
-    const res = await fetchWithRetry("https://example.com", {}, 3, (ms) => {
+    const res = await fetchWithRetry("https://example.com", {}, 3, async (ms) => {
       callbackArgs.push(ms);
     });
     expect(res.status).toBe(200);

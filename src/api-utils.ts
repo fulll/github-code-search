@@ -37,6 +37,9 @@ export function formatRetryWait(ms: number): string {
  *   (see https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api)
  */
 function isRateLimitExceeded(res: Response): boolean {
+  // 429 Too Many Requests is always a rate-limit response.
+  if (res.status === 429) return true;
+  // 403 is a GitHub-specific rate-limit when accompanied by the right headers.
   if (res.status !== 403) return false;
   return (
     res.headers.get("x-ratelimit-remaining") === "0" || res.headers.get("Retry-After") !== null
@@ -145,9 +148,12 @@ export async function fetchWithRetry(
       // Cancel the response body before waiting/throwing to allow connection reuse
       await res.body?.cancel();
       if (!onRateLimit || longWaitAttempts >= maxRetries) {
-        throw new Error(
-          `GitHub API rate limit exceeded. Please retry in ${formatRetryWait(baseDelayMs)}.`,
-        );
+        // Produce an accurate message: 403/429 are rate-limit errors; 503 is a
+        // server backoff that should not be labelled "rate limit exceeded".
+        const messagePrefix = isRateLimitExceeded(res)
+          ? "GitHub API rate limit exceeded."
+          : "GitHub API requested a long backoff before retrying.";
+        throw new Error(`${messagePrefix} Please retry in ${formatRetryWait(baseDelayMs)}.`);
       }
       // Fix: await the callback — it owns the sleep so it can show a countdown
       // and honour an AbortSignal. Long waits do NOT count against maxRetries;
@@ -163,7 +169,7 @@ export async function fetchWithRetry(
     // Cancel the response body to allow the connection to be reused
     await res.body?.cancel();
     // Honour the caller's AbortSignal during the short wait
-    await abortableDelay(delayMs, options.signal as AbortSignal | undefined);
+    await abortableDelay(delayMs, options.signal ?? undefined);
     attempt++;
   }
 }
