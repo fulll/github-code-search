@@ -210,7 +210,7 @@ describe("fetchAllResults", () => {
     let searchPage = 0;
     globalThis.fetch = (async (url: string | URL | Request) => {
       const urlStr = url.toString();
-      if (urlStr.includes("raw.githubusercontent.com")) {
+      if (new URL(urlStr).hostname === "raw.githubusercontent.com") {
         return new Response("", { status: 404 });
       }
       searchPage++;
@@ -245,7 +245,7 @@ describe("fetchAllResults", () => {
     };
     globalThis.fetch = (async (url: string | URL | Request) => {
       const urlStr = url.toString();
-      if (urlStr.includes("raw.githubusercontent.com")) {
+      if (new URL(urlStr).hostname === "raw.githubusercontent.com") {
         return new Response(fileContent, { status: 200 });
       }
       return new Response(JSON.stringify({ items: [fakeItem], total_count: 1 }), {
@@ -273,7 +273,7 @@ describe("fetchAllResults", () => {
     };
     globalThis.fetch = (async (url: string | URL | Request) => {
       const urlStr = url.toString();
-      if (urlStr.includes("raw.githubusercontent.com")) {
+      if (new URL(urlStr).hostname === "raw.githubusercontent.com") {
         throw new Error("network error");
       }
       return new Response(JSON.stringify({ items: [fakeItem], total_count: 1 }), {
@@ -293,7 +293,7 @@ describe("fetchAllResults", () => {
     let searchCallCount = 0;
     globalThis.fetch = (async (url: string | URL | Request) => {
       const urlStr = url.toString();
-      if (urlStr.includes("raw.githubusercontent.com")) {
+      if (new URL(urlStr).hostname === "raw.githubusercontent.com") {
         return new Response("", { status: 404 });
       }
       searchCallCount++;
@@ -326,7 +326,7 @@ describe("fetchAllResults", () => {
     };
     globalThis.fetch = (async (url: string | URL | Request) => {
       const urlStr = url.toString();
-      if (urlStr.includes("raw.githubusercontent.com")) {
+      if (new URL(urlStr).hostname === "raw.githubusercontent.com") {
         return new Response("Not Found", { status: 404 });
       }
       return new Response(JSON.stringify({ items: [fakeItem], total_count: 1 }), {
