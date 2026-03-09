@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import {
   buildFetchProgress,
+  buildLineResolutionProgress,
   fetchAllResults,
   fetchRepoTeams,
   searchCode,
@@ -542,5 +543,52 @@ describe("buildFetchProgress", () => {
     const s = buildFetchProgress(0, 10);
     const stripped = s.replace(/\x1b\[[0-9;]*m/g, "");
     expect(stripped).not.toContain("▓");
+  });
+
+  it("does not throw when currentPage exceeds totalPages (out-of-range guard)", () => {
+    // paginatedFetch may request one extra empty page after the 1 000-result cap
+    expect(() => buildFetchProgress(11, 10)).not.toThrow();
+  });
+});
+
+// ─── buildLineResolutionProgress ─────────────────────────────────────────────────
+
+describe("buildLineResolutionProgress", () => {
+  it("starts with \\r to overwrite the current line", () => {
+    const s = buildLineResolutionProgress(5, 20);
+    expect(s.startsWith("\r")).toBe(true);
+  });
+
+  it("contains bright purple ANSI escape 38;5;129m", () => {
+    const s = buildLineResolutionProgress(5, 20);
+    expect(s).toContain("\x1b[38;5;129m");
+  });
+
+  it("contains done/total counter text", () => {
+    const s = buildLineResolutionProgress(12, 47);
+    const stripped = s.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).toContain("12/47");
+  });
+
+  it("full bar when done equals total — no empty block character", () => {
+    const s = buildLineResolutionProgress(20, 20);
+    const stripped = s.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).not.toContain("░");
+  });
+
+  it("empty bar at done=0 — no filled block character", () => {
+    const s = buildLineResolutionProgress(0, 20);
+    const stripped = s.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).not.toContain("▓");
+  });
+
+  it("contains 'Resolving line numbers' label", () => {
+    const s = buildLineResolutionProgress(3, 10);
+    const stripped = s.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).toContain("Resolving line numbers");
+  });
+
+  it("does not throw when done exceeds total (out-of-range guard)", () => {
+    expect(() => buildLineResolutionProgress(21, 20)).not.toThrow();
   });
 });

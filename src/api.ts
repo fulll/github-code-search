@@ -1,6 +1,6 @@
 import pc from "picocolors";
 import type { CodeMatch } from "./types.ts";
-import { fetchWithRetry, formatRetryWait, paginatedFetch } from "./api-utils.ts";
+import { concurrentMap, fetchWithRetry, formatRetryWait, paginatedFetch } from "./api-utils.ts";
 import { getCacheKey, readCache, writeCache } from "./cache.ts";
 
 // ─── Raw GitHub API types (internal) ─────────────────────────────────────────
@@ -149,6 +149,23 @@ export async function searchCode(
 const PROGRESS_BAR_WIDTH = 20;
 
 /**
+ * Build the coloured block portion of a progress bar.
+ * Pure function — no side effects.
+ * \x1b[38;5;129m — bright purple (filled blocks)
+ * \x1b[38;5;240m — dark grey (empty blocks)
+ *
+ * `filled` is clamped to [0, PROGRESS_BAR_WIDTH] so callers never produce a
+ * negative repeat count (which would throw a RangeError) — e.g. when
+ * paginatedFetch requests one extra empty page after the 1 000-result cap and
+ * currentPage > totalPages.
+ */
+function buildProgressBar(filled: number): string {
+  const clampedFilled = Math.min(Math.max(0, Math.round(filled)), PROGRESS_BAR_WIDTH);
+  const clampedEmpty = PROGRESS_BAR_WIDTH - clampedFilled;
+  return `\x1b[38;5;129m${"▓".repeat(clampedFilled)}\x1b[38;5;240m${"░".repeat(clampedEmpty)}\x1b[0m`;
+}
+
+/**
  * Build a single-line purple progress bar string suitable for writing to
  * stderr with a leading \r so it overwrites the current line.
  *
@@ -156,11 +173,18 @@ const PROGRESS_BAR_WIDTH = 20;
  */
 export function buildFetchProgress(currentPage: number, totalPages: number): string {
   const filled = totalPages > 0 ? Math.round((currentPage / totalPages) * PROGRESS_BAR_WIDTH) : 0;
-  const empty = PROGRESS_BAR_WIDTH - filled;
-  // \x1b[38;5;129m — bright purple (filled blocks)
-  // \x1b[38;5;240m — dark grey (empty blocks)
-  const bar = `\x1b[38;5;129m${"▓".repeat(filled)}\x1b[38;5;240m${"░".repeat(empty)}\x1b[0m`;
-  return `\r  Fetching results from GitHub… ${bar}  page ${currentPage}/${totalPages}`;
+  return `\r  Fetching results from GitHub… ${buildProgressBar(filled)}  page ${currentPage}/${totalPages}`;
+}
+
+/**
+ * Build a single-line progress bar string for the line-number resolution phase.
+ * Shows how many raw file fetches have completed out of the total.
+ *
+ * Pure function — no side effects; exported for unit testing.
+ */
+export function buildLineResolutionProgress(done: number, total: number): string {
+  const filled = total > 0 ? Math.round((done / total) * PROGRESS_BAR_WIDTH) : 0;
+  return `\r  Resolving line numbers… ${buildProgressBar(filled)}  ${done}/${total}`;
 }
 
 export async function fetchAllResults(
@@ -206,18 +230,35 @@ export async function fetchAllResults(
     ),
   ];
   const fileContentMap = new Map<string, string>();
-  await Promise.all(
-    urlsToFetch.map(async (htmlUrl) => {
-      try {
-        const res = await fetchWithRetry(toRawUrl(htmlUrl), {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) fileContentMap.set(htmlUrl, await res.text());
-      } catch {
-        // Fall back to fragment-relative line numbers
-      }
-    }),
-  );
+  if (urlsToFetch.length > 0) {
+    // Fix: limit concurrency to avoid saturating the connection pool on slow
+    // networks. A per-request 5 s timeout prevents indefinite stalls;
+    // failures fall back to fragment-relative line numbers silently. — see issue #99
+    process.stderr.write(buildLineResolutionProgress(0, urlsToFetch.length));
+    let resolved = 0;
+    await concurrentMap(
+      urlsToFetch,
+      async (htmlUrl) => {
+        try {
+          // Disable retries (maxRetries=0) so the 5 s AbortSignal.timeout acts
+          // as a hard cap — retry delays in fetchWithRetry are not abort-aware.
+          const res = await fetchWithRetry(
+            toRawUrl(htmlUrl),
+            { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(5_000) },
+            0,
+          );
+          if (res.ok) fileContentMap.set(htmlUrl, await res.text());
+        } catch {
+          // Fall back to fragment-relative line numbers (timeout or network error)
+        }
+        resolved++;
+        process.stderr.write(buildLineResolutionProgress(resolved, urlsToFetch.length));
+      },
+      { concurrency: 20 },
+    );
+    // Clear the resolution progress line before continuing (ANSI erase-entire-line).
+    process.stderr.write("\x1b[2K\r");
+  }
 
   return allItems.map((item) => {
     const fileContent = fileContentMap.get(item.html_url);

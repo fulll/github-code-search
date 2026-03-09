@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { fetchWithRetry, formatRetryWait, paginatedFetch } from "./api-utils.ts";
+import { concurrentMap, fetchWithRetry, formatRetryWait, paginatedFetch } from "./api-utils.ts";
 
 const originalFetch = globalThis.fetch;
 const originalSetTimeout = globalThis.setTimeout;
@@ -287,5 +287,88 @@ describe("paginatedFetch", () => {
         throw new Error("API error");
       }),
     ).rejects.toThrow("API error");
+  });
+});
+
+// ─── concurrentMap ─────────────────────────────────────────────────────────────
+
+describe("concurrentMap", () => {
+  it("returns results in input order", async () => {
+    const result = await concurrentMap([3, 1, 2], async (n) => n * 10);
+    expect(result).toEqual([30, 10, 20]);
+  });
+
+  it("passes the correct index to fn", async () => {
+    const indices: number[] = [];
+    await concurrentMap(["a", "b", "c"], async (_item, i) => {
+      indices.push(i);
+    });
+    expect(indices.toSorted()).toEqual([0, 1, 2]);
+  });
+
+  it("handles an empty array", async () => {
+    const result = await concurrentMap([], async (n: number) => n);
+    expect(result).toEqual([]);
+  });
+
+  it("respects the concurrency cap — at most N tasks run simultaneously", async () => {
+    let active = 0;
+    let maxActive = 0;
+    const concurrency = 3;
+    // Use the real setTimeout (not the immediate shim from beforeEach) so that
+    // the async yield is genuine and multiple workers can interleave.
+    await concurrentMap(
+      Array.from({ length: 10 }, (_, i) => i),
+      async () => {
+        active++;
+        maxActive = Math.max(maxActive, active);
+        await new Promise((r) => originalSetTimeout(r, 0));
+        active--;
+      },
+      { concurrency },
+    );
+    expect(maxActive).toBeLessThanOrEqual(concurrency);
+  });
+
+  it("re-throws the first error after all tasks settle", async () => {
+    await expect(
+      concurrentMap([1, 2, 3], async (n) => {
+        if (n === 2) throw new Error("boom");
+        return n;
+      }),
+    ).rejects.toThrow("boom");
+  });
+
+  it("processes all items even when one throws", async () => {
+    const processed: number[] = [];
+    await concurrentMap([1, 2, 3], async (n) => {
+      processed.push(n);
+      if (n === 1) throw new Error("fail");
+    }).catch(() => {});
+    expect(processed.toSorted()).toEqual([1, 2, 3]);
+  });
+
+  it("throws RangeError when concurrency is 0", async () => {
+    await expect(concurrentMap([1], async (n) => n, { concurrency: 0 })).rejects.toThrow(
+      RangeError,
+    );
+  });
+
+  it("throws RangeError when concurrency is negative", async () => {
+    await expect(concurrentMap([1], async (n) => n, { concurrency: -1 })).rejects.toThrow(
+      RangeError,
+    );
+  });
+
+  it("throws RangeError when concurrency is NaN", async () => {
+    await expect(concurrentMap([1], async (n) => n, { concurrency: Number.NaN })).rejects.toThrow(
+      RangeError,
+    );
+  });
+
+  it("throws RangeError when concurrency is a float (e.g. 1.5)", async () => {
+    await expect(concurrentMap([1], async (n) => n, { concurrency: 1.5 })).rejects.toThrow(
+      RangeError,
+    );
   });
 });

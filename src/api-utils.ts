@@ -113,6 +113,49 @@ export async function fetchWithRetry(
 }
 
 /**
+ * Runs `fn` over every item in `items` with at most `concurrency` tasks
+ * running in parallel at any one time (semaphore pattern, no extra deps).
+ *
+ * Results are returned in input order regardless of completion order.
+ * All items are processed even if some `fn` calls throw; the first error
+ * encountered is recorded and re-thrown only after all work has completed.
+ */
+export async function concurrentMap<T, R>(
+  items: T[],
+  fn: (item: T, index: number) => Promise<R>,
+  { concurrency = 20 }: { concurrency?: number } = {},
+): Promise<R[]> {
+  if (!Number.isInteger(concurrency) || concurrency < 1) {
+    throw new RangeError(
+      `concurrentMap: concurrency must be a positive integer, got ${concurrency}`,
+    );
+  }
+  const results: R[] = Array.from({ length: items.length }) as R[];
+  let nextIndex = 0;
+  let firstError: unknown;
+  let hasError = false;
+
+  async function worker(): Promise<void> {
+    while (true) {
+      const index = nextIndex++;
+      if (index >= items.length) return;
+      try {
+        results[index] = await fn(items[index], index);
+      } catch (err) {
+        if (!hasError) {
+          hasError = true;
+          firstError = err;
+        }
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
+  if (hasError) throw firstError;
+  return results;
+}
+
+/**
  * Fetches all pages from a paginated GitHub API endpoint.
  *
  * Calls `fetchPage(pageNumber)` starting at page 1 and stops when the
