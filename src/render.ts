@@ -226,8 +226,12 @@ function clipAnsi(str: string, maxVisible: number): string {
     }
     visCount++;
     if (visCount === maxVisible) {
-      // Cut after this visible char and reset SGR.
-      return str.slice(0, i + 1) + "\x1b[0m";
+      // Cut after this visible char. Use a targeted SGR reset that clears bold
+      // and foreground color (22;39) but deliberately leaves background color
+      // (49) untouched. A full \x1b[0m reset would clear any background set
+      // by the *caller* (e.g. renderActiveLine's dark-purple bg), causing the
+      // remainder of the active row to lose its highlight — see issue #105.
+      return str.slice(0, i + 1) + "\x1b[22;39m";
     }
     i++;
   }
@@ -499,7 +503,16 @@ export function renderGroups(
       // Fix: clip section label to termWidth so the label line never wraps.
       // "── " prefix is 3 visible chars + 1 trailing space = 4 chars total.
       const SECTION_FIXED = 4; // "── " (3) + trailing " " (1)
-      const maxLabelChars = Math.max(4, termWidth - SECTION_FIXED);
+      // Use Math.max(0, …) — not Math.max(4, …) — so that on very narrow
+      // terminals the label budget never exceeds the actual available width
+      // and forces a line wider than termWidth. When the budget is 0 or 1
+      // we skip rendering the section entirely to avoid wrapping.
+      const maxLabelChars = Math.max(0, termWidth - SECTION_FIXED);
+      if (maxLabelChars === 0) {
+        usedLines += sectionCost;
+        if (usedLines >= viewportHeight) break;
+        continue;
+      }
       const label =
         row.sectionLabel.length > maxLabelChars
           ? row.sectionLabel.slice(0, maxLabelChars - 1) + "…"
@@ -571,7 +584,11 @@ export function renderGroups(
       const prefixWidth = isCursor
         ? ACTIVE_BAR_WIDTH + INDENT.length + 1 + 1 // bar + "  " + checkbox + space = 5
         : INDENT.length * 2 + 1 + 1; // "  " + "  " + checkbox + space = 6
-      const maxPathVisible = Math.max(10, termWidth - prefixWidth - locSuffix.length);
+      // Use Math.max(1, …) so that on very narrow terminals the floor of 1
+      // never exceeds the available width (unlike Math.max(10, …) which can
+      // produce a maxPathVisible wider than termWidth - prefixWidth,
+      // reintroducing line wrapping — see review on #106).
+      const maxPathVisible = Math.max(1, termWidth - prefixWidth - locSuffix.length);
       const rawPath = isCursor
         ? `${highlightText(match.path, "path", (s) => pc.bold(pc.white(s)))}${styledLocSuffix}`
         : `${highlightText(match.path, "path", pc.cyan)}${styledLocSuffix}`;

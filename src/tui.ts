@@ -197,7 +197,17 @@ export async function runInteractive(
     // list, the rows visible from scrollOffset onwards can be fewer than
     // viewportHeight — leaving blank space above the footer even though rows
     // above scrollOffset could fill it. See issue #105.
-    scrollOffset = normalizeScrollOffset(scrollOffset, rows, groups, getViewportHeight(rows));
+    //
+    // Iterate to a fixed point: getViewportHeight depends on scrollOffset (via
+    // the sticky-header condition). Decreasing scrollOffset can change whether
+    // the sticky header is shown, which changes viewportHeight by 1, so a
+    // single pass can stop 1 row early. Loop until both values stabilise.
+    for (;;) {
+      const vh = getViewportHeight(rows);
+      const next = normalizeScrollOffset(scrollOffset, rows, groups, vh);
+      if (next === scrollOffset) break;
+      scrollOffset = next;
+    }
     const rendered = renderGroups(groups, cursor, rows, termHeight, scrollOffset, query, org, {
       filterPath,
       filterMode,
