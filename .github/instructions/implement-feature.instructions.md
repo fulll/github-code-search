@@ -77,10 +77,8 @@ bun run build.ts       # binary compiles without errors
 Once the PR is merged into `main`, publish a **minor** (new feature) or **major** (breaking change) release:
 
 ```bash
-bun pm version minor           # new feature:   1.2.4 → 1.3.0
-# or
-bun pm version major           # breaking change: 1.2.4 → 2.0.0
-
+sed -i '' 's/"version": ".*"/"version": "X.Y.Z"/' package.json  # bump directly — do NOT use bun pm version
+# X.Y.Z: new feature → 1.2.4 → 1.3.0  |  breaking change → 1.2.4 → 2.0.0
 git checkout -b release/$(jq -r .version package.json)
 git add package.json
 git commit -S -m "v$(jq -r .version package.json)"
@@ -90,7 +88,7 @@ git push origin release/$(jq -r .version package.json) --tags
 
 The tag push triggers `cd.yaml` which builds all-platform binaries and creates the GitHub Release automatically.
 
-For **minor and major releases**, also write the blog post **before pushing the tag**:
+For **minor and major releases**, a blog post is **required** — **ask the user interactively** for the highlights and description before writing `docs/blog/release-v<X-Y-Z>.md`. Do not draft it from code alone.
 
 - Create `docs/blog/release-v<X-Y-Z>.md` with feature highlights
 - Add a row in `docs/blog/index.md`
