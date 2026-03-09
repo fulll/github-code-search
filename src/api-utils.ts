@@ -91,11 +91,20 @@ function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
       clearTimeout(id);
       reject(signal!.reason ?? new DOMException("Aborted", "AbortError"));
     };
+    // Attach the listener BEFORE starting the timer so an abort that fires
+    // between the initial check and addEventListener is not missed.
+    signal?.addEventListener("abort", onAbort, { once: true });
+    // Re-check after attaching to close the race window: if the signal was
+    // aborted in between, clean up and reject synchronously.
+    if (signal?.aborted) {
+      signal.removeEventListener("abort", onAbort);
+      reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+      return;
+    }
     const id = setTimeout(() => {
       signal?.removeEventListener("abort", onAbort);
       resolve();
     }, ms);
-    signal?.addEventListener("abort", onAbort, { once: true });
   });
 }
 

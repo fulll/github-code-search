@@ -225,16 +225,23 @@ async function searchAction(
   const isCI = process.env.CI === "true" || opts.interactive === false;
 
   // Shared promise for concurrent rate-limit hits (e.g. from Promise.all in
-  // fetchRepoTeams). If a countdown is already running, new callers attach to
-  // the same promise so only one countdown displays at a time.
+  // fetchRepoTeams). If a countdown is already running and covers the required
+  // wait, new callers piggyback on it. If a new caller needs a *longer* wait
+  // (different reset timestamps), a fresh countdown replaces the old one so
+  // no caller retries before its required deadline.
   let activeCooldown: Promise<void> | null = null;
+  let cooldownUntil = 0;
 
   /** Shared rate-limit handler used for both the code search and the team fetch. */
   const onRateLimit = (waitMs: number): Promise<void> => {
-    if (activeCooldown !== null) {
-      // Piggyback on the in-flight countdown — no need for a second one.
+    const desiredEnd = Date.now() + waitMs;
+    if (activeCooldown !== null && cooldownUntil >= desiredEnd) {
+      // Existing countdown covers the required wait — piggyback on it.
       return activeCooldown;
     }
+    // No countdown running, or the new wait extends beyond the current one.
+    // Start a fresh countdown for the longer duration.
+    cooldownUntil = desiredEnd;
     activeCooldown = (async () => {
       const totalSeconds = Math.ceil(waitMs / 1_000);
       // Start on a fresh line so the countdown doesn't overwrite the progress bar
@@ -249,6 +256,7 @@ async function searchAction(
       process.stderr.write(`\r  ${pc.dim("Rate limited")} — resuming\u2026${" ".repeat(40)}`);
     })().finally(() => {
       activeCooldown = null;
+      cooldownUntil = 0;
     });
     return activeCooldown;
   };
