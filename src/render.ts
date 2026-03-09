@@ -203,8 +203,15 @@ function stripAnsi(str: string): string {
 /**
  * Clip a string (which may contain ANSI escape sequences) to at most
  * `maxVisible` visible characters. Correctly skips over escape sequences
- * when counting, and appends a SGR reset (`\x1b[0m`) at the cut point so
- * the terminal is left in a clean state.
+ * when counting, and iterates by Unicode code point (not UTF-16 code unit)
+ * so clipping never splits a surrogate pair (e.g. emoji like 🔍).
+ *
+ * At the cut point a partial SGR reset (`\x1b[22;39m`) is appended to
+ * clear bold and foreground colour while deliberately **leaving background
+ * colour intact** (no `\x1b[49m`). A full `\x1b[0m` reset would undo any
+ * background applied by the caller (e.g. renderActiveLine's dark-purple
+ * highlight), causing the remainder of the active row to lose its colour
+ * on narrow terminals — see issue #105.
  *
  * If the string already fits within `maxVisible` visible chars it is
  * returned unchanged.
@@ -224,16 +231,17 @@ function clipAnsi(str: string, maxVisible: number): string {
       i = j + 1; // skip the terminating letter too
       continue;
     }
+    // Advance by code-point width (2 UTF-16 units for non-BMP chars like emoji)
+    // so we never split a surrogate pair at a cut boundary.
+    const cp = str.codePointAt(i)!;
+    const cpLen = cp > 0xffff ? 2 : 1;
     visCount++;
     if (visCount === maxVisible) {
-      // Cut after this visible char. Use a targeted SGR reset that clears bold
-      // and foreground color (22;39) but deliberately leaves background color
-      // (49) untouched. A full \x1b[0m reset would clear any background set
-      // by the *caller* (e.g. renderActiveLine's dark-purple bg), causing the
-      // remainder of the active row to lose its highlight — see issue #105.
-      return str.slice(0, i + 1) + "\x1b[22;39m";
+      // Cut after this visible char. Use a partial SGR reset (bold + fg only)
+      // so that the caller's background colour is preserved.
+      return str.slice(0, i + cpLen) + "\x1b[22;39m";
     }
-    i++;
+    i += cpLen;
   }
   return str;
 }
@@ -509,6 +517,11 @@ export function renderGroups(
       // we skip rendering the section entirely to avoid wrapping.
       const maxLabelChars = Math.max(0, termWidth - SECTION_FIXED);
       if (maxLabelChars === 0) {
+        // Terminal too narrow to render even a minimal label. Push blank
+        // placeholder lines so that lines[] stays in sync with usedLines
+        // and the footer-padding arithmetic remains correct — see review #106.
+        if (usedLines > 0) lines.push(""); // blank separator when not first
+        lines.push(""); // empty label placeholder
         usedLines += sectionCost;
         if (usedLines >= viewportHeight) break;
         continue;
@@ -554,9 +567,11 @@ export function renderGroups(
       const leftPartRaw = `${arrow} ${checkbox} ${repoName}`;
       const countLen = stripAnsi(count).length;
       const barAdjust = isCursor ? ACTIVE_BAR_WIDTH : 0;
-      // Fix: ensure leftPart + count fits within termWidth — clip repoName if needed.
-      // The maximum visible width available for leftPart: termWidth - countLen - barAdjust.
-      const maxLeftVisible = Math.max(4, termWidth - countLen - barAdjust);
+      // Use Math.max(1, …) so that on very narrow terminals the floor of 1
+      // never exceeds the available width (unlike Math.max(4, …) which can
+      // produce a maxLeftVisible wider than the actual space and reintroduce
+      // wrapping — see review on #106).
+      const maxLeftVisible = Math.max(1, termWidth - countLen - barAdjust);
       const leftPart =
         stripAnsi(leftPartRaw).length > maxLeftVisible
           ? clipAnsi(leftPartRaw, maxLeftVisible)
