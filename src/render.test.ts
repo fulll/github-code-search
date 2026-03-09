@@ -11,6 +11,7 @@ import {
   buildSummaryFull,
   highlightFragment,
   isCursorVisible,
+  normalizeScrollOffset,
   renderGroups,
   renderHelpOverlay,
   rowTerminalLines,
@@ -1057,7 +1058,9 @@ describe("renderGroups filter opts", () => {
   it("status bar hint line includes all navigation hint shortcuts", () => {
     const groups = [makeGroup("org/repo", ["a.ts"])];
     const rows = buildRows(groups);
-    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", {});
+    // Use a wide terminal so hints are not clipped — this test validates content,
+    // not the clipping behaviour (which is covered by the "hints clipping" test).
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", { termWidth: 200 });
     const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
     expect(stripped).toContain("Z fold-all");
     expect(stripped).toContain("o open");
@@ -1542,5 +1545,439 @@ describe("renderGroups — position indicator", () => {
     const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", { termWidth: 80 });
     const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
     expect(stripped).toContain("↕ row 1 of 15");
+  });
+
+  it("rendered output never exceeds termHeight lines when termWidth is narrow (hints clipping)", () => {
+    // Regression guard for issue #105 (root cause: hints line wraps on narrow terminals).
+    // The hints text is ~158 visible chars. On an 80-col terminal it wraps to 2 rows, making
+    // the rendered output termHeight+1 lines long → terminal scrolls → title disappears from top.
+    // Fix: hints are clipped to termWidth so the line always occupies exactly 1 terminal row.
+    const termWidth = 80; // narrower than the full hints text (~158 chars)
+    const groups = [makeGroup("org/repoA", ["a.ts", "b.ts", "c.ts"], false)];
+    const rows = buildRows(groups);
+    const out = renderGroups(groups, 0, rows, 20, 0, "q", "org", { termWidth });
+    // The hints line must not exceed termWidth visible chars — if it does it wraps
+    // and the terminal displays one extra line, pushing the title off the top.
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    const hintsLine = stripped.split("\n").find((l) => l.startsWith("← / →"));
+    expect(hintsLine).toBeDefined();
+    expect(hintsLine!.length).toBeLessThanOrEqual(termWidth);
+    // Title must still appear as the very first content
+    expect(stripped.startsWith(" github-code-search ")).toBe(true);
+  });
+
+  it("section label never wraps — long label is clipped to termWidth (regression #105)", () => {
+    // When a team/section name is longer than termWidth, the rendered "── label " line
+    // would wrap to 2+ physical lines. usedLines += 2 only accounts for 1 physical label
+    // line → the viewport overflows by 1 → title scrolls off. Fix: clip label to termWidth-4.
+    const termWidth = 60;
+    const longLabel = "squad-architecture-and-platform-with-extra-words-that-exceed-width";
+    const groups = [
+      {
+        ...makeGroup("org/repoA", ["a.ts"], true),
+        sectionLabel: longLabel,
+      },
+    ];
+    const rows = buildRows(groups);
+    const out = renderGroups(groups, 0, rows, 20, 0, "q", "org", { termWidth });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    // Find the section line (contains "──")
+    const sectionLine = stripped.split("\n").find((l) => l.startsWith("── "));
+    expect(sectionLine).toBeDefined();
+    // "── " (3) + label + " " (1) must fit in termWidth
+    expect(sectionLine!.length).toBeLessThanOrEqual(termWidth);
+    // Title must still appear at the top
+    expect(stripped.startsWith(" github-code-search ")).toBe(true);
+  });
+
+  it("fragment lines never wrap — clipped to termWidth minus indent (regression #105)", () => {
+    // Fragment lines truncated to MAX_LINE_CHARS=120 + 6 chars indent = 126 visible chars.
+    // On a terminal < 127 cols they wrap, causing the render budget to undercount physical
+    // lines, which makes the output exceed termHeight and the title scrolls off.
+    // Fix: fragmentMaxChars = termWidth - 6 so rendered lines are always ≤ termWidth chars.
+    const termWidth = 80;
+    const longFragment = "x".repeat(200); // single very long code line (no newlines)
+    const groups: import("./types.ts").RepoGroup[] = [
+      {
+        repoFullName: "org/repo",
+        matches: [
+          {
+            path: "src/file.ts",
+            repoFullName: "org/repo",
+            htmlUrl: "https://github.com/org/repo/blob/main/src/file.ts",
+            archived: false,
+            textMatches: [{ fragment: longFragment, matches: [] }],
+          },
+        ],
+        folded: false,
+        repoSelected: true,
+        extractSelected: [true],
+      },
+    ];
+    const rows = buildRows(groups);
+    const out = renderGroups(groups, 0, rows, 20, 0, "q", "org", { termWidth });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    // Find the fragment line (indented with 6 spaces before code)
+    const fragLine = stripped.split("\n").find((l) => l.startsWith("      ") && l.includes("x"));
+    expect(fragLine).toBeDefined();
+    // Visible width must not exceed termWidth (clip ensures no wrap)
+    expect(fragLine!.length).toBeLessThanOrEqual(termWidth);
+  });
+
+  it("title line never wraps — long query+org clipped to termWidth (regression #105)", () => {
+    // " github-code-search " prefix is 22 visible chars.
+    // A very long query or org can push the title past termWidth → wraps → title gone.
+    const termWidth = 40;
+    const groups = [makeGroup("org/repoA", ["a.ts"], true)];
+    const rows = buildRows(groups);
+    const out = renderGroups(
+      groups,
+      0,
+      rows,
+      20,
+      0,
+      "this-is-a-very-long-query-string-that-exceeds-width",
+      "my-very-long-org-name",
+      { termWidth },
+    );
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    const titleLine = stripped.split("\n")[0];
+    expect(titleLine.length).toBeLessThanOrEqual(termWidth);
+    expect(stripped.startsWith(" github-code-search ")).toBe(true);
+  });
+
+  it("summary line never wraps — clipped to termWidth (regression #105)", () => {
+    // buildSummaryFull can produce long strings when selected counts are shown.
+    const termWidth = 40;
+    // Create many repos/files/matches with partial selection to force the long form.
+    const groups = Array.from({ length: 50 }, (_, i) =>
+      makeGroup(
+        `org/repo${i}`,
+        Array.from({ length: 20 }, (__, j) => `file${j}.ts`),
+      ),
+    );
+    // Deselect one to force the "(X selected)" annotation
+    groups[0].repoSelected = false;
+    groups[0].extractSelected[0] = false;
+    const rows = buildRows(groups);
+    const out = renderGroups(groups, 0, rows, 20, 0, "q", "org", { termWidth });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    const lines = stripped.split("\n");
+    // Summary is the second line (index 1)
+    expect(lines[1].length).toBeLessThanOrEqual(termWidth);
+  });
+
+  it("repo line never wraps — long repoFullName clipped to termWidth (regression #105)", () => {
+    // A very long repo name with right-aligned match count should never exceed termWidth.
+    const termWidth = 40;
+    const groups = [
+      makeGroup("org/a-very-long-repository-name-that-exceeds-terminal-width", ["a.ts"], true),
+    ];
+    const rows = buildRows(groups);
+    const out = renderGroups(groups, 0, rows, 20, 0, "q", "org", { termWidth });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    // Find the repo line — may start with ▌ (active bar) + ▾/▸, or directly ▾/▸ when inactive
+    const repoLine = stripped.split("\n").find((l) => l.includes("▾") || l.includes("▸"));
+    expect(repoLine).toBeDefined();
+    expect(repoLine!.length).toBeLessThanOrEqual(termWidth);
+  });
+
+  it("extract path line never wraps — long file path clipped to termWidth (regression #105)", () => {
+    // A very long file path in an extract row should be clipped.
+    const termWidth = 40;
+    const groups: import("./types.ts").RepoGroup[] = [
+      {
+        repoFullName: "org/repo",
+        matches: [
+          {
+            path: "src/this/is/a/very/deeply/nested/path/that/exceeds/terminal/width.ts",
+            repoFullName: "org/repo",
+            htmlUrl: "https://github.com/org/repo/blob/main/deeply/nested.ts",
+            archived: false,
+            textMatches: [
+              { fragment: "code", matches: [{ text: "code", indices: [0, 4], line: 42, col: 1 }] },
+            ],
+          },
+        ],
+        folded: false,
+        repoSelected: true,
+        extractSelected: [true],
+      },
+    ];
+    const rows = buildRows(groups);
+    const out = renderGroups(groups, 0, rows, 20, 0, "q", "org", { termWidth });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    // Extract path line: inactive form = "    ✓ " (6 visible chars) + path
+    const extractLine = stripped.split("\n").find((l) => l.match(/^    [✓ ]/));
+    expect(extractLine).toBeDefined();
+    expect(extractLine!.length).toBeLessThanOrEqual(termWidth);
+  });
+
+  it("extract path line (cursor=active) never wraps — correct active prefix width (regression #106)", () => {
+    // Active prefix: ACTIVE_BAR_WIDTH (1) + "  " (2) + checkbox (1) + space (1) = 5 visible chars.
+    // Previous code subtracted PATH_INDENT twice for inactive rows which over-clipped.
+    // This test verifies the active (cursor=1) form uses the correct prefix width.
+    const termWidth = 40;
+    const groups: import("./types.ts").RepoGroup[] = [
+      {
+        repoFullName: "org/repo",
+        matches: [
+          {
+            path: "src/this/is/a/very/deeply/nested/path/that/exceeds/terminal/width.ts",
+            repoFullName: "org/repo",
+            htmlUrl: "https://github.com/org/repo/blob/main/deeply/nested.ts",
+            archived: false,
+            textMatches: [
+              { fragment: "code", matches: [{ text: "code", indices: [0, 4], line: 42, col: 1 }] },
+            ],
+          },
+        ],
+        folded: false,
+        repoSelected: true,
+        extractSelected: [true],
+      },
+    ];
+    const rows = buildRows(groups);
+    // cursor=1 → extract row is the cursor (active) form
+    const out = renderGroups(groups, 1, rows, 20, 0, "q", "org", { termWidth });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    // Active extract line starts with "▌  ✓ " (bar + 2-space indent + checkbox + space)
+    const extractLine = stripped.split("\n").find((l) => l.match(/^▌\s+[✓ ]/));
+    expect(extractLine).toBeDefined();
+    expect(extractLine!.length).toBeLessThanOrEqual(termWidth);
+  });
+
+  it("fragment lines never wrap on very narrow terminal — Math.max(1,…) not Math.max(20,…) (regression #106)", () => {
+    // fragmentMaxChars = Math.max(1, termWidth - FRAGMENT_INDENT - 1).
+    // With the old Math.max(20, …) floor, on a very narrow terminal (termWidth ≤ 26)
+    // fragmentMaxChars could be clamped to 20. Combined with FRAGMENT_INDENT=6, the rendered
+    // fragment line (6+20 = 26 chars) would exceed termWidth and wrap.
+    // Fix: use Math.max(1, …) so the fragment never exceeds termWidth.
+    const termWidth = 15; // narrower than FRAGMENT_INDENT(6) + old floor(20) = 26
+    const longFragment = "x".repeat(200);
+    const groups: import("./types.ts").RepoGroup[] = [
+      {
+        repoFullName: "org/repo",
+        matches: [
+          {
+            path: "f.ts",
+            repoFullName: "org/repo",
+            htmlUrl: "https://github.com/org/repo/blob/main/f.ts",
+            archived: false,
+            textMatches: [{ fragment: longFragment, matches: [] }],
+          },
+        ],
+        folded: false,
+        repoSelected: true,
+        extractSelected: [true],
+      },
+    ];
+    const rows = buildRows(groups);
+    const out = renderGroups(groups, 0, rows, 20, 0, "q", "org", { termWidth });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    const fragLine = stripped.split("\n").find((l) => l.startsWith("      ") && l.includes("x"));
+    expect(fragLine).toBeDefined();
+    expect(fragLine!.length).toBeLessThanOrEqual(termWidth);
+  });
+
+  it("sticky repo line never wraps — long repoFullName clipped to termWidth (regression #105)", () => {
+    // When a repo header has scrolled past the viewport, the sticky line must still fit.
+    const termWidth = 40;
+    const longRepoName = "org/a-very-long-repository-name-that-exceeds-terminal-width";
+    const groups: import("./types.ts").RepoGroup[] = [
+      {
+        repoFullName: longRepoName,
+        matches: [
+          {
+            path: "a.ts",
+            repoFullName: longRepoName,
+            htmlUrl: "https://github.com/org/repo/blob/main/a.ts",
+            archived: false,
+            textMatches: [{ fragment: "x", matches: [] }],
+          },
+          {
+            path: "b.ts",
+            repoFullName: longRepoName,
+            htmlUrl: "https://github.com/org/repo/blob/main/b.ts",
+            archived: false,
+            textMatches: [{ fragment: "x", matches: [] }],
+          },
+        ],
+        folded: false,
+        repoSelected: true,
+        extractSelected: [true, true],
+      },
+    ];
+    const rows = buildRows(groups);
+    // cursor points to second extract (index 2), scrollOffset=1 (repo row scrolled off)
+    const out = renderGroups(groups, 2, rows, 20, 1, "q", "org", { termWidth });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    // Sticky line starts with "▲"
+    const stickyLine = stripped.split("\n").find((l) => l.startsWith("▲"));
+    expect(stickyLine).toBeDefined();
+    expect(stickyLine!.length).toBeLessThanOrEqual(termWidth);
+  });
+
+  it("section after folded-repo cursor never overflows viewport (regression #105)", () => {
+    // Root cause: for `section` rows, the render loop was pushing the line to output
+    // BEFORE checking whether the 2-line section budget fit in the remaining viewport.
+    // Contrast with repo/extract rows which check first.
+    // Symptom: cursor on a folded repo (1 line), next row is a section (2 lines).
+    // If only 1 line remained in the viewport, the section was still rendered → output
+    // exceeded termHeight by 1 → title scrolled off the top.
+    // This is exactly the "folded: title gone, unfolded: title back" behaviour reported.
+    //
+    // Setup: termHeight=14 → viewportHeight=8.
+    // 6 folded repo rows fill usedLines=6 before cursor.
+    // Cursor on folded repo: usedLines=6+1=7, 7 < 8 → loop continues.
+    // Section row next: usedLines+2=9 > 8 → must break WITHOUT rendering (with fix).
+    // Without the guard: section is pushed to lines[] first, usedLines=9, then break
+    // → output has 9 viewport lines instead of max 8 → total 15 > termHeight=14 → title scrolls off.
+    const termHeight = 14; // viewportHeight = termHeight - 6 = 8
+    // 6 folded repos to fill usedLines=6 before the cursor repo
+    const prefixGroups = Array.from({ length: 6 }, (_, i) =>
+      makeGroup(`org/repo${i}`, ["f.ts"], true),
+    );
+    // cursor repo: folded (1 line). The NEXT group has a sectionLabel so buildRows emits
+    // a section row before it.
+    const cursorGroup = makeGroup("org/cursor-repo", ["f.ts"], true);
+    const nextGroup = {
+      ...makeGroup("org/next-repo", ["f.ts"], true),
+      sectionLabel: "squad-portal",
+    };
+    const allGroups = [...prefixGroups, cursorGroup, nextGroup];
+    const rows = buildRows(allGroups);
+    // cursor=6 (the 7th row, 0-indexed: rows 0..5 are the 6 prefix repos, row 6 = cursorRepo)
+    const cursorIndex = 6;
+    const out = renderGroups(allGroups, cursorIndex, rows, termHeight, 0, "q", "org", {
+      termWidth: 80,
+    });
+    const outputLines = out.split("\n");
+    // The rendered output must never exceed termHeight physical lines.
+    expect(outputLines.length).toBeLessThanOrEqual(termHeight);
+    // Title must still be the first line.
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped.startsWith(" github-code-search ")).toBe(true);
+    // Footer must be anchored to the last line.
+    const strippedLines = stripped.split("\n");
+    expect(strippedLines[strippedLines.length - 1].trim()).toMatch(/^↕ row \d+ of \d+$/);
+  });
+
+  it("section as first viewport row costs 1 line — footer does not disappear (regression #105)", () => {
+    // Root cause: section rows embedded a leading \\n in their string.
+    // When the section is the FIRST row rendered in the viewport (usedLines===0),
+    // the hints header already ends with \\n, and lines.join("\\n") adds a second \\n
+    // before the section's own \\n prefix → 2 blank lines (3 physical lines for a
+    // "2-line" element) → 1 extra line over budget → footer "↕ row X of Y" pushed
+    // below the bottom of the terminal and lost.
+    //
+    // Fix: blank separator emitted only when usedLines > 0 (not embedded in the string).
+    // sectionCost = usedLines === 0 ? 1 : 2.
+    //
+    // Setup: termHeight=8 → viewportHeight=2.
+    // scrollOffset=1 → rows[1] is a section row → first viewport row is a section.
+    // Old code: section cost = 2 → fills viewport; repo behind section is skipped.
+    //   But worse: embed \\n → actual physical lines = 3 → total output = 9 > 8 → title gone.
+    // New code: section cost = 1 → 1 line remaining → next repo row fits → footer stays.
+    // In both cases the total output lines must not exceed termHeight.
+    const termHeight = 8; // viewportHeight = 8 - 6 = 2
+    const group0 = makeGroup("org/repo0", ["a.ts"], true);
+    const group1 = {
+      ...makeGroup("org/repo1", ["b.ts"], true),
+      sectionLabel: "squad-portal",
+    };
+    const groups = [group0, group1];
+    const rows = buildRows(groups);
+    // rows[0]=repo0, rows[1]=section for squad-portal, rows[2]=repo1
+    // scrollOffset=1 → section is first in viewport
+    const cursorIndex = 2; // cursor on repo1
+    const out = renderGroups(groups, cursorIndex, rows, termHeight, 1, "q", "org", {
+      termWidth: 80,
+    });
+    const outputLines = out.split("\n");
+    // The rendered output must never exceed termHeight physical lines.
+    expect(outputLines.length).toBeLessThanOrEqual(termHeight);
+    // Title must still be the first line.
+    const strippedOut = out.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(strippedOut.startsWith(" github-code-search ")).toBe(true);
+    // Footer position indicator (↕) must appear on the very last line so that
+    // it is anchored to the bottom of the terminal (padding test).
+    const strippedLines = strippedOut.split("\n");
+    expect(strippedLines[strippedLines.length - 1].trim()).toMatch(/^↕ row \d+ of \d+$/);
+  });
+
+  it("footer is fixed at the last line even when viewport content is sparse (regression #105)", () => {
+    // Root cause: the footer was appended immediately after the last rendered item.
+    // When the viewport was not full (few results, everything folded, or cursor near
+    // the end), the footer floated up instead of staying at the bottom.
+    // Fix: push (viewportHeight - usedLines) blank lines before the footer so that
+    // the total rendered line count is always exactly termHeight.
+    //
+    // Setup: 2 folded repos → 2 viewport lines used.
+    // termHeight=10 → viewportHeight=4 → 2 unused lines above footer.
+    // With fix: output = 10 lines, footer on line 10.
+    // Without fix: output = 8 lines, footer on line 8 (floats 2 lines above bottom).
+    const termHeight = 10;
+    const groups = [makeGroup("org/repo0", ["a.ts"], true), makeGroup("org/repo1", ["b.ts"], true)];
+    const rows = buildRows(groups);
+    const out = renderGroups(groups, 0, rows, termHeight, 0, "q", "org", { termWidth: 80 });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    const lines = stripped.split("\n");
+    // Output must be exactly termHeight lines (not fewer due to missing padding).
+    expect(lines).toHaveLength(termHeight);
+    // Footer must be the last line.
+    expect(lines[lines.length - 1].trim()).toMatch(/^↕ row \d+ of \d+$/);
+    // Second-to-last must be blank (the \n separator before the indicator).
+    expect(lines[lines.length - 2].trim()).toBe("");
+  });
+});
+
+// ─── normalizeScrollOffset ────────────────────────────────────────────────────
+
+describe("normalizeScrollOffset", () => {
+  it("returns 0 when scrollOffset is already 0", () => {
+    const groups = [makeGroup("org/repo0", ["a.ts"], true)];
+    const rows = buildRows(groups);
+    expect(normalizeScrollOffset(0, rows, groups, 10)).toBe(0);
+  });
+
+  it("does not decrease scrollOffset when viewport is already full", () => {
+    // 5 folded repos, scrollOffset=2, viewportHeight=3 → rows 2..4 fill exactly 3 lines.
+    // Prepending row 1 would need 4 lines → scrollOffset stays at 2.
+    const groups = Array.from({ length: 5 }, (_, i) => makeGroup(`org/repo${i}`, ["f.ts"], true));
+    const rows = buildRows(groups);
+    expect(normalizeScrollOffset(2, rows, groups, 3)).toBe(2);
+  });
+
+  it("decreases scrollOffset to fill empty space at the bottom", () => {
+    // 5 folded repos. scrollOffset=4 → only row 4 (1 line) visible in a viewport of 3.
+    // Prepending row 3: 2 lines ≤ 3 → scrollOffset decreases to 3.
+    // Prepending row 2: 3 lines ≤ 3 → scrollOffset decreases to 2.
+    // Prepending row 1: 4 lines > 3 → stop.
+    const groups = Array.from({ length: 5 }, (_, i) => makeGroup(`org/repo${i}`, ["f.ts"], true));
+    const rows = buildRows(groups);
+    expect(normalizeScrollOffset(4, rows, groups, 3)).toBe(2);
+  });
+
+  it("normalizes all the way to 0 when all rows fit", () => {
+    // 2 folded repos (2 lines total) in a viewport of 5 → scrollOffset pulled back to 0.
+    const groups = [makeGroup("org/repo0", ["a.ts"], true), makeGroup("org/repo1", ["b.ts"], true)];
+    const rows = buildRows(groups);
+    expect(normalizeScrollOffset(2, rows, groups, 5)).toBe(0);
+  });
+
+  it("accounts for section cost when section is first in candidate viewport", () => {
+    // rows: [repo0(1), section(1 as first), repo1(1)] → total 3 lines when starting at 0.
+    // viewportHeight=3, scrollOffset=1 (section is first) → cost=1 for section → total=2 ≤ 3.
+    // But adding row 0 (repo0): it is no longer first, section becomes 2nd → section costs 2 → total=4 > 3.
+    // Wait: from index 0: repo0=1, then section (used=1, not 0) = 2 lines, repo1=1 → total=4 > 3.
+    // So scrollOffset should stay at 1.
+    const groups = [
+      makeGroup("org/repo0", ["a.ts"], true),
+      { ...makeGroup("org/repo1", ["b.ts"], true), sectionLabel: "squad-portal" },
+    ];
+    const rows = buildRows(groups);
+    // rows: [repo0, section:squad-portal, repo1]
+    expect(normalizeScrollOffset(1, rows, groups, 3)).toBe(1);
   });
 });

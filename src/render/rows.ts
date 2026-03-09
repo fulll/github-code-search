@@ -94,6 +94,51 @@ export function buildRows(
   return rows;
 }
 
+/**
+ * Normalises scrollOffset downward so the viewport is always packed from the
+ * bottom. After a fold, a filter change, or navigating near the end of the
+ * list, the rows visible from scrollOffset to rows.length-1 can occupy fewer
+ * than viewportHeight lines — leaving blank padding above the footer even
+ * though rows above scrollOffset could fill it.
+ *
+ * The function decreases scrollOffset as long as prepending the next row above
+ * still fits within viewportHeight, using the same section-cost rules as
+ * renderGroups (section first-in-viewport costs 1 line, otherwise 2).
+ *
+ * It is a pure function: no mutation, no I/O — see issue #105.
+ */
+export function normalizeScrollOffset(
+  scrollOffset: number,
+  rows: Row[],
+  groups: RepoGroup[],
+  viewportHeight: number,
+): number {
+  while (scrollOffset > 0) {
+    // Count lines that rows[scrollOffset-1 .. end] would occupy.
+    let used = 0;
+    for (let i = scrollOffset - 1; i < rows.length; i++) {
+      const row = rows[i];
+      let h: number;
+      if (row.type === "section") {
+        // Mirror renderGroups section cost: 1 when first in viewport, 2 otherwise.
+        h = used === 0 ? 1 : 2;
+      } else {
+        const group = row.repoIndex >= 0 ? groups[row.repoIndex] : undefined;
+        h = rowTerminalLines(group, row);
+      }
+      used += h;
+      if (used > viewportHeight) break;
+    }
+    if (used <= viewportHeight) {
+      // One more row above still fits — pull back to fill the empty space.
+      scrollOffset--;
+    } else {
+      break;
+    }
+  }
+  return scrollOffset;
+}
+
 /** Returns true if the cursor row is currently within the visible viewport.
  *
  * Mirrors the renderGroups break condition exactly:
@@ -112,8 +157,19 @@ export function isCursorVisible(
   for (let i = scrollOffset; i < rows.length; i++) {
     if (usedLines >= viewportHeight) return false;
     const row = rows[i];
-    const group = row.repoIndex >= 0 ? groups[row.repoIndex] : undefined;
-    const h = rowTerminalLines(group, row);
+    let h: number;
+    if (row.type === "section") {
+      // Mirror renderGroups: a section costs 1 line when first in the viewport
+      // (label only — no blank separator), 2 lines otherwise (blank + label).
+      // Using the fixed rowTerminalLines value of 2 here was off by 1 for the
+      // first-in-viewport case, causing isCursorVisible to report the cursor
+      // as hidden 1 step too early and triggering an unnecessary scrollOffset
+      // advance — see issue #105.
+      h = usedLines === 0 ? 1 : 2;
+    } else {
+      const group = row.repoIndex >= 0 ? groups[row.repoIndex] : undefined;
+      h = rowTerminalLines(group, row);
+    }
     if (i === cursor) {
       // The row is visible only if it actually fits in the remaining space
       // (same rule as renderGroups: first row always shows, others need room).
