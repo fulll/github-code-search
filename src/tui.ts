@@ -11,7 +11,7 @@ import {
   type FilterStats,
 } from "./render.ts";
 import { buildOutput } from "./output.ts";
-import type { FilterTarget, OutputFormat, OutputType, RepoGroup } from "./types.ts";
+import type { FilterTarget, OutputFormat, OutputType, RepoGroup, Row } from "./types.ts";
 
 // ─── Key binding constants ────────────────────────────────────────────────────
 
@@ -123,16 +123,29 @@ export async function runInteractive(
   // HEADER_LINES (4) + position indicator (2) = 6 fixed lines consumed by renderGroups.
   // filterBarLines (0–2) and the sticky repo line (0–1) are added dynamically below.
   // Use getViewportHeight() for scroll decisions so they match what renderGroups actually renders.
-  const getViewportHeight = () => {
+  const getViewportHeight = (rows: Row[]) => {
     let barLines = 0;
     if (filterMode) barLines = 2;
     else if (filterPath || filterTarget !== "path" || filterRegex) barLines = 1;
-    // When scrolled past the top and the cursor is within the visible window,
-    // renderGroups may show a sticky repo header that consumes one extra line.
-    // Mirror the condition precisely: sticky only appears when the cursor row is
-    // an extract whose repo row has scrolled above the viewport (repoRowIndex <
-    // scrollOffset). `cursor >= scrollOffset` is the necessary pre-condition.
-    const stickyHeaderLines = scrollOffset > 0 && cursor >= scrollOffset ? 1 : 0;
+    // Fix: mirror renderGroups exactly — sticky header only appears when the
+    // cursor is on an *extract* row whose repo header has scrolled above the
+    // viewport (repoRowIndex < scrollOffset). Using a broader condition (any
+    // scroll + cursor in viewport) caused getViewportHeight to return termHeight-7
+    // when renderGroups used termHeight-6, making isCursorVisible return false
+    // one step too early and advancing scrollOffset past the first visible row.
+    // See issue #105.
+    let stickyHeaderLines = 0;
+    if (scrollOffset > 0) {
+      const cursorRow = rows[cursor];
+      if (cursorRow?.type === "extract" && cursorRow.repoIndex >= 0) {
+        const repoRowIndex = rows.findIndex(
+          (r) => r.type === "repo" && r.repoIndex === cursorRow.repoIndex,
+        );
+        if (repoRowIndex >= 0 && repoRowIndex < scrollOffset) {
+          stickyHeaderLines = 1;
+        }
+      }
+    }
     return termHeight - 6 - barLines - stickyHeaderLines;
   };
 
@@ -406,7 +419,7 @@ export async function runInteractive(
       cursor = next;
       while (
         scrollOffset < cursor &&
-        !isCursorVisible(rows, groups, cursor, scrollOffset, getViewportHeight())
+        !isCursorVisible(rows, groups, cursor, scrollOffset, getViewportHeight(rows))
       ) {
         scrollOffset++;
       }
@@ -482,7 +495,7 @@ export async function runInteractive(
       while (cursor > 0 && rows[cursor]?.type === "section") cursor--;
       while (
         scrollOffset < cursor &&
-        !isCursorVisible(rows, groups, cursor, scrollOffset, getViewportHeight())
+        !isCursorVisible(rows, groups, cursor, scrollOffset, getViewportHeight(rows))
       ) {
         scrollOffset++;
       }
@@ -490,7 +503,7 @@ export async function runInteractive(
 
     // Page Up / Ctrl+U — scroll up by a full page
     if (key === KEY_PAGE_UP || key === KEY_CTRL_U) {
-      const pageSize = Math.max(1, getViewportHeight());
+      const pageSize = Math.max(1, getViewportHeight(rows));
       cursor = Math.max(0, cursor - pageSize);
       while (cursor > 0 && rows[cursor]?.type === "section") cursor--;
       // If we've paged up to the top and the first row is a section,
@@ -503,12 +516,12 @@ export async function runInteractive(
 
     // Page Down / Ctrl+D — scroll down by a full page
     if (key === KEY_PAGE_DOWN || key === KEY_CTRL_D) {
-      const pageSize = Math.max(1, getViewportHeight());
+      const pageSize = Math.max(1, getViewportHeight(rows));
       cursor = Math.min(rows.length - 1, cursor + pageSize);
       while (cursor < rows.length - 1 && rows[cursor]?.type === "section") cursor++;
       while (
         scrollOffset < cursor &&
-        !isCursorVisible(rows, groups, cursor, scrollOffset, getViewportHeight())
+        !isCursorVisible(rows, groups, cursor, scrollOffset, getViewportHeight(rows))
       ) {
         scrollOffset++;
       }

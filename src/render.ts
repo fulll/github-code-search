@@ -196,6 +196,40 @@ function stripAnsi(str: string): string {
 }
 
 /**
+ * Clip a string (which may contain ANSI escape sequences) to at most
+ * `maxVisible` visible characters. Correctly skips over escape sequences
+ * when counting, and appends a SGR reset (`\x1b[0m`) at the cut point so
+ * the terminal is left in a clean state.
+ *
+ * If the string already fits within `maxVisible` visible chars it is
+ * returned unchanged.
+ */
+function clipAnsi(str: string, maxVisible: number): string {
+  if (maxVisible <= 0) return "";
+  if (stripAnsi(str).length <= maxVisible) return str;
+
+  let visCount = 0;
+  let i = 0;
+  while (i < str.length) {
+    // ANSI escape sequence: \x1b[ … <letter>
+    if (str[i] === "\x1b" && i + 1 < str.length && str[i + 1] === "[") {
+      // Skip to the terminating letter (one of m G K H F)
+      let j = i + 2;
+      while (j < str.length && !/[mGKHF]/.test(str[j])) j++;
+      i = j + 1; // skip the terminating letter too
+      continue;
+    }
+    visCount++;
+    if (visCount === maxVisible) {
+      // Cut after this visible char and reset SGR.
+      return str.slice(0, i + 1) + "\x1b[0m";
+    }
+    i++;
+  }
+  return str;
+}
+
+/**
  * Returns a text-highlight function compiled once per renderGroups call.
  * The returned function applies bold-yellow highlighting to every occurrence of
  * `pattern` in the given text — but only when `filterTarget === target`.
@@ -285,9 +319,12 @@ export function renderGroups(
   const lines: string[] = [];
 
   lines.push(
-    `${pc.bgMagenta(pc.bold(" github-code-search "))} ${pc.bold(pc.cyan(query))} ${pc.dim("in")} ${pc.bold(pc.yellow(org))}`,
+    clipAnsi(
+      `${pc.bgMagenta(pc.bold(" github-code-search "))} ${pc.bold(pc.cyan(query))} ${pc.dim("in")} ${pc.bold(pc.yellow(org))}`,
+      termWidth,
+    ),
   );
-  lines.push(buildSummaryFull(groups));
+  lines.push(clipAnsi(buildSummaryFull(groups), termWidth));
 
   // Active filter text used for in-row highlighting (filterInput while typing, filterPath once confirmed)
   const activeFilter = filterMode ? filterInput : filterPath;
@@ -373,19 +410,28 @@ export function renderGroups(
         stats.hiddenMatches
       } hidden in ${stats.hiddenRepos} repo${stats.hiddenRepos !== 1 ? "s" : ""}  r to reset`,
     );
-    lines.push(`🔍${targetBadge}${pc.bold("filter:")} ${pc.yellow(filterPath)}  ${statsStr}`);
+    // Fix: clip so the filter status line never wraps — see issue #105.
+    lines.push(
+      clipAnsi(
+        `🔍${targetBadge}${pc.bold("filter:")} ${pc.yellow(filterPath)}  ${statsStr}`,
+        termWidth,
+      ),
+    );
     filterBarLines = 1;
   } else if (filterTarget !== "path" || filterRegex) {
     // No active filter text, but non-default mode selected — remind the user.
-    lines.push(`🔍${targetBadge}${pc.dim("f to filter")}`);
+    lines.push(clipAnsi(`🔍${targetBadge}${pc.dim("f to filter")}`, termWidth));
     filterBarLines = 1;
   }
 
-  lines.push(
-    pc.dim(
-      "← / → fold/unfold  Z fold-all  ↑ / ↓ navigate  gg/G top/bot  PgUp/Dn page  spc select  a all  n none  o open  f filter  t target  h help  ↵ confirm  q quit\n",
-    ),
-  );
+  // Fix: clip hints to termWidth visible chars so the line never wraps and always
+  // occupies exactly 1 terminal row. Without clipping the ~158-char hint string
+  // wraps on typical terminals (< 160 cols), making the rendered output exceed
+  // termHeight by 1 line and causing the title to scroll off the top — see issue #105.
+  const HINTS_TEXT =
+    "← / → fold/unfold  Z fold-all  ↑ / ↓ navigate  gg/G top/bot  PgUp/Dn page  spc select  a all  n none  o open  f filter  t target  h help  ↵ confirm  q quit";
+  const clippedHints = HINTS_TEXT.length > termWidth ? HINTS_TEXT.slice(0, termWidth) : HINTS_TEXT;
+  lines.push(pc.dim(`${clippedHints}\n`));
 
   // ── Sticky current-repo ───────────────────────────────────────────────────
   // When the cursor is on an extract row whose repo header has scrolled above
@@ -405,8 +451,10 @@ export function renderGroups(
     if (repoRowIndex >= 0 && repoRowIndex < scrollOffset) {
       const g = groups[cursorRow.repoIndex];
       const checkbox = g.repoSelected ? pc.green("✓") : " ";
-      stickyRepoLine = pc.dim(
-        `▲ ${checkbox} ${pc.bold(g.repoFullName)} ${pc.dim(buildMatchCountLabel(g))}`,
+      // Fix: clip to termWidth so the sticky line never wraps — see issue #105.
+      stickyRepoLine = clipAnsi(
+        pc.dim(`▲ ${checkbox} ${pc.bold(g.repoFullName)} ${pc.dim(buildMatchCountLabel(g))}`),
+        termWidth,
       );
       lines.push(stickyRepoLine);
     }
@@ -414,6 +462,13 @@ export function renderGroups(
 
   const viewportHeight =
     termHeight - HEADER_LINES - filterBarLines - 2 - (stickyRepoLine !== null ? 1 : 0);
+  // Fix: clip fragment lines to termWidth minus the 3-level indent (INDENT*3 = 6 chars)
+  // so that no fragment line wraps in the terminal. Without clipping, MAX_LINE_CHARS=120
+  // produces lines up to 126 visible chars with indent, which wraps on typical terminals
+  // (≤120 cols) and causes the rendered output to exceed termHeight — see issue #105.
+  // The -1 accounts for the "…" appended by highlightFragment when a line is truncated.
+  const FRAGMENT_INDENT = INDENT.length * 3; // 6 chars: "      "
+  const fragmentMaxChars = Math.max(20, termWidth - FRAGMENT_INDENT - 1);
   let usedLines = 0;
 
   for (let i = scrollOffset; i < rows.length; i++) {
@@ -421,8 +476,22 @@ export function renderGroups(
 
     // ── Section header row ────────────────────────────────────────────────
     if (row.type === "section") {
-      lines.push(pc.magenta(pc.bold(`\n── ${row.sectionLabel} `)));
-      usedLines += 2; // blank separator line + label line
+      // Fix: guard against overflow before rendering — mirrors the non-section check below.
+      // Without this guard a section row that only partly fits (e.g. 1 line remaining but
+      // the section needs 2) is pushed to lines[] before the budget check, causing the
+      // rendered output to exceed viewportHeight by 1 line — see issue #105.
+      if (usedLines + 2 > viewportHeight && usedLines > 0) break;
+      // Fix: clip section label to termWidth so the label line never wraps.
+      // "── " prefix is 3 visible chars + 1 trailing space = 4 chars total.
+      // Without clipping a long team name scrolls the title off the top — see issue #105.
+      const SECTION_FIXED = 4; // "── " (3) + trailing " " (1)
+      const maxLabelChars = Math.max(4, termWidth - SECTION_FIXED);
+      const label =
+        row.sectionLabel.length > maxLabelChars
+          ? row.sectionLabel.slice(0, maxLabelChars - 1) + "…"
+          : row.sectionLabel;
+      lines.push(pc.magenta(pc.bold(`\n── ${label} `)));
+      usedLines += 2; // blank separator line + label line (now guaranteed to fit in 1 physical line)
       if (usedLines >= viewportHeight) break;
       continue;
     }
@@ -451,10 +520,17 @@ export function renderGroups(
       // Right-align the match count flush to the terminal edge.
       // When active, subtract ACTIVE_BAR_WIDTH from padding so that
       // bar (1 char) + line content = termWidth total.
-      const leftPart = `${arrow} ${checkbox} ${repoName}`;
-      const leftLen = stripAnsi(leftPart).length;
+      const leftPartRaw = `${arrow} ${checkbox} ${repoName}`;
       const countLen = stripAnsi(count).length;
       const barAdjust = isCursor ? ACTIVE_BAR_WIDTH : 0;
+      // Fix: ensure leftPart + count fits within termWidth — clip repoName if needed.
+      // The maximum visible width available for leftPart: termWidth - countLen - barAdjust.
+      const maxLeftVisible = Math.max(4, termWidth - countLen - barAdjust);
+      const leftPart =
+        stripAnsi(leftPartRaw).length > maxLeftVisible
+          ? clipAnsi(leftPartRaw, maxLeftVisible)
+          : leftPartRaw;
+      const leftLen = stripAnsi(leftPart).length;
       const pad = Math.max(0, termWidth - leftLen - countLen - barAdjust);
       const lineContent = pad > 0 ? `${leftPart}${" ".repeat(pad)}${count}` : `${leftPart}${count}`;
       lines.push(isCursor ? renderActiveLine(lineContent) : lineContent);
@@ -468,9 +544,20 @@ export function renderGroups(
       // Active extract row: locSuffix uses bold+white (same as path) for
       // visual homogeneity. Inactive: dim to de-emphasise the coordinates.
       const styledLocSuffix = isCursor ? pc.bold(pc.white(locSuffix)) : pc.dim(locSuffix);
-      const filePath = isCursor
+      // Fix: clip the path to fit within termWidth — account for indent (4 visible chars:
+      // INDENT + checkbox + space) + ACTIVE_BAR_WIDTH when on cursor — see issue #105.
+      const PATH_INDENT = INDENT.length + 1 + 1; // "  " + checkbox + space = 4
+      const maxPathVisible = Math.max(
+        10,
+        termWidth - PATH_INDENT - (isCursor ? ACTIVE_BAR_WIDTH : PATH_INDENT) - locSuffix.length,
+      );
+      const rawPath = isCursor
         ? `${highlightText(match.path, "path", (s) => pc.bold(pc.white(s)))}${styledLocSuffix}`
         : `${highlightText(match.path, "path", pc.cyan)}${styledLocSuffix}`;
+      const filePath =
+        stripAnsi(rawPath).length > maxPathVisible + locSuffix.length
+          ? clipAnsi(rawPath, maxPathVisible + locSuffix.length)
+          : rawPath;
       const extractLineContent = `${INDENT}${checkbox} ${filePath}`;
       lines.push(
         isCursor
@@ -489,6 +576,7 @@ export function renderGroups(
           tm.fragment,
           mergeSegments([...tm.matches, ...extraSegs]),
           match.path,
+          fragmentMaxChars,
         );
         for (const fl of fragmentLines) {
           lines.push(`${INDENT}${INDENT}${INDENT}${fl}`);

@@ -298,11 +298,16 @@ const MAX_LINE_CHARS = 120;
  * - Preserves newlines (each code line → one terminal line).
  * - Applies language-aware syntax coloring.
  * - Overlays bold-yellow highlights for matched segments.
+ *
+ * @param maxLineChars - Maximum visible characters per line before truncation.
+ *   Pass `termWidth - indent` so that rendered lines never wrap in the terminal.
+ *   Defaults to MAX_LINE_CHARS (120) for callers that don't know termWidth.
  */
 export function highlightFragment(
   fragment: string,
   segments: TextMatchSegment[],
   filePath: string,
+  maxLineChars = MAX_LINE_CHARS,
 ): string[] {
   const lang = detectLang(filePath);
   const rawLines = fragment.split("\n");
@@ -314,7 +319,7 @@ export function highlightFragment(
   for (let li = 0; li < linesToShow; li++) {
     const line = rawLines[li];
     const lineEnd = offset + line.length;
-    const raw = line.length > MAX_LINE_CHARS ? line.slice(0, MAX_LINE_CHARS) + "…" : line;
+    const raw = line.length > maxLineChars ? line.slice(0, maxLineChars) + "…" : line;
 
     // Find segments that overlap this line, adjusted to line-local offsets
     const localSegs = segments
