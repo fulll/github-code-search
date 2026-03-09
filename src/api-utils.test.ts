@@ -364,4 +364,10 @@ describe("concurrentMap", () => {
       RangeError,
     );
   });
+
+  it("throws RangeError when concurrency is a float (e.g. 1.5)", async () => {
+    await expect(concurrentMap([1], async (n) => n, { concurrency: 1.5 })).rejects.toThrow(
+      RangeError,
+    );
+  });
 });

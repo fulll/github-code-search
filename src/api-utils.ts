@@ -125,7 +125,7 @@ export async function concurrentMap<T, R>(
   fn: (item: T, index: number) => Promise<R>,
   { concurrency = 20 }: { concurrency?: number } = {},
 ): Promise<R[]> {
-  if (!Number.isFinite(concurrency) || concurrency < 1) {
+  if (!Number.isInteger(concurrency) || concurrency < 1) {
     throw new RangeError(
       `concurrentMap: concurrency must be a positive integer, got ${concurrency}`,
     );

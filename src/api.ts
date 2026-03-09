@@ -229,10 +229,13 @@ export async function fetchAllResults(
       urlsToFetch,
       async (htmlUrl) => {
         try {
-          const res = await fetchWithRetry(toRawUrl(htmlUrl), {
-            headers: { Authorization: `Bearer ${token}` },
-            signal: AbortSignal.timeout(5_000),
-          });
+          // Disable retries (maxRetries=0) so the 5 s AbortSignal.timeout acts
+          // as a hard cap — retry delays in fetchWithRetry are not abort-aware.
+          const res = await fetchWithRetry(
+            toRawUrl(htmlUrl),
+            { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(5_000) },
+            0,
+          );
           if (res.ok) fileContentMap.set(htmlUrl, await res.text());
         } catch {
           // Fall back to fragment-relative line numbers (timeout or network error)
