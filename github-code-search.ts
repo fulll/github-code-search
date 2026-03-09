@@ -224,11 +224,22 @@ async function searchAction(
   /** True when running in non-interactive / CI mode */
   const isCI = process.env.CI === "true" || opts.interactive === false;
 
-  const rawMatches = await fetchAllResults(query, org, GITHUB_TOKEN!, (waitMs) => {
-    process.stderr.write(
-      `\n  ${pc.yellow("Rate limited")} — waiting ${formatRetryWait(waitMs)}, resuming automatically…\n  `,
-    );
-  });
+  /** Shared rate-limit handler used for both the code search and the team fetch. */
+  const onRateLimit = async (waitMs: number) => {
+    const totalSeconds = Math.ceil(waitMs / 1_000);
+    // Start on a fresh line so the countdown doesn't overwrite the progress bar
+    process.stderr.write("\n");
+    for (let s = totalSeconds; s > 0; s--) {
+      process.stderr.write(
+        `\r  ${pc.yellow("Rate limited")} — resuming in ${formatRetryWait(s * 1_000)}\u2026${" ".repeat(10)}`,
+      );
+      await new Promise((r) => setTimeout(r, 1_000));
+    }
+    // Leave cursor at line start; the next \r progress update will overwrite cleanly
+    process.stderr.write(`\r  ${pc.dim("Rate limited")} — resuming\u2026${" ".repeat(40)}`);
+  };
+
+  const rawMatches = await fetchAllResults(query, org, GITHUB_TOKEN!, onRateLimit);
   let groups = aggregate(rawMatches, excludedRepos, excludedExtractRefs, includeArchived);
 
   // ─── Team-prefix grouping ─────────────────────────────────────────────────
@@ -238,7 +249,7 @@ async function searchAction(
       .map((p) => p.trim())
       .filter(Boolean);
     if (prefixes.length > 0) {
-      const teamMap = await fetchRepoTeams(org, GITHUB_TOKEN!, prefixes, opts.cache);
+      const teamMap = await fetchRepoTeams(org, GITHUB_TOKEN!, prefixes, opts.cache, onRateLimit);
       // Attach team lists to each group
       for (const g of groups) {
         g.teams = teamMap.get(g.repoFullName) ?? [];

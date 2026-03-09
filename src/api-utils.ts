@@ -72,28 +72,57 @@ function getRetryDelayMs(res: Response, attempt: number): number {
 }
 
 /**
+ * Sleep for `ms` milliseconds. If `signal` is provided and aborts before the
+ * timer fires, the promise rejects with the signal's abort reason. This makes
+ * the inter-retry delay abort-aware, consistent with the `fetch` call itself.
+ */
+function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    const id = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(id);
+        reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+      },
+      { once: true },
+    );
+  });
+}
+
+/**
  * Performs a `fetch` with automatic retry on 429 (rate-limited), 503
- * (server unavailable) and 403 primary rate-limit responses, using
- * exponential backoff with optional `Retry-After` / `x-ratelimit-reset`
- * header support.
+ * (server unavailable) and 403 rate-limit responses (both primary and
+ * secondary), using exponential backoff with optional `Retry-After` /
+ * `x-ratelimit-reset` header support.
  *
  * Non-retryable responses (including successful ones) are returned immediately.
  * After `maxRetries` exhausted the last response is returned — callers must
  * still check `res.ok`.
  *
- * When the computed wait exceeds MAX_AUTO_RETRY_WAIT_MS and no `onRateLimit`
- * callback is provided, the function throws a descriptive error so the user
- * isn't silently blocked for minutes. When a callback is provided it is called
- * with the wait duration in milliseconds, the function sleeps for that duration,
- * then retries — the caller is responsible for surfacing the wait to the user.
+ * When the computed wait exceeds MAX_AUTO_RETRY_WAIT_MS:
+ * - Without `onRateLimit`: throws a descriptive error immediately.
+ * - With `onRateLimit`: **awaits** the callback, which is responsible for the
+ *   full sleep (so it can show a countdown, honour an AbortSignal, etc.).
+ *   These long waits do **not** count against `maxRetries`; a separate
+ *   `longWaitAttempts` counter (also capped at `maxRetries`) prevents infinite
+ *   loops when the rate-limit never clears.
+ *
+ * Short retries (wait ≤ MAX_AUTO_RETRY_WAIT_MS) honour `options.signal` —
+ * aborting during the delay rejects the promise with the signal's abort reason.
  */
 export async function fetchWithRetry(
   url: string,
   options: RequestInit,
   maxRetries = 3,
-  onRateLimit?: (waitMs: number) => void,
+  onRateLimit?: (waitMs: number) => void | Promise<void>,
 ): Promise<Response> {
   let attempt = 0;
+  let longWaitAttempts = 0;
   while (true) {
     const res = await fetch(url, options);
 
@@ -111,15 +140,17 @@ export async function fetchWithRetry(
     if (baseDelayMs > MAX_AUTO_RETRY_WAIT_MS) {
       // Cancel the response body before waiting/throwing to allow connection reuse
       await res.body?.cancel();
-      if (!onRateLimit) {
+      if (!onRateLimit || longWaitAttempts >= maxRetries) {
         throw new Error(
           `GitHub API rate limit exceeded. Please retry in ${formatRetryWait(baseDelayMs)}.`,
         );
       }
-      // Fix: inform caller and wait for the full reset duration without counting
-      // this as a retry attempt (it is an API-imposed mandatory pause). — see issue #102
-      onRateLimit(baseDelayMs);
-      await new Promise((r) => setTimeout(r, baseDelayMs));
+      // Fix: await the callback — it owns the sleep so it can show a countdown
+      // and honour an AbortSignal. Long waits do NOT count against maxRetries;
+      // longWaitAttempts (capped at maxRetries) guards against infinite loops.
+      // — see issue #102
+      longWaitAttempts++;
+      await onRateLimit(baseDelayMs);
       continue; // do NOT increment attempt
     }
 
@@ -127,7 +158,8 @@ export async function fetchWithRetry(
     const delayMs = baseDelayMs * (0.9 + Math.random() * 0.2);
     // Cancel the response body to allow the connection to be reused
     await res.body?.cancel();
-    await new Promise((r) => setTimeout(r, delayMs));
+    // Honour the caller's AbortSignal during the short wait
+    await abortableDelay(delayMs, options.signal as AbortSignal | undefined);
     attempt++;
   }
 }

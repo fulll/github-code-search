@@ -308,6 +308,7 @@ export async function fetchRepoTeams(
   token: string,
   prefixes: string[],
   useCache = true,
+  onRateLimit?: (waitMs: number) => void | Promise<void>,
 ): Promise<Map<string, string[]>> {
   // ── Cache lookup ────────────────────────────────────────────────────────────
   // The team list is quasi-static; cache it for 24 h to avoid dozens of API
@@ -333,9 +334,12 @@ export async function fetchRepoTeams(
     let teamsPage = 1;
     while (true) {
       const params = new URLSearchParams({ per_page: "100", page: String(teamsPage) });
-      const res = await fetchWithRetry(`https://api.github.com/orgs/${org}/teams?${params}`, {
-        headers: githubHeaders(token, "application/vnd.github+json"),
-      });
+      const res = await fetchWithRetry(
+        `https://api.github.com/orgs/${org}/teams?${params}`,
+        { headers: githubHeaders(token, "application/vnd.github+json") },
+        3,
+        onRateLimit,
+      );
       if (!res.ok) await throwApiError(res, "list teams");
       const teams = (await res.json()) as RawTeam[];
       for (const t of teams) {
@@ -368,6 +372,8 @@ export async function fetchRepoTeams(
         const res = await fetchWithRetry(
           `https://api.github.com/orgs/${org}/teams/${slug}/repos?${params}`,
           { headers: githubHeaders(token, "application/vnd.github+json") },
+          3,
+          onRateLimit,
         );
         if (!res.ok) {
           // 404 is expected for nested/secret teams — skip silently.

@@ -287,6 +287,31 @@ describe("fetchAllResults", () => {
     expect(results[0].textMatches[0].matches[0].line).toBe(1);
   });
 
+  it("does not request page 11 when total_count is exactly 1000 (10 full pages)", async () => {
+    // Regression guard for the 422 "Cannot access beyond the first 1000 results"
+    // error that occurred when total_count was an exact multiple of 100.
+    let searchCallCount = 0;
+    globalThis.fetch = (async (url: string | URL | Request) => {
+      const urlStr = url.toString();
+      if (urlStr.includes("raw.githubusercontent.com")) {
+        return new Response("", { status: 404 });
+      }
+      searchCallCount++;
+      return new Response(
+        JSON.stringify({
+          items: Array.from({ length: 100 }, (_, i) => makeFetchItem(i)),
+          total_count: 1000,
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }) as typeof fetch;
+
+    const results = await fetchAllResults("q", "org", "tok");
+    expect(results).toHaveLength(1000);
+    // Exactly 10 pages fetched — page 11 must never be requested
+    expect(searchCallCount).toBe(10);
+  });
+
   it("falls back when raw content fetch returns non-ok status", async () => {
     const fakeItem = {
       path: "src/mod.ts",
