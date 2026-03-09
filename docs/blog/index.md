@@ -11,6 +11,7 @@ Full release notes and changelogs are always available on
 
 | Release                    | Highlights                                                                                                 |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| [v1.8.3](./release-v1-8-3) | Fix TUI layout: header/footer anchoring, viewport packing and narrow-terminal rendering                    |
 | [v1.8.2](./release-v1-8-2) | Fix rate-limit errors aborting multi-page searches — auto-wait and resume with live feedback               |
 | [v1.8.1](./release-v1-8-1) | Fix silent hang after pagination bar — concurrency cap + progress bar for line-number resolution           |
 | [v1.8.0](./release-v1-8-0) | Purple TUI theme, fetch progress bar, position indicator, line-anchored file links, Esc to close help      |
