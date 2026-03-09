@@ -315,13 +315,14 @@ describe("concurrentMap", () => {
     let active = 0;
     let maxActive = 0;
     const concurrency = 3;
+    // Use the real setTimeout (not the immediate shim from beforeEach) so that
+    // the async yield is genuine and multiple workers can interleave.
     await concurrentMap(
       Array.from({ length: 10 }, (_, i) => i),
       async () => {
         active++;
         maxActive = Math.max(maxActive, active);
-        // Yield to allow other microtasks to start
-        await new Promise((r) => setTimeout(r, 0));
+        await new Promise((r) => originalSetTimeout(r, 0));
         active--;
       },
       { concurrency },

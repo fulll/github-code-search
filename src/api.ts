@@ -149,6 +149,16 @@ export async function searchCode(
 const PROGRESS_BAR_WIDTH = 20;
 
 /**
+ * Build the coloured block portion of a progress bar.
+ * Pure function — no side effects.
+ * \x1b[38;5;129m — bright purple (filled blocks)
+ * \x1b[38;5;240m — dark grey (empty blocks)
+ */
+function buildProgressBar(filled: number, empty: number): string {
+  return `\x1b[38;5;129m${"▓".repeat(filled)}\x1b[38;5;240m${"░".repeat(empty)}\x1b[0m`;
+}
+
+/**
  * Build a single-line purple progress bar string suitable for writing to
  * stderr with a leading \r so it overwrites the current line.
  *
@@ -157,10 +167,7 @@ const PROGRESS_BAR_WIDTH = 20;
 export function buildFetchProgress(currentPage: number, totalPages: number): string {
   const filled = totalPages > 0 ? Math.round((currentPage / totalPages) * PROGRESS_BAR_WIDTH) : 0;
   const empty = PROGRESS_BAR_WIDTH - filled;
-  // \x1b[38;5;129m — bright purple (filled blocks)
-  // \x1b[38;5;240m — dark grey (empty blocks)
-  const bar = `\x1b[38;5;129m${"▓".repeat(filled)}\x1b[38;5;240m${"░".repeat(empty)}\x1b[0m`;
-  return `\r  Fetching results from GitHub… ${bar}  page ${currentPage}/${totalPages}`;
+  return `\r  Fetching results from GitHub… ${buildProgressBar(filled, empty)}  page ${currentPage}/${totalPages}`;
 }
 
 /**
@@ -172,8 +179,7 @@ export function buildFetchProgress(currentPage: number, totalPages: number): str
 export function buildLineResolutionProgress(done: number, total: number): string {
   const filled = total > 0 ? Math.round((done / total) * PROGRESS_BAR_WIDTH) : 0;
   const empty = PROGRESS_BAR_WIDTH - filled;
-  const bar = `\x1b[38;5;129m${"▓".repeat(filled)}\x1b[38;5;240m${"░".repeat(empty)}\x1b[0m`;
-  return `\r  Resolving line numbers… ${bar}  ${done}/${total}`;
+  return `\r  Resolving line numbers… ${buildProgressBar(filled, empty)}  ${done}/${total}`;
 }
 
 export async function fetchAllResults(
