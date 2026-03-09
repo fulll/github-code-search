@@ -117,14 +117,19 @@ export async function fetchWithRetry(
  * running in parallel at any one time (semaphore pattern, no extra deps).
  *
  * Results are returned in input order regardless of completion order.
- * If one or more `fn` calls throw, the first error is re-thrown after all
- * in-flight tasks have settled.
+ * All items are processed even if some `fn` calls throw; the first error
+ * encountered is recorded and re-thrown only after all work has completed.
  */
 export async function concurrentMap<T, R>(
   items: T[],
   fn: (item: T, index: number) => Promise<R>,
   { concurrency = 20 }: { concurrency?: number } = {},
 ): Promise<R[]> {
+  if (!Number.isFinite(concurrency) || concurrency < 1) {
+    throw new RangeError(
+      `concurrentMap: concurrency must be a positive integer, got ${concurrency}`,
+    );
+  }
   const results: R[] = Array.from({ length: items.length }) as R[];
   let nextIndex = 0;
   let firstError: unknown;

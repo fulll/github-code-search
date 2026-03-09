@@ -242,8 +242,8 @@ export async function fetchAllResults(
       },
       { concurrency: 20 },
     );
-    // Clear the resolution progress line before continuing.
-    process.stderr.write("\r" + " ".repeat(60) + "\r");
+    // Clear the resolution progress line before continuing (ANSI erase-entire-line).
+    process.stderr.write("\x1b[2K\r");
   }
 
   return allItems.map((item) => {

@@ -346,4 +346,22 @@ describe("concurrentMap", () => {
     }).catch(() => {});
     expect(processed.toSorted()).toEqual([1, 2, 3]);
   });
+
+  it("throws RangeError when concurrency is 0", async () => {
+    await expect(concurrentMap([1], async (n) => n, { concurrency: 0 })).rejects.toThrow(
+      RangeError,
+    );
+  });
+
+  it("throws RangeError when concurrency is negative", async () => {
+    await expect(concurrentMap([1], async (n) => n, { concurrency: -1 })).rejects.toThrow(
+      RangeError,
+    );
+  });
+
+  it("throws RangeError when concurrency is NaN", async () => {
+    await expect(concurrentMap([1], async (n) => n, { concurrency: Number.NaN })).rejects.toThrow(
+      RangeError,
+    );
+  });
 });
