@@ -18,6 +18,7 @@ import { resolve } from "node:path";
 import pc from "picocolors";
 import { aggregate, normaliseExtractRef, normaliseRepo } from "./src/aggregate.ts";
 import { fetchAllResults, fetchRepoTeams } from "./src/api.ts";
+import { formatRetryWait } from "./src/api-utils.ts";
 import { buildOutput } from "./src/output.ts";
 import { groupByTeamPrefix, flattenTeamSections } from "./src/group.ts";
 import { checkForUpdate } from "./src/upgrade.ts";
@@ -223,7 +224,11 @@ async function searchAction(
   /** True when running in non-interactive / CI mode */
   const isCI = process.env.CI === "true" || opts.interactive === false;
 
-  const rawMatches = await fetchAllResults(query, org, GITHUB_TOKEN!);
+  const rawMatches = await fetchAllResults(query, org, GITHUB_TOKEN!, (waitMs) => {
+    process.stderr.write(
+      `\n  ${pc.yellow("Rate limited")} — waiting ${formatRetryWait(waitMs)}, resuming automatically…\n  `,
+    );
+  });
   let groups = aggregate(rawMatches, excludedRepos, excludedExtractRefs, includeArchived);
 
   // ─── Team-prefix grouping ─────────────────────────────────────────────────

@@ -218,6 +218,47 @@ describe("fetchWithRetry – 403 rate-limit handling", () => {
     expect(calls).toBe(1);
   });
 
+  it("retries on 403 secondary rate-limit (Retry-After header) within threshold", async () => {
+    let calls = 0;
+    globalThis.fetch = (async () => {
+      calls++;
+      if (calls === 1) {
+        return new Response("secondary rate limited", {
+          status: 403,
+          headers: { "Retry-After": "1" }, // 1 s → within 10 s threshold
+        });
+      }
+      return new Response("ok", { status: 200 });
+    }) as typeof fetch;
+
+    const res = await fetchWithRetry("https://example.com", {}, 3);
+    expect(res.status).toBe(200);
+    expect(calls).toBe(2);
+  });
+
+  it("calls onRateLimit for 403 secondary rate-limit (Retry-After) exceeding threshold", async () => {
+    let calls = 0;
+    const callbackArgs: number[] = [];
+    globalThis.fetch = (async () => {
+      calls++;
+      if (calls === 1) {
+        return new Response("secondary rate limited", {
+          status: 403,
+          headers: { "Retry-After": "300" }, // 5 minutes → exceeds threshold
+        });
+      }
+      return new Response("ok", { status: 200 });
+    }) as typeof fetch;
+
+    const res = await fetchWithRetry("https://example.com", {}, 3, (ms) => {
+      callbackArgs.push(ms);
+    });
+    expect(res.status).toBe(200);
+    expect(calls).toBe(2);
+    expect(callbackArgs).toHaveLength(1);
+    expect(callbackArgs[0]).toBeGreaterThan(10_000);
+  });
+
   it("throws with a human-readable error when Retry-After header exceeds threshold", async () => {
     globalThis.fetch = (async () => {
       return new Response("rate limited", {
@@ -229,6 +270,66 @@ describe("fetchWithRetry – 403 rate-limit handling", () => {
     await expect(fetchWithRetry("https://example.com", {}, 3)).rejects.toThrow(
       /GitHub API rate limit exceeded\. Please retry in \d+ minute/,
     );
+  });
+
+  it("calls onRateLimit callback and retries instead of throwing when wait exceeds threshold", async () => {
+    let calls = 0;
+    const callbackArgs: number[] = [];
+    // reset = now + 5 minutes → exceeds the 10 s threshold
+    const resetTimestamp = Math.ceil((Date.now() + 300_000) / 1_000);
+    globalThis.fetch = (async () => {
+      calls++;
+      if (calls === 1) {
+        return new Response("rate limited", {
+          status: 403,
+          headers: {
+            "x-ratelimit-remaining": "0",
+            "x-ratelimit-reset": String(resetTimestamp),
+          },
+        });
+      }
+      return new Response("ok", { status: 200 });
+    }) as typeof fetch;
+
+    const onRateLimit = (waitMs: number) => {
+      callbackArgs.push(waitMs);
+    };
+    const res = await fetchWithRetry("https://example.com", {}, 3, onRateLimit);
+    expect(res.status).toBe(200);
+    expect(calls).toBe(2);
+    expect(callbackArgs).toHaveLength(1);
+    expect(callbackArgs[0]).toBeGreaterThan(10_000);
+  });
+
+  it("does not count the onRateLimit wait as a retry attempt", async () => {
+    let calls = 0;
+    const resetTimestamp = Math.ceil((Date.now() + 300_000) / 1_000);
+    // First 2 calls: rate-limited (long wait); 3rd call: success
+    globalThis.fetch = (async () => {
+      calls++;
+      if (calls < 3) {
+        return new Response("rate limited", {
+          status: 403,
+          headers: {
+            "x-ratelimit-remaining": "0",
+            "x-ratelimit-reset": String(resetTimestamp),
+          },
+        });
+      }
+      return new Response("ok", { status: 200 });
+    }) as typeof fetch;
+
+    const callbackCount = { n: 0 };
+    const res = await fetchWithRetry(
+      "https://example.com",
+      {},
+      1, // maxRetries = 1 — would throw on attempt 2 if rate-limit burns retries
+      () => {
+        callbackCount.n++;
+      },
+    );
+    expect(res.status).toBe(200);
+    expect(callbackCount.n).toBe(2);
   });
 });
 

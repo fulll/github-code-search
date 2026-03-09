@@ -128,6 +128,7 @@ export async function searchCode(
   org: string,
   token: string,
   page = 1,
+  onRateLimit?: (waitMs: number) => void,
 ): Promise<{ items: RawCodeItem[]; total: number }> {
   const params = new URLSearchParams({
     // @see https://docs.github.com/en/rest/search/search?apiVersion=2022-11-28#constructing-a-search-query
@@ -136,9 +137,12 @@ export async function searchCode(
     page: String(page),
   });
   // @see https://docs.github.com/en/rest/search/search?apiVersion=2022-11-28#search-code
-  const res = await fetchWithRetry(`https://api.github.com/search/code?${params}`, {
-    headers: githubHeaders(token),
-  });
+  const res = await fetchWithRetry(
+    `https://api.github.com/search/code?${params}`,
+    { headers: githubHeaders(token) },
+    3,
+    onRateLimit,
+  );
   if (!res.ok) await throwApiError(res);
   const data = (await res.json()) as SearchCodeResponse;
   return { items: data.items ?? [], total: data.total_count ?? 0 };
@@ -191,16 +195,22 @@ export async function fetchAllResults(
   query: string,
   org: string,
   token: string,
+  onRateLimit?: (waitMs: number) => void,
 ): Promise<CodeMatch[]> {
   // Write the initial progress line (no newline — will be overwritten by \r).
   process.stderr.write(pc.dim("  Fetching results from GitHub…"));
   let totalPages = 0;
   // GitHub code search is capped at 1000 results; paginatedFetch stops naturally
-  // when a page returns fewer than 100 items (or the API returns an empty page
-  // after the cap is reached).
+  // when a page returns fewer than 100 items. When total_count is an exact
+  // multiple of 100 (e.g. 1000 results), paginatedFetch would request page 11
+  // which GitHub rejects with 422 "Cannot access beyond the first 1000 results".
+  // Fix: guard against that by returning [] as soon as page > totalPages. — see issue #102
   const allItems = await paginatedFetch<RawCodeItem>(
     async (page) => {
-      const { items, total } = await searchCode(query, org, token, page);
+      // Short-circuit: GitHub caps at 1 000 results (10 pages max).
+      // Once we know totalPages, skip any page that would exceed the cap.
+      if (totalPages > 0 && page > totalPages) return [];
+      const { items, total } = await searchCode(query, org, token, page, onRateLimit);
       // On the first page, compute the expected number of pages so the bar
       // can show realistic progress. GitHub caps at 1 000 results (10 pages).
       if (page === 1) {

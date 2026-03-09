@@ -30,11 +30,17 @@ export function formatRetryWait(ms: number): string {
 }
 
 /**
- * Returns true when the response is a GitHub primary rate-limit 403
- * (x-ratelimit-remaining is "0").
+ * Returns true when the response is a GitHub primary or secondary rate-limit 403.
+ *
+ * Primary rate limit:   403 + x-ratelimit-remaining: 0
+ * Secondary rate limit: 403 + Retry-After header
+ *   (see https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api)
  */
 function isRateLimitExceeded(res: Response): boolean {
-  return res.status === 403 && res.headers.get("x-ratelimit-remaining") === "0";
+  if (res.status !== 403) return false;
+  return (
+    res.headers.get("x-ratelimit-remaining") === "0" || res.headers.get("Retry-After") !== null
+  );
 }
 
 /**
@@ -43,12 +49,15 @@ function isRateLimitExceeded(res: Response): boolean {
  * exponential back-off.
  */
 function getRetryDelayMs(res: Response, attempt: number): number {
-  // x-ratelimit-reset: Unix timestamp (seconds) when the quota refills
+  // x-ratelimit-reset: Unix timestamp (seconds) when the quota refills.
+  // Add a 1 s buffer to guard against clock skew between client and GitHub
+  // servers — without it the first retry can arrive fractionally early and
+  // immediately hit the same limit again.
   const resetHeader = res.headers.get("x-ratelimit-reset");
   if (resetHeader !== null) {
     const resetTime = parseInt(resetHeader, 10);
     if (Number.isFinite(resetTime)) {
-      return Math.max(0, resetTime * 1_000 - Date.now());
+      return Math.max(0, resetTime * 1_000 - Date.now() + 1_000);
     }
   }
   // Retry-After: seconds to wait (used by 429 / secondary rate limits)
@@ -72,13 +81,17 @@ function getRetryDelayMs(res: Response, attempt: number): number {
  * After `maxRetries` exhausted the last response is returned — callers must
  * still check `res.ok`.
  *
- * When the computed wait exceeds MAX_AUTO_RETRY_WAIT_MS the function throws a
- * descriptive error so the user isn't silently blocked for minutes.
+ * When the computed wait exceeds MAX_AUTO_RETRY_WAIT_MS and no `onRateLimit`
+ * callback is provided, the function throws a descriptive error so the user
+ * isn't silently blocked for minutes. When a callback is provided it is called
+ * with the wait duration in milliseconds, the function sleeps for that duration,
+ * then retries — the caller is responsible for surfacing the wait to the user.
  */
 export async function fetchWithRetry(
   url: string,
   options: RequestInit,
   maxRetries = 3,
+  onRateLimit?: (waitMs: number) => void,
 ): Promise<Response> {
   let attempt = 0;
   while (true) {
@@ -96,11 +109,18 @@ export async function fetchWithRetry(
     const baseDelayMs = getRetryDelayMs(res, attempt);
 
     if (baseDelayMs > MAX_AUTO_RETRY_WAIT_MS) {
-      // Cancel the response body before throwing to allow connection reuse
+      // Cancel the response body before waiting/throwing to allow connection reuse
       await res.body?.cancel();
-      throw new Error(
-        `GitHub API rate limit exceeded. Please retry in ${formatRetryWait(baseDelayMs)}.`,
-      );
+      if (!onRateLimit) {
+        throw new Error(
+          `GitHub API rate limit exceeded. Please retry in ${formatRetryWait(baseDelayMs)}.`,
+        );
+      }
+      // Fix: inform caller and wait for the full reset duration without counting
+      // this as a retry attempt (it is an API-imposed mandatory pause). — see issue #102
+      onRateLimit(baseDelayMs);
+      await new Promise((r) => setTimeout(r, baseDelayMs));
+      continue; // do NOT increment attempt
     }
 
     // Add ±10 % jitter to avoid thundering-herd on concurrent retries
