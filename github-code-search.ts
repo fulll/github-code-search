@@ -224,19 +224,33 @@ async function searchAction(
   /** True when running in non-interactive / CI mode */
   const isCI = process.env.CI === "true" || opts.interactive === false;
 
+  // Shared promise for concurrent rate-limit hits (e.g. from Promise.all in
+  // fetchRepoTeams). If a countdown is already running, new callers attach to
+  // the same promise so only one countdown displays at a time.
+  let activeCooldown: Promise<void> | null = null;
+
   /** Shared rate-limit handler used for both the code search and the team fetch. */
-  const onRateLimit = async (waitMs: number) => {
-    const totalSeconds = Math.ceil(waitMs / 1_000);
-    // Start on a fresh line so the countdown doesn't overwrite the progress bar
-    process.stderr.write("\n");
-    for (let s = totalSeconds; s > 0; s--) {
-      process.stderr.write(
-        `\r  ${pc.yellow("Rate limited")} — resuming in ${formatRetryWait(s * 1_000)}\u2026${" ".repeat(10)}`,
-      );
-      await new Promise((r) => setTimeout(r, 1_000));
+  const onRateLimit = (waitMs: number): Promise<void> => {
+    if (activeCooldown !== null) {
+      // Piggyback on the in-flight countdown — no need for a second one.
+      return activeCooldown;
     }
-    // Leave cursor at line start; the next \r progress update will overwrite cleanly
-    process.stderr.write(`\r  ${pc.dim("Rate limited")} — resuming\u2026${" ".repeat(40)}`);
+    activeCooldown = (async () => {
+      const totalSeconds = Math.ceil(waitMs / 1_000);
+      // Start on a fresh line so the countdown doesn't overwrite the progress bar
+      process.stderr.write("\n");
+      for (let s = totalSeconds; s > 0; s--) {
+        process.stderr.write(
+          `\r  ${pc.yellow("Rate limited")} — resuming in ${formatRetryWait(s * 1_000)}\u2026${" ".repeat(10)}`,
+        );
+        await new Promise((r) => setTimeout(r, 1_000));
+      }
+      // Leave cursor at line start; the next \r progress update will overwrite cleanly
+      process.stderr.write(`\r  ${pc.dim("Rate limited")} — resuming\u2026${" ".repeat(40)}`);
+    })().finally(() => {
+      activeCooldown = null;
+    });
+    return activeCooldown;
   };
 
   const rawMatches = await fetchAllResults(query, org, GITHUB_TOKEN!, onRateLimit);

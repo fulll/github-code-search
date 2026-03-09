@@ -82,15 +82,17 @@ function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
       reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
       return;
     }
-    const id = setTimeout(resolve, ms);
-    signal?.addEventListener(
-      "abort",
-      () => {
-        clearTimeout(id);
-        reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
-      },
-      { once: true },
-    );
+    // Extract the handler so it can be removed when the timer fires, preventing
+    // listener accumulation across many retries.
+    const onAbort = () => {
+      clearTimeout(id);
+      reject(signal!.reason ?? new DOMException("Aborted", "AbortError"));
+    };
+    const id = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
   });
 }
 
@@ -106,8 +108,10 @@ function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
  *
  * When the computed wait exceeds MAX_AUTO_RETRY_WAIT_MS:
  * - Without `onRateLimit`: throws a descriptive error immediately.
- * - With `onRateLimit`: **awaits** the callback, which is responsible for the
- *   full sleep (so it can show a countdown, honour an AbortSignal, etc.).
+ * - With `onRateLimit`: **awaits** the callback, which **must** sleep for (at
+ *   least) `waitMs` milliseconds — e.g. by showing a countdown timer. A
+ *   callback that returns immediately without sleeping will cause the loop to
+ *   retry at once and exhaust `longWaitAttempts` very quickly.
  *   These long waits do **not** count against `maxRetries`; a separate
  *   `longWaitAttempts` counter (also capped at `maxRetries`) prevents infinite
  *   loops when the rate-limit never clears.
@@ -119,7 +123,7 @@ export async function fetchWithRetry(
   url: string,
   options: RequestInit,
   maxRetries = 3,
-  onRateLimit?: (waitMs: number) => void | Promise<void>,
+  onRateLimit?: (waitMs: number) => Promise<void>,
 ): Promise<Response> {
   let attempt = 0;
   let longWaitAttempts = 0;

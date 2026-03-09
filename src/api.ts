@@ -128,7 +128,7 @@ export async function searchCode(
   org: string,
   token: string,
   page = 1,
-  onRateLimit?: (waitMs: number) => void,
+  onRateLimit?: (waitMs: number) => Promise<void>,
 ): Promise<{ items: RawCodeItem[]; total: number }> {
   const params = new URLSearchParams({
     // @see https://docs.github.com/en/rest/search/search?apiVersion=2022-11-28#constructing-a-search-query
@@ -195,7 +195,7 @@ export async function fetchAllResults(
   query: string,
   org: string,
   token: string,
-  onRateLimit?: (waitMs: number) => void,
+  onRateLimit?: (waitMs: number) => Promise<void>,
 ): Promise<CodeMatch[]> {
   // Write the initial progress line (no newline — will be overwritten by \r).
   process.stderr.write(pc.dim("  Fetching results from GitHub…"));
@@ -308,7 +308,7 @@ export async function fetchRepoTeams(
   token: string,
   prefixes: string[],
   useCache = true,
-  onRateLimit?: (waitMs: number) => void | Promise<void>,
+  onRateLimit?: (waitMs: number) => Promise<void>,
 ): Promise<Map<string, string[]>> {
   // ── Cache lookup ────────────────────────────────────────────────────────────
   // The team list is quasi-static; cache it for 24 h to avoid dozens of API

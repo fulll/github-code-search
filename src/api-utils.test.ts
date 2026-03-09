@@ -291,7 +291,7 @@ describe("fetchWithRetry – 403 rate-limit handling", () => {
       return new Response("ok", { status: 200 });
     }) as typeof fetch;
 
-    const onRateLimit = (waitMs: number) => {
+    const onRateLimit = async (waitMs: number) => {
       callbackArgs.push(waitMs);
     };
     const res = await fetchWithRetry("https://example.com", {}, 3, onRateLimit);
@@ -325,7 +325,7 @@ describe("fetchWithRetry – 403 rate-limit handling", () => {
       "https://example.com",
       {},
       5, // maxRetries = 5 — long waits do not burn regular retry attempts
-      () => {
+      async () => {
         callbackCount.n++;
       },
     );
@@ -347,7 +347,7 @@ describe("fetchWithRetry – 403 rate-limit handling", () => {
       })) as typeof fetch;
 
     await expect(
-      fetchWithRetry("https://example.com", {}, 2, () => {
+      fetchWithRetry("https://example.com", {}, 2, async () => {
         callbackCalls++;
       }),
     ).rejects.toThrow(/GitHub API rate limit exceeded/);
