@@ -10,6 +10,10 @@
 param(
   [String]$Version = "latest",
   [String]$InstallDir = "${Home}\.github-code-search\bin",
+  # Force a specific Windows variant (x64-modern, x64-baseline, arm64).
+  # When omitted, the script detects the architecture and probes the release
+  # for the best available binary with automatic fallback.
+  [String]$Target = "",
   [Switch]$NoPathUpdate = $false,
   [Switch]$DownloadWithoutCurl = $false
 )
@@ -65,20 +69,20 @@ function Write-Env {
 
 $Arch = (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment').PROCESSOR_ARCHITECTURE
 
-switch ($Arch) {
-  "AMD64" {
-    # Prefer the modern (AVX2) variant; fall back to the baseline build on older
-    # hardware. The caller can force a specific variant by setting $Target before
-    # running the script, or by passing a pre-resolved $Version that embeds the
-    # variant in the tag name.
-    # We probe the release assets via the GitHub API to choose automatically.
-    $Target = "x64-modern"
-  }
-  "ARM64" { $Target = "arm64" }
-  default {
-    Write-Output "Install Failed:"
-    Write-Output "  ${BinaryName} for Windows does not support architecture: $Arch"
-    return 1
+# Only auto-detect when the caller has not forced a specific variant via -Target.
+if ($Target -eq "") {
+  switch ($Arch) {
+    "AMD64" {
+      # Prefer the modern (AVX2) variant; fall back to the baseline build on
+      # older hardware. The probe loop below handles the automatic fallback.
+      $Target = "x64-modern"
+    }
+    "ARM64" { $Target = "arm64" }
+    default {
+      Write-Output "Install Failed:"
+      Write-Output "  ${BinaryName} for Windows does not support architecture: $Arch"
+      exit 1
+    }
   }
 }
 
@@ -91,7 +95,7 @@ $WinVer = [System.Environment]::OSVersion.Version
 if ($WinVer.Major -lt 10 -or ($WinVer.Major -eq 10 -and $WinVer.Build -lt $MinBuild)) {
   Write-Warning "${BinaryName} requires ${MinBuildName} or newer (build ${MinBuild}+)."
   Write-Warning "Your system: Windows $($WinVer.Major).$($WinVer.Minor) build $($WinVer.Build)"
-  return 1
+  exit 1
 }
 
 $ErrorActionPreference = "Stop"
@@ -110,7 +114,7 @@ if ($Version -eq "latest") {
     Write-Output "  Could not determine the latest release from the GitHub API."
     Write-Output "  URL: $ApiUrl"
     Write-Output "  $_"
-    return 1
+    exit 1
   }
 } else {
   $Tag = $Version
@@ -134,7 +138,8 @@ foreach ($Candidate in $CandidateTargets) {
   $CandidateArtifact = "${BinaryName}-windows-${Candidate}.exe"
   $CheckUrl = "https://github.com/${Repo}/releases/download/${Tag}/${CandidateArtifact}"
   try {
-    $Null = Invoke-WebRequest -Uri $CheckUrl -Method Head -UseBasicParsing -ErrorAction Stop
+    # -UseBasicParsing is removed in PowerShell 6+ (pwsh); omit it for compat.
+    $Null = Invoke-WebRequest -Uri $CheckUrl -Method Head -ErrorAction Stop
     $Artifact = $CandidateArtifact
     $Target = $Candidate
     break
@@ -147,7 +152,7 @@ if ($null -eq $Artifact) {
   Write-Output "Install Failed:"
   Write-Output "  No compatible Windows binary found for ${Tag}."
   Write-Output "  Tried: $($CandidateTargets -join ', ')"
-  return 1
+  exit 1
 }
 
 Write-Output "Installing ${BinaryName} ${Tag} (windows/${Target})..."
@@ -183,7 +188,7 @@ if ($DownloadWithoutCurl -or $DownloadFailed) {
     Write-Output "  $_"
     Write-Output ""
     Write-Output "  If your antivirus is blocking the download, try adding an exclusion."
-    return 1
+    exit 1
   }
 }
 
@@ -192,7 +197,7 @@ if (-not (Test-Path $TmpFile)) {
   Write-Output "  Downloaded file not found at ${TmpFile}."
   Write-Output "  This may be caused by antivirus software (e.g. Windows Defender) quarantining the binary."
   Write-Output "  Try adding an exclusion for ${TmpFile} and retry."
-  return 1
+  exit 1
 }
 
 # ── Install ──────────────────────────────────────────────────────────────────
@@ -209,7 +214,7 @@ try {
   Write-Output ""
   Write-Output "  If the file is in use, close any running instance and retry."
   Write-Output "  If your antivirus deleted the file, add an exclusion and retry."
-  return 1
+  exit 1
 }
 
 # ── PATH update ──────────────────────────────────────────────────────────────

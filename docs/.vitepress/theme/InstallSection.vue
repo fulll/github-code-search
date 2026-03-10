@@ -81,21 +81,19 @@ function copySearch() {
       </div>
     </div>
 
-    <div class="is-platform-tabs" role="tablist" aria-label="Platform">
+    <div class="is-platform-tabs" role="group" aria-label="Select platform">
       <button
-        role="tab"
         class="is-platform-tab"
         :class="{ active: platform === 'unix' }"
-        :aria-selected="platform === 'unix'"
+        :aria-pressed="platform === 'unix'"
         @click="platform = 'unix'"
       >
         macOS / Linux
       </button>
       <button
-        role="tab"
         class="is-platform-tab"
         :class="{ active: platform === 'windows' }"
-        :aria-selected="platform === 'windows'"
+        :aria-pressed="platform === 'windows'"
         @click="platform = 'windows'"
       >
         Windows

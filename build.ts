@@ -30,7 +30,10 @@ export type ParsedTarget = {
 export function parseTarget(t: string | null | undefined): ParsedTarget {
   if (!t)
     return {
-      os: process.platform,
+      // Normalize Node's "win32" platform name to the canonical "windows" used
+      // throughout this build script so isWindowsTarget() / getOutfile() work
+      // correctly when building natively on Windows without a --target flag.
+      os: process.platform === "win32" ? "windows" : process.platform,
       arch: process.arch === "x64" ? "x64" : process.arch,
     };
 

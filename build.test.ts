@@ -101,6 +101,17 @@ describe("parseTarget", () => {
     expect(parseTarget("bun-linux-x64-baseline").arch).toBe("x64-baseline");
     expect(parseTarget("bun-linux-x64").arch).toBe("x64");
   });
+
+  // Regression: on Windows, process.platform is "win32" which isWindowsTarget()
+  // does not recognise. parseTarget(null) must normalise it to "windows".
+  // We can't execute the null path on a non-Windows runner, but we can assert the
+  // downstream contract: "win32" alone must NOT satisfy isWindowsTarget (proving
+  // normalisation is necessary) and getOutfile("windows", null) must add .exe.
+  it("isWindowsTarget rejects bare win32 — normalisation in parseTarget is required", () => {
+    expect(isWindowsTarget("win32")).toBe(false);
+    expect(isWindowsTarget("windows")).toBe(true);
+    expect(getOutfile("windows", null)).toBe("./dist/github-code-search.exe");
+  });
 });
 
 // ─── isWindowsTarget ─────────────────────────────────────────────────────────
