@@ -1,12 +1,8 @@
 # Installation
 
-## Via `curl` (recommended)
+## Linux / macOS via `curl` (recommended)
 
 The install script auto-detects your OS (Linux, macOS, Windows via MINGW/MSYS/Cygwin) and architecture (x64, arm64) and downloads the right pre-compiled binary from the [latest release](https://github.com/fulll/github-code-search/releases/latest) to `/usr/local/bin`.
-
-::: warning Windows
-On Windows, the script requires a bash-compatible shell (Git Bash, MSYS2, or Cygwin). Native PowerShell is not supported — download the binary directly from the [releases page](https://github.com/fulll/github-code-search/releases/latest) instead.
-:::
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/fulll/github-code-search/main/install.sh | bash
@@ -23,6 +19,31 @@ INSTALL_DIR=~/.local/bin VERSION=vX.Y.Z \
 | ------------- | ---------------- | ----------------------------------------------- |
 | `INSTALL_DIR` | `/usr/local/bin` | Directory where the binary is installed         |
 | `VERSION`     | latest release   | Specific version tag to install (e.g. `v1.1.0`) |
+
+## Windows via PowerShell
+
+A native PowerShell script is available for Windows 10 (1809+) and later.
+
+```powershell
+powershell -c "irm https://raw.githubusercontent.com/fulll/github-code-search/main/install.ps1 | iex"
+```
+
+### Custom install directory or version
+
+```powershell
+& { $(irm https://raw.githubusercontent.com/fulll/github-code-search/main/install.ps1) } -Version v1.8.0 -InstallDir C:\tools\gcs\bin
+```
+
+| Parameter              | Default                     | Description                                     |
+| ---------------------- | --------------------------- | ----------------------------------------------- |
+| `-Version`             | `latest`                    | Version tag to install (e.g. `v1.8.0`)          |
+| `-InstallDir`          | `~\.github-code-search\bin` | Directory where the binary is installed         |
+| `-NoPathUpdate`        | `$false`                    | Skip adding install dir to user PATH            |
+| `-DownloadWithoutCurl` | `$false`                    | Force `Invoke-RestMethod` instead of `curl.exe` |
+
+::: tip
+The script automatically adds the install directory to your user PATH. New terminal windows will pick it up immediately.
+:::
 
 ## From source
 

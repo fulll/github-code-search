@@ -1,14 +1,26 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { withBase } from "vitepress";
 
 const CURL_CMD =
   "curl -fsSL https://raw.githubusercontent.com/fulll/github-code-search/main/install.sh | bash";
-const VERIFY_CMD = "github-code-search --version";
+const PS_CMD =
+  'powershell -c "irm https://raw.githubusercontent.com/fulll/github-code-search/main/install.ps1 | iex"';
 const SEARCH_CMD = 'github-code-search query "TODO" --org my-org';
+
+type Platform = "unix" | "windows";
+const platform = ref<Platform>("unix");
 
 const copiedInstall = ref(false);
 const copiedVerify = ref(false);
+
+const installCmd = computed(() => (platform.value === "unix" ? CURL_CMD : PS_CMD));
+const shellLabel = computed(() => (platform.value === "unix" ? "bash" : "powershell"));
+const tokenLine = computed(() =>
+  platform.value === "unix"
+    ? { kw: "export", value: " GITHUB_TOKEN=ghp_your_token_here" }
+    : { kw: "$env:", value: 'GITHUB_TOKEN = "ghp_your_token_here"' },
+);
 
 async function copy(text: string, target: "install" | "verify") {
   try {
@@ -30,7 +42,7 @@ async function copy(text: string, target: "install" | "verify") {
 }
 
 function copyInstall() {
-  copy(CURL_CMD, "install");
+  copy(installCmd.value, "install");
 }
 function copySearch() {
   copy(SEARCH_CMD, "verify");
@@ -43,7 +55,7 @@ function copySearch() {
       <h2 id="install-section-title" class="is-title">Get up and running in 30 seconds</h2>
       <p class="is-subtitle">
         One command. Auto-detects your OS and architecture.<br />
-        Works on macOS, Linux, and Windows (Git Bash / MSYS2).
+        Works on macOS, Linux, and Windows.
       </p>
       <div class="is-compat" aria-label="Supported shells and platforms">
         <span class="is-compat-label">Works with</span>
@@ -51,6 +63,7 @@ function copySearch() {
           <span class="is-compat-badge">zsh</span>
           <span class="is-compat-badge">bash</span>
           <span class="is-compat-badge">fish</span>
+          <span class="is-compat-badge">PowerShell</span>
           <span class="is-compat-sep" aria-hidden="true"></span>
           <span class="is-compat-badge">macOS</span>
           <span class="is-compat-badge">Linux</span>
@@ -68,6 +81,27 @@ function copySearch() {
       </div>
     </div>
 
+    <div class="is-platform-tabs" role="tablist" aria-label="Platform">
+      <button
+        role="tab"
+        class="is-platform-tab"
+        :class="{ active: platform === 'unix' }"
+        :aria-selected="platform === 'unix'"
+        @click="platform = 'unix'"
+      >
+        macOS / Linux
+      </button>
+      <button
+        role="tab"
+        class="is-platform-tab"
+        :class="{ active: platform === 'windows' }"
+        :aria-selected="platform === 'windows'"
+        @click="platform = 'windows'"
+      >
+        Windows
+      </button>
+    </div>
+
     <div class="is-steps">
       <!-- Step 1: Install -->
       <div class="is-step">
@@ -79,7 +113,7 @@ function copySearch() {
               <span class="is-dot is-dot-red" aria-hidden="true"></span>
               <span class="is-dot is-dot-yellow" aria-hidden="true"></span>
               <span class="is-dot is-dot-green" aria-hidden="true"></span>
-              <span class="is-terminal-title" aria-hidden="true">bash</span>
+              <span class="is-terminal-title" aria-hidden="true">{{ shellLabel }}</span>
               <button
                 class="is-copy-btn"
                 :class="{ copied: copiedInstall }"
@@ -105,7 +139,9 @@ function copySearch() {
                 </svg>
               </button>
             </div>
-            <pre class="is-code"><code><span class="is-prompt">$</span> {{ CURL_CMD }}</code></pre>
+            <pre
+              class="is-code"
+            ><code><span class="is-prompt">{{ platform === 'windows' ? '>' : '$' }}</span> {{ installCmd }}</code></pre>
           </div>
         </div>
       </div>
@@ -148,11 +184,11 @@ function copySearch() {
               <span class="is-dot is-dot-red" aria-hidden="true"></span>
               <span class="is-dot is-dot-yellow" aria-hidden="true"></span>
               <span class="is-dot is-dot-green" aria-hidden="true"></span>
-              <span class="is-terminal-title" aria-hidden="true">bash</span>
+              <span class="is-terminal-title" aria-hidden="true">{{ shellLabel }}</span>
             </div>
             <pre
               class="is-code"
-            ><code><span class="is-prompt">$</span> <span class="is-kw">export</span> GITHUB_TOKEN=<span class="is-str">ghp_your_token_here</span></code></pre>
+            ><code><span class="is-prompt">{{ platform === 'windows' ? '>' : '$' }}</span> <span class="is-kw">{{ tokenLine.kw }}</span><span class="is-str">{{ tokenLine.value }}</span></code></pre>
           </div>
         </div>
       </div>
@@ -169,7 +205,7 @@ function copySearch() {
               <span class="is-dot is-dot-red" aria-hidden="true"></span>
               <span class="is-dot is-dot-yellow" aria-hidden="true"></span>
               <span class="is-dot is-dot-green" aria-hidden="true"></span>
-              <span class="is-terminal-title" aria-hidden="true">bash</span>
+              <span class="is-terminal-title" aria-hidden="true">{{ shellLabel }}</span>
               <button
                 class="is-copy-btn"
                 :class="{ copied: copiedVerify }"
@@ -197,7 +233,7 @@ function copySearch() {
             </div>
             <pre
               class="is-code"
-            ><code><span class="is-prompt">$</span> github-code-search query <span class="is-str">"TODO"</span> --org my-org</code></pre>
+            ><code><span class="is-prompt">{{ platform === 'windows' ? '>' : '$' }}</span> github-code-search query <span class="is-str">"TODO"</span> --org my-org</code></pre>
           </div>
         </div>
       </div>
@@ -531,6 +567,42 @@ function copySearch() {
   border-radius: 50%;
   background: var(--vp-c-divider);
   flex-shrink: 0;
+}
+
+/* ── Platform tabs ─────────────────────────────────────────────────────── */
+.is-platform-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 28px;
+}
+
+.is-platform-tab {
+  padding: 6px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--vp-c-divider);
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-2);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.is-platform-tab:hover {
+  background: rgba(153, 51, 255, 0.08);
+  border-color: rgba(153, 51, 255, 0.25);
+  color: var(--vp-c-text-1);
+}
+
+.is-platform-tab.active {
+  background: rgba(153, 51, 255, 0.12);
+  border-color: rgba(153, 51, 255, 0.4);
+  color: var(--vp-c-brand-1);
+  font-weight: 600;
 }
 
 /* ── Responsive ────────────────────────────────────────────────────────── */
