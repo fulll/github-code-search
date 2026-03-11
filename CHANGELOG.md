@@ -4,8 +4,9 @@ Release notes and changelogs are published on the **[project blog](https://fulll
 
 Each release entry covers the motivation, new features, breaking changes (if any), and upgrade notes.
 
-| Version                                                                  | Blog post                                                                                                       |
-| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| Version                                                                  | Blog post                                                                                                              |
+| ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| [v1.9.0](https://fulll.github.io/github-code-search/blog/release-v1-9-0) | Windows support — native x64, x64-modern, x64-baseline and ARM64 binaries with one-line PowerShell installer          |
 | [v1.8.3](https://fulll.github.io/github-code-search/blog/release-v1-8-3) | Fix TUI layout: header/footer anchoring, viewport packing, narrow-terminal clipping, active-row contrast        |
 | [v1.8.2](https://fulll.github.io/github-code-search/blog/release-v1-8-2) | Fix rate-limit errors aborting multi-page searches; auto-wait and retry with live progress                      |
 | [v1.8.1](https://fulll.github.io/github-code-search/blog/release-v1-8-1) | Fix silent hang after pagination bar — concurrency cap + progress bar for line-number resolution                |
