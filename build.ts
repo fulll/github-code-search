@@ -3,118 +3,244 @@
  * Build script – compiles github-code-search.ts into a standalone binary.
  *
  * Usage:
- *   bun run build.ts.ts                            # current platform
- *   bun run build.ts.ts --target=bun-linux-x64     # cross-compile
+ *   bun run build.ts                               # current platform
+ *   bun run build.ts --target=bun-linux-x64        # cross-compile
  *
  * Supported targets (Bun executables):
  *   bun-linux-x64  bun-linux-x64-baseline  bun-linux-arm64
  *   bun-darwin-x64  bun-darwin-arm64
- *   bun-windows-x64
+ *   bun-windows-x64  bun-windows-x64-baseline  bun-windows-x64-modern
+ *   bun-windows-arm64
  */
 
-import { version } from "./package.json" with { type: "json" };
+import { version, description, author, license } from "./package.json" with { type: "json" };
 
-// ─── CLI args ──────────────────────────────────────────────────────────────────
+// ─── Pure helpers (exported for unit tests) ───────────────────────────────────
 
-const targetArg = process.argv.find((a) => a.startsWith("--target="));
-const target = targetArg?.slice("--target=".length) ?? null;
+export type ParsedTarget = {
+  os: string;
+  arch: string;
+};
 
-// ─── Derive OS / arch from target ─────────────────────────────────────────────
+/**
+ * Derive a canonical { os, arch } pair from a Bun target string such as
+ * "bun-windows-x64-modern" or "bun-linux-arm64".
+ * Returns { os: process.platform, arch: process.arch } when `t` is null/undefined.
+ */
+export function parseTarget(t: string | null | undefined): ParsedTarget {
+  if (!t)
+    return {
+      // Normalize Node's "win32" platform name to the canonical "windows" used
+      // throughout this build script so isWindowsTarget() / getOutfile() work
+      // correctly when building natively on Windows without a --target flag.
+      os: process.platform === "win32" ? "windows" : process.platform,
+      arch: process.arch === "x64" ? "x64" : process.arch,
+    };
 
-function parseTarget(t: string): { os: string; arch: string } {
   const s = t.replace(/^bun-/, "");
+
   if (s.startsWith("linux-x64-baseline")) return { os: "linux", arch: "x64-baseline" };
   if (s.startsWith("linux-x64")) return { os: "linux", arch: "x64" };
   if (s.startsWith("linux-arm64-musl")) return { os: "linux", arch: "arm64-musl" };
   if (s.startsWith("linux-arm64")) return { os: "linux", arch: "arm64" };
   if (s.startsWith("darwin-x64")) return { os: "darwin", arch: "x64" };
   if (s.startsWith("darwin-arm64")) return { os: "darwin", arch: "arm64" };
+  if (s.startsWith("windows-x64-baseline")) return { os: "windows", arch: "x64-baseline" };
+  if (s.startsWith("windows-x64-modern")) return { os: "windows", arch: "x64-modern" };
   if (s.startsWith("windows-x64")) return { os: "windows", arch: "x64" };
-  return { os: process.platform, arch: process.arch };
+  if (s.startsWith("windows-arm64")) return { os: "windows", arch: "arm64" };
+
+  // Fix: normalize win32 → windows for unrecognised target strings (e.g. future targets).
+  return { os: process.platform === "win32" ? "windows" : process.platform, arch: process.arch };
 }
 
-const { os: targetOs, arch: targetArch } = target
-  ? parseTarget(target)
-  : {
-      os: process.platform,
-      arch: process.arch === "x64" ? "x64" : process.arch,
-    };
-
-// ─── Output path ───────────────────────────────────────────────────────────────
-
-const ext = targetOs === "windows" ? ".exe" : "";
-const suffix = target ? `-${target.replace(/^bun-/, "")}` : "";
-const outfile = `./dist/github-code-search${suffix}${ext}`;
-
-// ─── Git commit hash ──────────────────────────────────────────────────────────
-
-let commit = "dev";
-try {
-  const proc = Bun.spawn(["git", "rev-parse", "--short", "HEAD"], {
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  await proc.exited;
-  commit = (await new Response(proc.stdout).text()).trim() || "dev";
-} catch {
-  // Not a git repo or git not available
+/**
+ * Returns true when the given os value targets Windows.
+ */
+export function isWindowsTarget(targetOs: string): boolean {
+  return targetOs === "windows";
 }
 
-// ─── Build ────────────────────────────────────────────────────────────────────
+/**
+ * Compute the output filename for the binary.
+ *
+ *   target=bun-linux-x64          → dist/github-code-search-linux-x64
+ *   target=bun-windows-x64        → dist/github-code-search-windows-x64.exe
+ *   target=bun-windows-x64-modern → dist/github-code-search-windows-x64-modern.exe
+ *   target=null (native)          → dist/github-code-search
+ */
+export function getOutfile(targetOs: string, target: string | null): string {
+  const ext = isWindowsTarget(targetOs) ? ".exe" : "";
+  const suffix = target ? `-${target.replace(/^bun-/, "")}` : "";
+  return `./dist/github-code-search${suffix}${ext}`;
+}
 
-const label = `${version} (${commit} · ${targetOs}/${targetArch})`;
-console.log(`Building github-code-search v${label}… outfile=${outfile}`);
-if (target) console.log(`  Target: ${target}`);
+export type WindowsMeta = {
+  iconPath?: string;
+  title?: string;
+  publisher?: string;
+  appVersion?: string;
+  description?: string;
+  copyright?: string;
+};
 
-await Bun.$`mkdir -p dist`;
-await Bun.build({
-  entrypoints: ["./github-code-search.ts"],
-  minify: true,
-  bytecode: true,
-  compile: {
-    outfile,
-  },
-  define: {
-    BUILD_VERSION: JSON.stringify(version),
-    BUILD_COMMIT: JSON.stringify(commit),
-    BUILD_TARGET_OS: JSON.stringify(targetOs),
-    BUILD_TARGET_ARCH: JSON.stringify(targetArch),
-  },
-  target: target ? target : undefined,
-});
-
-console.log(`  Built ${outfile}`);
-
-// ─── Ad-hoc codesign (macOS only) ────────────────────────────────────────────
-
-if (targetOs === "darwin" && process.platform === "darwin") {
-  const sign = Bun.spawn(
-    [
-      "codesign",
-      "--deep",
-      "--force",
-      "--sign",
-      "-",
-      "--entitlements",
-      `${import.meta.dir}/entitlements.plist`,
+/**
+ * Build the `compile` options forwarded to Bun.build().
+ * Windows binaries receive metadata-enriching flags so the resulting .exe
+ * is not misidentified as "bun" by the OS and shows correct file properties.
+ * See: https://bun.sh/docs/bundler/executables#windows-specific-flags
+ *
+ * @param meta.iconPath Absolute path to .ico — must be absolute so Bun
+ *   resolves it correctly regardless of the caller's CWD.
+ */
+export function getBuildCompileOptions(
+  targetOs: string,
+  outfile: string,
+  meta: WindowsMeta = {},
+): NonNullable<Parameters<typeof Bun.build>[0]["compile"]> {
+  if (isWindowsTarget(targetOs)) {
+    return {
       outfile,
-    ],
-    { stdout: "inherit", stderr: "inherit" },
-  );
-  const signCode = await sign.exited;
-  if (signCode !== 0) {
-    console.error(`codesign failed (exit ${signCode})`);
-    process.exit(signCode);
+      windows: {
+        // iconPath must be absolute — relative paths are resolved from the
+        // process CWD which may differ from the script location.
+        icon: meta.iconPath,
+        // hideConsole: true — prevents Windows from spawning a detached console
+        // window when the binary is launched from a GUI context (e.g. Explorer).
+        // The binary still runs correctly in any terminal emulator / cmd / pwsh.
+        hideConsole: true,
+        title: meta.title,
+        publisher: meta.publisher,
+        version: meta.appVersion,
+        description: meta.description,
+        copyright: meta.copyright,
+      },
+    };
   }
-  console.log(`  Codesigned ${outfile}`);
+  return { outfile };
+}
 
-  const verify = Bun.spawn(["codesign", "--verify", "--verbose", outfile], {
-    stdout: "inherit",
-    stderr: "inherit",
+/**
+ * Extract the --target=<value> argument from a process argv array.
+ * Pure function — extracted so it can be unit-tested without touching process.argv.
+ */
+export function parseTargetArg(argv: string[]): string | null {
+  return argv.find((a) => a.startsWith("--target="))?.slice("--target=".length) ?? null;
+}
+
+/**
+ * Format the human-readable version label printed during the build.
+ * Pure function — extracted so it can be unit-tested.
+ */
+export function buildLabel(ver: string, commit: string, os: string, arch: string): string {
+  return `${ver} (${commit} · ${os}/${arch})`;
+}
+
+/**
+ * Format the copyright string embedded in Windows EXE metadata.
+ * Pure function — extracted so it can be unit-tested.
+ */
+export function buildCopyrightLine(year: number, authorName: string, lic: string): string {
+  return `Copyright © ${year} ${authorName} — ${lic}`;
+}
+
+// ─── CLI args ─────────────────────────────────────────────────────────────────
+
+// Fix: guard with import.meta.main so this block does not run when build.ts is
+// imported by unit tests — see issue #108.
+if (import.meta.main) {
+  const target = parseTargetArg(process.argv);
+
+  // ─── Derive OS / arch from target ────────────────────────────────────────
+
+  const { os: targetOs, arch: targetArch } = parseTarget(target);
+
+  // ─── Output path ─────────────────────────────────────────────────────────
+
+  const outfile = getOutfile(targetOs, target);
+
+  // ─── Git commit hash ─────────────────────────────────────────────────────
+
+  let commit = "dev";
+  try {
+    const proc = Bun.spawn(["git", "rev-parse", "--short", "HEAD"], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    await proc.exited;
+    commit = (await new Response(proc.stdout).text()).trim() || "dev";
+  } catch {
+    // Not a git repo or git not available
+  }
+
+  // ─── Build ───────────────────────────────────────────────────────────────
+
+  const label = buildLabel(version, commit, targetOs, targetArch);
+  console.log(`Building github-code-search v${label}… outfile=${outfile}`);
+  if (target) console.log(`  Target: ${target}`);
+
+  // Absolute path to the Windows icon — must be absolute so Bun resolves it
+  // correctly when the script is invoked from any working directory.
+  const icoPath = `${import.meta.dir}/docs/public/icons/favicon.ico`;
+
+  const currentYear = new Date().getFullYear();
+  const authorName = typeof author === "string" ? author : author.name;
+
+  await Bun.$`mkdir -p dist`;
+  await Bun.build({
+    entrypoints: ["./github-code-search.ts"],
+    minify: true,
+    // Fix: bytecode: true causes the binary to fail on Windows — removed.
+    compile: getBuildCompileOptions(targetOs, outfile, {
+      iconPath: icoPath,
+      title: "github-code-search",
+      publisher: authorName,
+      appVersion: version,
+      description,
+      copyright: buildCopyrightLine(currentYear, authorName, license),
+    }),
+    define: {
+      BUILD_VERSION: JSON.stringify(version),
+      BUILD_COMMIT: JSON.stringify(commit),
+      BUILD_TARGET_OS: JSON.stringify(targetOs),
+      BUILD_TARGET_ARCH: JSON.stringify(targetArch),
+    },
+    target: target ? (target as Parameters<typeof Bun.build>[0]["target"]) : undefined,
   });
-  const verifyCode = await verify.exited;
-  if (verifyCode !== 0) {
-    console.error(`codesign verification failed (exit ${verifyCode})`);
-    process.exit(verifyCode);
+
+  console.log(`  Built ${outfile}`);
+
+  // ─── Ad-hoc codesign (macOS only) ────────────────────────────────────────
+
+  if (targetOs === "darwin" && process.platform === "darwin") {
+    const sign = Bun.spawn(
+      [
+        "codesign",
+        "--deep",
+        "--force",
+        "--sign",
+        "-",
+        "--entitlements",
+        `${import.meta.dir}/entitlements.plist`,
+        outfile,
+      ],
+      { stdout: "inherit", stderr: "inherit" },
+    );
+    const signCode = await sign.exited;
+    if (signCode !== 0) {
+      console.error(`codesign failed (exit ${signCode})`);
+      process.exit(signCode);
+    }
+    console.log(`  Codesigned ${outfile}`);
+
+    const verify = Bun.spawn(["codesign", "--verify", "--verbose", outfile], {
+      stdout: "inherit",
+      stderr: "inherit",
+    });
+    const verifyCode = await verify.exited;
+    if (verifyCode !== 0) {
+      console.error(`codesign verification failed (exit ${verifyCode})`);
+      process.exit(verifyCode);
+    }
   }
 }

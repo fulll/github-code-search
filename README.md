@@ -14,9 +14,19 @@ keyboard-driven TUI, fine-grained extract selection, markdown/JSON output.
 
 ## Quick start
 
+**macOS / Linux**
+
 ```bash
 export GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
 curl -fsSL https://raw.githubusercontent.com/fulll/github-code-search/main/install.sh | bash
+github-code-search query "TODO" --org my-org
+```
+
+**Windows** (PowerShell)
+
+```powershell
+$env:GITHUB_TOKEN = "ghp_xxxxxxxxxxxxxxxxxxxx"
+powershell -c "irm https://raw.githubusercontent.com/fulll/github-code-search/main/install.ps1 | iex"
 github-code-search query "TODO" --org my-org
 ```
 

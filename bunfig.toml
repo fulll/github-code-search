@@ -4,4 +4,7 @@ coverageReporter = ["text", "lcov"]
 coverageThreshold = { lines = 0.75, functions = 0.8, statements = 0.8 }
 coverageSkipTestFiles = true
 preload = ["./src/test-setup.ts"]
-coveragePathIgnorePatterns = ["src/test-setup.ts"]
+# build.ts is an executable entry script (like tui.ts): its side-effectful main
+# block (Bun.build, git, codesign) cannot be unit-tested. All pure helpers are
+# exported and tested separately.
+coveragePathIgnorePatterns = ["src/test-setup.ts", "build.ts"]

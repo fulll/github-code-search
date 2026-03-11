@@ -30,6 +30,15 @@ jobs:
           - runner: ubuntu-latest
             target: bun-windows-x64
             artifact: github-code-search-windows-x64.exe
+          - runner: ubuntu-latest
+            target: bun-windows-x64-baseline
+            artifact: github-code-search-windows-x64-baseline.exe
+          - runner: ubuntu-latest
+            target: bun-windows-x64-modern
+            artifact: github-code-search-windows-x64-modern.exe
+          - runner: ubuntu-latest
+            target: bun-windows-arm64
+            artifact: github-code-search-windows-arm64.exe
           # macOS — must run on macOS for ad-hoc codesigning
           - runner: macos-latest
             target: bun-darwin-x64

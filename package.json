@@ -45,6 +45,7 @@
     "docs:build": "vitepress build docs",
     "docs:build:a11y": "VITEPRESS_HOSTNAME=http://localhost:4173 vitepress build docs",
     "docs:build:og": "bun scripts/generate-og.ts",
+    "generate-ico": "bun scripts/generate-ico.ts",
     "docs:preview": "vitepress preview docs",
     "docs:a11y": "pa11y-ci --config .pa11yci.json --sitemap http://localhost:4173${VITEPRESS_BASE:-/github-code-search/}sitemap.xml",
     "docs:lhci": "lhci autorun --config .lhci.config.cjs",
@@ -64,6 +65,7 @@
     "oxfmt": "^0.36.0",
     "oxlint": "^1.51.0",
     "pa11y-ci": "^4.1.0",
+    "sharp": "^0.34.5",
     "vitepress": "^1.6.3",
     "vitepress-mermaid-renderer": "^1.1.18"
   }
