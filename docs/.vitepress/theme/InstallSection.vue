@@ -596,6 +596,11 @@ function copySearch() {
   color: var(--vp-c-text-1);
 }
 
+.is-platform-tab:focus-visible {
+  outline: 2px solid #cc88ff;
+  outline-offset: 2px;
+}
+
 .is-platform-tab.active {
   background: rgba(153, 51, 255, 0.12);
   border-color: rgba(153, 51, 255, 0.4);

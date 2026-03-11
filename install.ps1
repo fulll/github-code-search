@@ -131,6 +131,9 @@ if ($Version -eq "latest") {
 $CandidateTargets = @($Target)
 if ($Target -eq "x64-modern") {
   $CandidateTargets += "x64-baseline"
+  $CandidateTargets += "x64"
+} elseif ($Target -eq "x64-baseline") {
+  $CandidateTargets += "x64"
 }
 
 $Artifact = $null
@@ -220,7 +223,8 @@ try {
 # ── PATH update ──────────────────────────────────────────────────────────────
 
 if (-not $NoPathUpdate) {
-  $Path = (Get-Env -Key "Path") -split ';'
+  $ExistingPath = Get-Env -Key "Path"
+  $Path = if ($null -ne $ExistingPath) { $ExistingPath -split ';' } else { @() }
   if ($Path -notcontains $InstallDir) {
     $Path += $InstallDir
     Write-Env -Key 'Path' -Value ($Path -join ';')

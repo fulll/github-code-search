@@ -1,12 +1,39 @@
 import { describe, it, expect } from "bun:test";
 import {
   parseTarget,
+  parseTargetArg,
   isWindowsTarget,
   getOutfile,
   getBuildCompileOptions,
+  buildLabel,
+  buildCopyrightLine,
   type WindowsMeta,
 } from "./build";
+// ─── parseTargetArg ─────────────────────────────────────────────────────────────
 
+describe("parseTargetArg", () => {
+  it("extracts the target value from argv", () => {
+    expect(parseTargetArg(["bun", "build.ts", "--target=bun-linux-x64"])).toBe("bun-linux-x64");
+  });
+
+  it("returns null when no --target= flag is present", () => {
+    expect(parseTargetArg(["bun", "build.ts"])).toBeNull();
+  });
+
+  it("returns null for empty argv", () => {
+    expect(parseTargetArg([])).toBeNull();
+  });
+
+  it("ignores unrelated flags", () => {
+    expect(parseTargetArg(["bun", "--verbose", "--target=bun-windows-x64"])).toBe(
+      "bun-windows-x64",
+    );
+  });
+
+  it("returns empty string when --target= has no value", () => {
+    expect(parseTargetArg(["bun", "--target="])).toBe("");
+  });
+});
 // ─── parseTarget ─────────────────────────────────────────────────────────────
 
 describe("parseTarget", () => {
@@ -111,6 +138,13 @@ describe("parseTarget", () => {
     expect(isWindowsTarget("win32")).toBe(false);
     expect(isWindowsTarget("windows")).toBe(true);
     expect(getOutfile("windows", null)).toBe("./dist/github-code-search.exe");
+  });
+
+  // Regression: the end-of-function fallback (unrecognised target string) must
+  // also normalise win32 → windows, not leak the raw Node.js platform alias.
+  it("never returns win32 as os for unknown target strings", () => {
+    const result = parseTarget("bun-completely-unknown-future-target");
+    expect(result.os).not.toBe("win32");
   });
 });
 
@@ -255,5 +289,37 @@ describe("getBuildCompileOptions", () => {
     expect(opts.outfile).toBe("./dist/foo.exe");
     expect(opts.windows.icon).toBeUndefined();
     expect(opts.windows.title).toBeUndefined();
+  });
+});
+
+// ─── buildLabel ──────────────────────────────────────────────────────────────
+
+describe("buildLabel", () => {
+  it("formats the label string correctly", () => {
+    expect(buildLabel("1.9.0", "abc1234", "linux", "x64")).toBe("1.9.0 (abc1234 · linux/x64)");
+  });
+
+  it("works with windows target", () => {
+    expect(buildLabel("1.9.0", "abc1234", "windows", "x64-modern")).toBe(
+      "1.9.0 (abc1234 · windows/x64-modern)",
+    );
+  });
+
+  it("works with dev commit", () => {
+    expect(buildLabel("1.9.0", "dev", "darwin", "arm64")).toBe("1.9.0 (dev · darwin/arm64)");
+  });
+});
+
+// ─── buildCopyrightLine ──────────────────────────────────────────────────────
+
+describe("buildCopyrightLine", () => {
+  it("formats the copyright string correctly", () => {
+    expect(buildCopyrightLine(2026, "fulll", "MIT")).toBe("Copyright © 2026 fulll — MIT");
+  });
+
+  it("uses the provided year", () => {
+    expect(buildCopyrightLine(2030, "Acme Corp", "Apache-2.0")).toBe(
+      "Copyright © 2030 Acme Corp — Apache-2.0",
+    );
   });
 });

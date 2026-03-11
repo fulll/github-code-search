@@ -10,10 +10,11 @@
  */
 
 import sharp from "sharp";
-import { writeFileSync } from "fs";
+import { mkdirSync, writeFileSync } from "fs";
+import { resolve } from "node:path";
 
-const SRC = "./docs/public/logo.svg";
-const DEST = "./docs/public/icons/favicon.ico";
+const SRC = resolve(import.meta.dirname, "../docs/public/logo.svg");
+const DEST = resolve(import.meta.dirname, "../docs/public/icons/favicon.ico");
 
 const SIZES = [16, 32, 48, 256];
 
@@ -50,6 +51,7 @@ icondir.writeUInt16LE(1, 2); // type = 1 (icon)
 icondir.writeUInt16LE(pngs.length, 4); // number of images
 
 const ico = Buffer.concat([icondir, ...entries, ...pngs]);
+mkdirSync(resolve(import.meta.dirname, "../docs/public/icons"), { recursive: true });
 writeFileSync(DEST, ico);
 
 const sizes = SIZES.map((s) => `${s}×${s}`).join(", ");
