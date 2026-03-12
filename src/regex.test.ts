@@ -27,6 +27,12 @@ describe("isRegexQuery", () => {
   it("returns false for a qualifier-only query", () => {
     expect(isRegexQuery("filename:package.json")).toBe(false);
   });
+
+  it("returns false when /pattern/flags is not end-bounded (e.g. /useState/iSomething)", () => {
+    // Regression: the token must be followed by whitespace or end-of-string;
+    // a suffix of non-flag characters must not be silently swallowed.
+    expect(isRegexQuery("/useState/iSomething")).toBe(false);
+  });
 });
 
 // ─── buildApiQuery ────────────────────────────────────────────────────────────
@@ -37,6 +43,13 @@ describe("buildApiQuery — plain text passthrough", () => {
     expect(r.apiQuery).toBe("plain text query");
     expect(r.regexFilter).toBeNull();
     expect(r.warn).toBeUndefined();
+  });
+
+  it("/useState/iSomething is NOT treated as a regex token (boundary regression)", () => {
+    // 'iSomething' is not a valid flag sequence — the token should not match.
+    const r = buildApiQuery("/useState/iSomething");
+    expect(r.apiQuery).toBe("/useState/iSomething");
+    expect(r.regexFilter).toBeNull();
   });
 });
 

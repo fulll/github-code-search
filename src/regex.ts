@@ -84,11 +84,16 @@ interface RegexToken {
  * Returns `null` when no regex token is found.
  */
 function extractRegexToken(q: string): RegexToken | null {
-  // Match /pattern/flags where pattern doesn't contain unescaped newlines.
-  // The trailing flags are all current JS RegExp flag letters:
+  // Match /pattern/flags where:
+  //   - the pattern is a non-empty sequence that doesn't contain an unescaped
+  //     forward slash, backslash, or newline (\r / \n)
+  //   - the token ends at end-of-string or a whitespace boundary, so we don't
+  //     accidentally match a prefix of a longer non-delimited word
+  //     (e.g. /foo/iSomething must NOT be recognised as a regex token).
+  // The trailing flags cover all current JS RegExp flag letters:
   //   g (global), i (ignoreCase), m (multiline), s (dotAll),
   //   u (unicode), y (sticky), d (hasIndices ES2022), v (unicodeSets ES2023).
-  const m = q.match(/(?:^|\s)(\/(?:[^/\\]|\\.)+\/[gimsuydev]*)/);
+  const m = q.match(/(?:^|\s)(\/(?:[^/\\\r\n]|\\.)+\/[gimsuydev]*)(?=$|\s)/);
   if (!m || !m[1]) return null;
   const raw = m[1].trim();
   const lastSlash = raw.lastIndexOf("/");

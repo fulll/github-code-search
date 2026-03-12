@@ -223,4 +223,15 @@ describe("aggregate — regexFilter", () => {
     const groups = aggregate(matches, new Set(), new Set(), false, /axios/);
     expect(groups).toHaveLength(0);
   });
+
+  it("restores lastIndex to 0 after filtering (does not leak state to caller)", () => {
+    // Regression: aggregate() must not leave a stale lastIndex on the RegExp
+    // instance so callers that reuse it get consistent results.
+    const matches: CodeMatch[] = [
+      makeMatchWithFragments("myorg/repoA", "src/a.ts", ["import axios from 'axios'"]),
+    ];
+    const regex = /axios/g; // global flag: lastIndex advances after a match
+    aggregate(matches, new Set(), new Set(), false, regex);
+    expect(regex.lastIndex).toBe(0);
+  });
 });

@@ -49,6 +49,9 @@ export function aggregate(
         regexFilter.lastIndex = 0;
         return regexFilter.test(tm.fragment);
       });
+      // Fix: restore lastIndex to 0 so callers that reuse the same RegExp
+      // instance don't observe a stale non-zero lastIndex after aggregate().
+      regexFilter.lastIndex = 0;
       if (!hasMatch) continue;
     }
     const list = map.get(m.repoFullName) ?? [];
