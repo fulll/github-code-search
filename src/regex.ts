@@ -108,10 +108,12 @@ function extractApiTerm(pattern: string): { term: string; warn?: string } {
   // 1. Top-level alternation detection.
   const branches = splitTopLevelAlternation(pattern);
   if (branches.length > 1) {
-    // Each branch must yield a meaningful literal to use the OR strategy;
-    // otherwise fall through to the longest-literal approach.
+    // Each branch must yield a meaningful literal (>= 3 chars) to use the OR
+    // strategy — the same minimum enforced by the single-literal path below.
+    // Branches shorter than 3 chars (e.g. /a|bc/) fall through so the global
+    // "< 3 chars → warn + empty term" rule still applies.
     const branchTerms = branches.map((b) => longestLiteralSequence(b));
-    if (branchTerms.every((t) => t.length >= 1)) {
+    if (branchTerms.every((t) => t.length >= 3)) {
       return { term: branchTerms.join(" OR ") };
     }
   }

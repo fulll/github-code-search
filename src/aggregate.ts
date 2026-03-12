@@ -34,7 +34,7 @@ export function aggregate(
   excludedRepos: Set<string>,
   excludedExtractRefs: Set<string>,
   includeArchived = false,
-  regexFilter?: RegExp,
+  regexFilter?: RegExp | null,
 ): RepoGroup[] {
   const map = new Map<string, CodeMatch[]>();
   for (const m of matches) {
@@ -42,7 +42,7 @@ export function aggregate(
     if (!includeArchived && m.archived) continue;
     // Fix: when a regex filter is active, only keep matches where at least one
     // text_match fragment satisfies the pattern — see issue #111
-    if (regexFilter !== undefined) {
+    if (regexFilter != null) {
       const hasMatch = m.textMatches.some((tm) => {
         // Fix: reset lastIndex before each call — a global/sticky regex is
         // stateful and would produce false negatives on subsequent fragments.

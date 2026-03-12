@@ -195,6 +195,16 @@ describe("aggregate — regexFilter", () => {
     expect(groups).toHaveLength(2);
   });
 
+  it("keeps all matches when regexFilter is null (backward compat — null treated as no filter)", () => {
+    const matches: CodeMatch[] = [
+      makeMatchWithFragments("myorg/repoA", "src/a.ts", ["const x = 1"]),
+      makeMatchWithFragments("myorg/repoB", "src/b.ts", ["const y = 2"]),
+    ];
+
+    const groups = aggregate(matches, new Set(), new Set(), false, null);
+    expect(groups).toHaveLength(2);
+  });
+
   it("respects regex flags (case-insensitive)", () => {
     const matches: CodeMatch[] = [
       makeMatchWithFragments("myorg/repoA", "src/a.ts", ["import AXIOS from 'axios'"]),

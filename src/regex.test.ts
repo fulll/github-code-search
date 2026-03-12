@@ -69,6 +69,15 @@ describe("buildApiQuery — top-level alternation → OR", () => {
     expect(r.warn).toBeUndefined();
   });
 
+  it("/a|bc/ — short branches (< 3 chars each) fall back to longest literal and warn", () => {
+    // branches: "a" (1 char) and "bc" (2 chars) — both < 3 → fall back to
+    // longestLiteralSequence("a|bc") → "bc" (2 chars) < 3 → warn + empty term
+    const r = buildApiQuery("/a|bc/");
+    expect(r.warn).toBeDefined();
+    expect(r.apiQuery).toBe("");
+    expect(r.regexFilter).not.toBeNull();
+  });
+
   it("/\\\\|foo/ — escaped backslash before | → | is top-level → falls back to longest literal 'foo'", () => {
     // Pattern \\|foo: \\ is an escaped backslash (matches literal \), | is top-level.
     // splitTopLevelAlternation gives ["\\", "foo"]; "\\" yields no useful literal
