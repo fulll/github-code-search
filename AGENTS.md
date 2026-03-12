@@ -80,6 +80,9 @@ src/
   completions.ts         # Pure shell-completion generators: generateCompletion(),
                          #   detectShell(), getCompletionFilePath() — no I/O
   group.ts               # groupByTeamPrefix — team-prefix grouping logic
+  regex.ts               # Pure query parser: isRegexQuery(), buildApiQuery()
+                         #   Detects /pattern/ syntax, derives safe API term,
+                         #   returns RegExp for local client-side filtering — no I/O
   render.ts              # Façade re-exporting sub-modules + top-level
                          #   renderGroups() / renderHelpOverlay()
   tui.ts                 # Interactive keyboard-driven UI (navigation, filter mode,

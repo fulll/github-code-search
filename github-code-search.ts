@@ -24,6 +24,7 @@ import { groupByTeamPrefix, flattenTeamSections } from "./src/group.ts";
 import { checkForUpdate } from "./src/upgrade.ts";
 import { runInteractive } from "./src/tui.ts";
 import { generateCompletion, detectShell } from "./src/completions.ts";
+import { buildApiQuery, isRegexQuery } from "./src/regex.ts";
 import type { OutputFormat, OutputType } from "./src/types.ts";
 
 // Version + build metadata injected at compile time via --define (see build.ts).
@@ -179,6 +180,15 @@ function addSearchOptions(cmd: Command): Command {
     .option(
       "--no-cache",
       "Bypass the 24 h team-list cache and re-fetch teams from GitHub (only applies with --group-by-team-prefix).",
+    )
+    .option(
+      "--regex-hint <term>",
+      [
+        "Override the search term sent to the GitHub API when using a regex query.",
+        "Useful when auto-extraction produces a term that is too broad or too narrow.",
+        'Example: --regex-hint "axios"  (for query /from.*[\'"]axios/)',
+        "Docs: https://fulll.github.io/github-code-search/usage/search-syntax#regex-queries",
+      ].join("\n"),
     );
 }
 
@@ -195,6 +205,7 @@ async function searchAction(
     includeArchived: boolean;
     groupByTeamPrefix: string;
     cache: boolean;
+    regexHint?: string;
   },
 ): Promise<void> {
   // ─── GitHub API token ───────────────────────────────────────────────────────
@@ -264,8 +275,32 @@ async function searchAction(
     return activeCooldown;
   };
 
-  const rawMatches = await fetchAllResults(query, org, GITHUB_TOKEN!, onRateLimit);
-  let groups = aggregate(rawMatches, excludedRepos, excludedExtractRefs, includeArchived);
+  // ─── Regex query detection ───────────────────────────────────────────────
+  let effectiveQuery = query;
+  let regexFilter: RegExp | undefined;
+  if (isRegexQuery(query)) {
+    const { apiQuery, regexFilter: rf, warn } = buildApiQuery(query);
+    if (warn && !opts.regexHint) {
+      console.error(
+        pc.yellow(`⚠  Regex mode — ${warn}\n   Provide a manual hint with --regex-hint <term>.`),
+      );
+      process.exit(1);
+    }
+    effectiveQuery = opts.regexHint ?? apiQuery;
+    regexFilter = rf ?? undefined;
+    process.stderr.write(
+      pc.dim(`  ℹ  Regex mode — GitHub query: "${effectiveQuery}", local filter: ${query}\n`),
+    );
+  }
+
+  const rawMatches = await fetchAllResults(effectiveQuery, org, GITHUB_TOKEN!, onRateLimit);
+  let groups = aggregate(
+    rawMatches,
+    excludedRepos,
+    excludedExtractRefs,
+    includeArchived,
+    regexFilter,
+  );
 
   // ─── Team-prefix grouping ─────────────────────────────────────────────────
   if (opts.groupByTeamPrefix) {
