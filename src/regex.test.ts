@@ -175,6 +175,27 @@ describe("buildApiQuery — flags", () => {
   });
 });
 
+describe("buildApiQuery — special escape handling in longestLiteralSequence", () => {
+  it("/\\buseState\\b/ → useState (word-boundary escapes do not contaminate the term)", () => {
+    // Regression: \b is a regex assertion, not the letter 'b'.
+    // The sequence must be broken at \b so 'useState' is extracted, not 'buseStateb'.
+    const r = buildApiQuery("/\\buseState\\b/");
+    expect(r.apiQuery).toBe("useState");
+    expect(r.regexFilter).not.toBeNull();
+  });
+
+  it("/\\d+\\.\\d+/ → empty term + warn (\\d and \\. are not literals)", () => {
+    const r = buildApiQuery("/\\d+\\.\\d+/");
+    expect(r.apiQuery).toBe("");
+    expect(r.warn).toBeDefined();
+  });
+
+  it("/foobar\\sxyz/ → foobar (\\s breaks the sequence, longer prefix wins)", () => {
+    const r = buildApiQuery("/foobar\\sxyz/");
+    expect(r.apiQuery).toBe("foobar");
+  });
+});
+
 describe("buildApiQuery — warn cases", () => {
   it("/[~^]?[0-9]+\\.[0-9]+/ → empty term + warn", () => {
     const r = buildApiQuery("/[~^]?[0-9]+\\.[0-9]+/");
