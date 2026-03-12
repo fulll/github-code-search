@@ -224,14 +224,18 @@ describe("aggregate — regexFilter", () => {
     expect(groups).toHaveLength(0);
   });
 
-  it("restores lastIndex to 0 after filtering (does not leak state to caller)", () => {
-    // Regression: aggregate() must not leave a stale lastIndex on the RegExp
-    // instance so callers that reuse it get consistent results.
+  it("restores lastIndex to its pre-call value after filtering (does not clobber caller state)", () => {
+    // Regression: aggregate() must restore lastIndex to whatever the caller had
+    // set before the call — not necessarily 0.
     const matches: CodeMatch[] = [
       makeMatchWithFragments("myorg/repoA", "src/a.ts", ["import axios from 'axios'"]),
     ];
-    const regex = /axios/g; // global flag: lastIndex advances after a match
+    const regex = /axios/g;
+    // Caller has already run a match, so lastIndex is non-zero.
+    regex.test("import axios from 'axios'");
+    const savedIndex = regex.lastIndex;
+    expect(savedIndex).toBeGreaterThan(0);
     aggregate(matches, new Set(), new Set(), false, regex);
-    expect(regex.lastIndex).toBe(0);
+    expect(regex.lastIndex).toBe(savedIndex);
   });
 });

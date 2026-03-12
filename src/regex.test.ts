@@ -215,10 +215,14 @@ describe("buildApiQuery — warn cases", () => {
     expect(r.warn).toBeDefined();
   });
 
-  it("/[/ (invalid regex) → empty term + warn + null filter", () => {
+  it("/[/ (invalid regex) → warn includes the engine error message", () => {
     const r = buildApiQuery("/[/");
     expect(r.apiQuery).toBe("");
     expect(r.regexFilter).toBeNull();
+    // The warn message must include the engine-provided reason (not just a
+    // generic message), so callers can surface a precise debugging hint.
     expect(r.warn).toBeDefined();
+    // The raw token should appear in warn for easy identification.
+    expect(r.warn).toContain("/[/");
   });
 });

@@ -43,15 +43,18 @@ export function aggregate(
     // Fix: when a regex filter is active, only keep matches where at least one
     // text_match fragment satisfies the pattern — see issue #111
     if (regexFilter != null) {
+      // Preserve the caller's lastIndex: aggregate() must not have observable
+      // side-effects on the passed-in RegExp instance.
+      const savedLastIndex = regexFilter.lastIndex;
       const hasMatch = m.textMatches.some((tm) => {
         // Fix: reset lastIndex before each call — a global/sticky regex is
         // stateful and would produce false negatives on subsequent fragments.
         regexFilter.lastIndex = 0;
         return regexFilter.test(tm.fragment);
       });
-      // Fix: restore lastIndex to 0 so callers that reuse the same RegExp
-      // instance don't observe a stale non-zero lastIndex after aggregate().
-      regexFilter.lastIndex = 0;
+      // Restore the caller's original lastIndex (rather than hard-coding 0),
+      // so aggregate() doesn't have observable side effects on its inputs.
+      regexFilter.lastIndex = savedLastIndex;
       if (!hasMatch) continue;
     }
     const list = map.get(m.repoFullName) ?? [];

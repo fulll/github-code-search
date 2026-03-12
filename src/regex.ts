@@ -43,12 +43,14 @@ export function buildApiQuery(q: string): {
   let regexFilter: RegExp | null = null;
   try {
     regexFilter = new RegExp(pattern, safeFlags);
-  } catch {
-    // Fix: invalid regex pattern — warn and return empty query — see issue #111
+  } catch (err) {
+    // Fix: invalid regex — warn with the engine's own error message so callers
+    // can surface a precise reason (e.g. invalid flags vs bad syntax).
+    const reason = err instanceof Error ? err.message : String(err);
     return {
       apiQuery: "",
       regexFilter: null,
-      warn: `Invalid regex pattern: /${pattern}/${flags}`,
+      warn: `Invalid regex /${pattern}/${flags}: ${reason}`,
     };
   }
 
