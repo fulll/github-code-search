@@ -60,15 +60,10 @@ export function buildApiQuery(q: string): {
   // Derive the API search term from the regex pattern.
   const { term, warn } = extractApiTerm(pattern);
 
-  // Rebuild the API query by replacing the regex token with the derived term,
-  // preserving all other tokens (qualifiers and free-text terms alike).
-  const apiQuery = q
-    .trim()
-    .split(/\s+/)
-    .map((t) => (t === raw ? term : t))
-    .filter((t) => t.length > 0)
-    .join(" ")
-    .trim();
+  // Rebuild the API query by replacing the regex token in-place, preserving
+  // all other characters byte-for-byte — including quoted phrases (e.g.
+  // '"exact match" /pattern/') whose internal whitespace must not be split.
+  const apiQuery = q.replace(raw, term).trim();
 
   return { apiQuery, regexFilter, warn };
 }

@@ -144,6 +144,15 @@ describe("buildApiQuery — qualifier preservation", () => {
     const r = buildApiQuery("path:src/ /useState/");
     expect(r.apiQuery).toBe("path:src/ useState");
   });
+
+  it("preserves quoted phrase alongside regex token", () => {
+    // Regression: split(/\s+/) would break quoted phrases like \"feature flag\";
+    // the reconstruction must replace only the regex token, byte-for-byte.
+    const r = buildApiQuery('"feature flag" /from.*axios/');
+    expect(r.apiQuery).toBe('"feature flag" axios');
+    expect(r.regexFilter).not.toBeNull();
+    expect(r.warn).toBeUndefined();
+  });
 });
 
 describe("buildApiQuery — flags", () => {
