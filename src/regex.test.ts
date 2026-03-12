@@ -13,7 +13,7 @@ describe("isRegexQuery", () => {
   });
 
   it("returns true for a query mixing qualifiers and regex", () => {
-    expect(isRegexQuery('filename:package.json /["\'"]axios["\'"]:/'));
+    expect(isRegexQuery('filename:package.json /["\'"]axios["\'"]:/')).toBe(true);
   });
 
   it("returns false for a plain text query", () => {
@@ -68,6 +68,15 @@ describe("buildApiQuery — top-level alternation → OR", () => {
     expect(r.regexFilter).toEqual(/TODO|FIXME|HACK/);
     expect(r.warn).toBeUndefined();
   });
+
+  it("/\\\\|foo/ — escaped backslash before | → | is top-level → falls back to longest literal 'foo'", () => {
+    // Pattern \\|foo: \\ is an escaped backslash (matches literal \), | is top-level.
+    // splitTopLevelAlternation gives ["\\", "foo"]; "\\" yields no useful literal
+    // so branchTerms fails the every->=1 check and we fall back to longestLiteralSequence.
+    const r = buildApiQuery("/\\\\|foo/");
+    expect(r.apiQuery).toBe("foo");
+    expect(r.regexFilter).not.toBeNull();
+  });
 });
 
 describe("buildApiQuery — partial alternation falls back to longest literal", () => {
@@ -81,11 +90,17 @@ describe("buildApiQuery — partial alternation falls back to longest literal", 
 });
 
 describe("buildApiQuery — qualifier preservation", () => {
-  it('filename:package.json /[\'"]axios[\'"]:\\s*"/ → filename:package.json axios', () => {
+  it("filename:package.json /['\"axios['\"]:/ → filename:package.json axios", () => {
     const r = buildApiQuery("filename:package.json /['\"]axios['\"]:/");
     expect(r.apiQuery).toBe("filename:package.json axios");
     expect(r.regexFilter).not.toBeNull();
     expect(r.warn).toBeUndefined();
+  });
+
+  it("preserves free-text terms alongside the regex token", () => {
+    const r = buildApiQuery("useFeatureFlag NOT deprecated /pattern/i");
+    expect(r.apiQuery).toBe("useFeatureFlag NOT deprecated pattern");
+    expect(r.regexFilter).not.toBeNull();
   });
 
   it("preserves language: qualifier", () => {
@@ -109,6 +124,12 @@ describe("buildApiQuery — flags", () => {
   it("/pattern/gi → g flag stripped, i kept", () => {
     const r = buildApiQuery("/pattern/gi");
     expect(r.regexFilter?.flags).not.toContain("g");
+    expect(r.regexFilter?.flags).toContain("i");
+  });
+
+  it("/pattern/iy → y (sticky) flag stripped, i kept", () => {
+    const r = buildApiQuery("/pattern/iy");
+    expect(r.regexFilter?.flags).not.toContain("y");
     expect(r.regexFilter?.flags).toContain("i");
   });
 });

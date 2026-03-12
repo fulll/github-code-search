@@ -4,9 +4,6 @@
 // These helpers detect regex queries, derive a safe literal term to send to the
 // API (casting a wide net), and return a compiled RegExp for local post-filtering.
 
-/** GitHub search qualifier tokens to preserve unchanged (e.g. filename:foo.json). */
-const QUALIFIER_RE = /^(?:filename|language|path|extension|repo|org|NOT):?\S*/;
-
 /**
  * Returns true if `q` contains a `/pattern/` or `/pattern/flags` token.
  * A leading qualifier like `filename:package.json /regex/` is also matched.
@@ -39,9 +36,10 @@ export function buildApiQuery(q: string): {
     return { apiQuery: q, regexFilter: null };
   }
 
-  // Compile the regex (strip the `g` flag — GitHub doesn't return all occurrences).
+  // Compile the regex (strip stateful flags `g` and `y` — GitHub doesn't return
+  // all occurrences and `y` (sticky) makes RegExp.test() stateful via lastIndex).
   const { pattern, flags, raw } = token;
-  const safeFlags = flags.replace("g", "");
+  const safeFlags = flags.replace(/[gy]/g, "");
   let regexFilter: RegExp | null = null;
   try {
     regexFilter = new RegExp(pattern, safeFlags);
@@ -54,17 +52,18 @@ export function buildApiQuery(q: string): {
     };
   }
 
-  // Separate qualifier tokens from the regex token.
-  const qualifiers = q
-    .replace(raw, "")
-    .trim()
-    .split(/\s+/)
-    .filter((t) => t.length > 0 && QUALIFIER_RE.test(t))
-    .join(" ");
-
   // Derive the API search term from the regex pattern.
   const { term, warn } = extractApiTerm(pattern);
-  const apiQuery = [qualifiers, term].filter(Boolean).join(" ").trim();
+
+  // Rebuild the API query by replacing the regex token with the derived term,
+  // preserving all other tokens (qualifiers and free-text terms alike).
+  const apiQuery = q
+    .trim()
+    .split(/\s+/)
+    .map((t) => (t === raw ? term : t))
+    .filter((t) => t.length > 0)
+    .join(" ")
+    .trim();
 
   return { apiQuery, regexFilter, warn };
 }
@@ -139,13 +138,22 @@ function splitTopLevelAlternation(pattern: string): string[] {
   let depth = 0; // tracks unescaped ( nesting
   let inClass = false; // tracks [...]
   let current = "";
+  let escaped = false; // true when current char is escaped by a preceding backslash
 
   for (let i = 0; i < pattern.length; i++) {
     const ch = pattern[i];
-    const prev = i > 0 ? pattern[i - 1] : "";
 
-    if (prev === "\\") {
+    if (escaped) {
+      // Current character is escaped — treat as literal, never as a delimiter.
       current += ch;
+      escaped = false;
+      continue;
+    }
+
+    if (ch === "\\") {
+      // Next character will be escaped.
+      current += ch;
+      escaped = true;
       continue;
     }
 
