@@ -130,6 +130,15 @@ describe("buildApiQuery — flags", () => {
     expect(r.regexFilter?.flags).toContain("i");
   });
 
+  it("/pattern/s → s (dotAll) flag recognized and preserved", () => {
+    // s is a valid JS RegExp flag (dotAll) — must be tokenized correctly
+    // so the /pattern/s token is replaced in the API query (not left as-is).
+    const r = buildApiQuery("/pattern/s");
+    expect(r.apiQuery).toBe("pattern");
+    expect(r.regexFilter).not.toBeNull();
+    expect(r.regexFilter?.flags).toContain("s");
+  });
+
   it("/pattern/gi → g flag stripped, i kept", () => {
     const r = buildApiQuery("/pattern/gi");
     expect(r.regexFilter?.flags).not.toContain("g");

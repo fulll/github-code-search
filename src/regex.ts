@@ -85,8 +85,10 @@ interface RegexToken {
  */
 function extractRegexToken(q: string): RegexToken | null {
   // Match /pattern/flags where pattern doesn't contain unescaped newlines.
-  // The trailing flags are optional letters (gimsuy).
-  const m = q.match(/(?:^|\s)(\/(?:[^/\\]|\\.)+\/[gimsuy]*)/);
+  // The trailing flags are all current JS RegExp flag letters:
+  //   g (global), i (ignoreCase), m (multiline), s (dotAll),
+  //   u (unicode), y (sticky), d (hasIndices ES2022), v (unicodeSets ES2023).
+  const m = q.match(/(?:^|\s)(\/(?:[^/\\]|\\.)+\/[gimsuydev]*)/);
   if (!m || !m[1]) return null;
   const raw = m[1].trim();
   const lastSlash = raw.lastIndexOf("/");
