@@ -137,3 +137,80 @@ describe("aggregate", () => {
     expect(groups).toHaveLength(0);
   });
 });
+
+// ─── aggregate with regexFilter ───────────────────────────────────────────────
+
+function makeMatchWithFragments(repo: string, path: string, fragments: string[]): CodeMatch {
+  return {
+    path,
+    repoFullName: repo,
+    htmlUrl: `https://github.com/${repo}/blob/main/${path}`,
+    archived: false,
+    textMatches: fragments.map((fragment) => ({ fragment, matches: [] })),
+  };
+}
+
+describe("aggregate — regexFilter", () => {
+  it("keeps matches where at least one fragment satisfies the regex", () => {
+    const matches: CodeMatch[] = [
+      makeMatchWithFragments("myorg/repoA", "src/a.ts", ["import axios from 'axios'"]),
+      makeMatchWithFragments("myorg/repoA", "src/b.ts", ["const x = 1"]),
+    ];
+
+    const groups = aggregate(matches, new Set(), new Set(), false, /axios/);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].matches).toHaveLength(1);
+    expect(groups[0].matches[0].path).toBe("src/a.ts");
+  });
+
+  it("excludes the whole repo when no fragment matches the regex", () => {
+    const matches: CodeMatch[] = [
+      makeMatchWithFragments("myorg/repoA", "src/a.ts", ["const x = 1"]),
+      makeMatchWithFragments("myorg/repoA", "src/b.ts", ["const y = 2"]),
+    ];
+
+    const groups = aggregate(matches, new Set(), new Set(), false, /axios/);
+    expect(groups).toHaveLength(0);
+  });
+
+  it("matches against any fragment in a multi-fragment match", () => {
+    const matches: CodeMatch[] = [
+      makeMatchWithFragments("myorg/repoA", "src/a.ts", [
+        "unrelated line",
+        'import axios from "axios"',
+      ]),
+    ];
+
+    const groups = aggregate(matches, new Set(), new Set(), false, /axios/);
+    expect(groups).toHaveLength(1);
+  });
+
+  it("keeps all matches when regexFilter is undefined (backward compat)", () => {
+    const matches: CodeMatch[] = [
+      makeMatchWithFragments("myorg/repoA", "src/a.ts", ["const x = 1"]),
+      makeMatchWithFragments("myorg/repoB", "src/b.ts", ["const y = 2"]),
+    ];
+
+    const groups = aggregate(matches, new Set(), new Set());
+    expect(groups).toHaveLength(2);
+  });
+
+  it("respects regex flags (case-insensitive)", () => {
+    const matches: CodeMatch[] = [
+      makeMatchWithFragments("myorg/repoA", "src/a.ts", ["import AXIOS from 'axios'"]),
+    ];
+
+    const groups = aggregate(matches, new Set(), new Set(), false, /axios/i);
+    expect(groups).toHaveLength(1);
+  });
+
+  it("works with matches having no textMatches (empty fragments array)", () => {
+    const matches: CodeMatch[] = [
+      makeMatch("myorg/repoA", "src/a.ts"), // textMatches: []
+    ];
+
+    // No fragments → regex can never match → repo excluded
+    const groups = aggregate(matches, new Set(), new Set(), false, /axios/);
+    expect(groups).toHaveLength(0);
+  });
+});

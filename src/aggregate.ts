@@ -34,11 +34,18 @@ export function aggregate(
   excludedRepos: Set<string>,
   excludedExtractRefs: Set<string>,
   includeArchived = false,
+  regexFilter?: RegExp,
 ): RepoGroup[] {
   const map = new Map<string, CodeMatch[]>();
   for (const m of matches) {
     if (excludedRepos.has(m.repoFullName)) continue;
     if (!includeArchived && m.archived) continue;
+    // Fix: when a regex filter is active, only keep matches where at least one
+    // text_match fragment satisfies the pattern — see issue #111
+    if (regexFilter !== undefined) {
+      const hasMatch = m.textMatches.some((tm) => regexFilter.test(tm.fragment));
+      if (!hasMatch) continue;
+    }
     const list = map.get(m.repoFullName) ?? [];
     list.push(m);
     map.set(m.repoFullName, list);
