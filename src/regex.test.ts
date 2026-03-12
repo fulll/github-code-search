@@ -122,7 +122,7 @@ describe("buildApiQuery — partial alternation falls back to longest literal", 
 });
 
 describe("buildApiQuery — qualifier preservation", () => {
-  it("filename:package.json /['\"axios['\"]:/ → filename:package.json axios", () => {
+  it("filename:package.json /['\"]axios['\"]:/ → filename:package.json axios", () => {
     const r = buildApiQuery("filename:package.json /['\"]axios['\"]:/");
     expect(r.apiQuery).toBe("filename:package.json axios");
     expect(r.regexFilter).not.toBeNull();

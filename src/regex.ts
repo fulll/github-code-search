@@ -36,8 +36,11 @@ export function buildApiQuery(q: string): {
     return { apiQuery: q, regexFilter: null };
   }
 
-  // Compile the regex (strip stateful flags `g` and `y` — GitHub doesn't return
-  // all occurrences and `y` (sticky) makes RegExp.test() stateful via lastIndex).
+  // Compile the regex. Strip stateful flags:
+  //   g (global)  — GitHub returns at most a few fragments, not all occurrences.
+  //   y (sticky)  — makes RegExp.test() stateful via lastIndex, causing false
+  //                 negatives when the same instance is reused across fragments.
+  // Both are intentionally removed; all other flags (i, m, s, d, v, …) are kept.
   const { pattern, flags, raw } = token;
   const safeFlags = flags.replace(/[gy]/g, "");
   let regexFilter: RegExp | null = null;
@@ -234,12 +237,12 @@ function longestLiteralSequence(pattern: string): string {
       const next = pattern[i + 1] ?? "";
       // Only accumulate if the escaped char is a word character or hyphen
       // AND is not a common regex escape or backreference (\b, \d, \s, \w,
-      // \p, \u, \x, \1–9, …) or control-character escape (\n, \r, \t, \f,
-      // \v, \a, \e). Those are non-literal and must break the current sequence
-      // (e.g. \buseState\b → 'useState', not 'buseStateb';
-      //        /foo\nbar/  → 'foobar' not 'foonbar').
+      // \p, \u, \x, \1–9, …) or control-character escape (\n, \r, \t, \f, \v).
+      // Note: \a and \e are NOT in this list — in JS without u/v they are
+      // identity escapes that simply match the literal letter ('a' or 'e'),
+      // so they should be accumulated, not broken on.
       const isWordLike = /[a-zA-Z0-9_-]/.test(next);
-      const isSpecialEscape = /[bBdDsSwWpPuUxX0-9nrtfvae]/.test(next);
+      const isSpecialEscape = /[bBdDsSwWpPuUxX0-9nrtfv]/.test(next);
       if (isWordLike && !isSpecialEscape) {
         current += next;
       } else {
