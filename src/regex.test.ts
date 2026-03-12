@@ -33,6 +33,10 @@ describe("isRegexQuery", () => {
     // a suffix of non-flag characters must not be silently swallowed.
     expect(isRegexQuery("/useState/iSomething")).toBe(false);
   });
+
+  it("returns false for /pattern/e ('e' is not a valid JS RegExp flag)", () => {
+    expect(isRegexQuery("/pattern/e")).toBe(false);
+  });
 });
 
 // ─── buildApiQuery ────────────────────────────────────────────────────────────
@@ -49,6 +53,12 @@ describe("buildApiQuery — plain text passthrough", () => {
     // 'iSomething' is not a valid flag sequence — the token should not match.
     const r = buildApiQuery("/useState/iSomething");
     expect(r.apiQuery).toBe("/useState/iSomething");
+    expect(r.regexFilter).toBeNull();
+  });
+
+  it("/pattern/e is NOT treated as a regex token ('e' is not a valid JS RegExp flag)", () => {
+    const r = buildApiQuery("/pattern/e");
+    expect(r.apiQuery).toBe("/pattern/e");
     expect(r.regexFilter).toBeNull();
   });
 });

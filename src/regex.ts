@@ -90,10 +90,11 @@ function extractRegexToken(q: string): RegexToken | null {
   //   - the token ends at end-of-string or a whitespace boundary, so we don't
   //     accidentally match a prefix of a longer non-delimited word
   //     (e.g. /foo/iSomething must NOT be recognised as a regex token).
-  // The trailing flags cover all current JS RegExp flag letters:
+  // The trailing flags cover all valid JS RegExp flag letters:
   //   g (global), i (ignoreCase), m (multiline), s (dotAll),
   //   u (unicode), y (sticky), d (hasIndices ES2022), v (unicodeSets ES2023).
-  const m = q.match(/(?:^|\s)(\/(?:[^/\\\r\n]|\\.)+\/[gimsuydev]*)(?=$|\s)/);
+  // Note: 'e' is intentionally excluded — it is not a valid JS RegExp flag.
+  const m = q.match(/(?:^|\s)(\/(?:[^/\\\r\n]|\\.)+\/[gimsuydv]*)(?=$|\s)/);
   if (!m || !m[1]) return null;
   const raw = m[1].trim();
   const lastSlash = raw.lastIndexOf("/");
@@ -144,8 +145,8 @@ function extractApiTerm(pattern: string): { term: string; warn?: string } {
  */
 function splitTopLevelAlternation(pattern: string): string[] {
   const branches: string[] = [];
-  let depth = 0; // tracks unescaped ( nesting
-  let inClass = false; // tracks [...]
+  let depth = 0; // tracks unescaped '(' nesting depth outside character classes
+  let inClass = false; // tracks whether we are currently inside a character class [...]
   let current = "";
   let escaped = false; // true when current char is escaped by a preceding backslash
 
