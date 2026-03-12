@@ -232,10 +232,12 @@ function longestLiteralSequence(pattern: string): string {
       const next = pattern[i + 1] ?? "";
       // Only accumulate if the escaped char is a word character or hyphen
       // AND is not a common regex escape or backreference (\b, \d, \s, \w,
-      // \p, \u, \x, \1–\9, …). Those are non-literal and must break the
-      // current sequence (e.g. \buseState\b → 'useState', not 'buseStateb').
+      // \p, \u, \x, \1–9, …) or control-character escape (\n, \r, \t, \f,
+      // \v, \a, \e). Those are non-literal and must break the current sequence
+      // (e.g. \buseState\b → 'useState', not 'buseStateb';
+      //        /foo\nbar/  → 'foobar' not 'foonbar').
       const isWordLike = /[a-zA-Z0-9_-]/.test(next);
-      const isSpecialEscape = /[bBdDsSwWpPuUxX0-9]/.test(next);
+      const isSpecialEscape = /[bBdDsSwWpPuUxX0-9nrtfvae]/.test(next);
       if (isWordLike && !isSpecialEscape) {
         current += next;
       } else {

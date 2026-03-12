@@ -194,6 +194,17 @@ describe("buildApiQuery — special escape handling in longestLiteralSequence", 
     const r = buildApiQuery("/foobar\\sxyz/");
     expect(r.apiQuery).toBe("foobar");
   });
+
+  it("/foobar\\nbar/ → foobar (\\n is a control-character escape, not the letter 'n')", () => {
+    // Regression: \n must break the sequence, not accumulate 'n' → 'foobarnbar'.
+    const r = buildApiQuery("/foobar\\nbar/");
+    expect(r.apiQuery).toBe("foobar");
+  });
+
+  it("/foobar\\tbaz/ → foobar (\\t control escape breaks the sequence)", () => {
+    const r = buildApiQuery("/foobar\\tbaz/");
+    expect(r.apiQuery).toBe("foobar");
+  });
 });
 
 describe("buildApiQuery — warn cases", () => {
