@@ -109,6 +109,7 @@ export async function runInteractive(
   outputType: OutputType = "repo-and-matches",
   includeArchived = false,
   groupByTeamPrefix = "",
+  regexHint = "",
 ): Promise<void> {
   if (groups.length === 0) {
     console.log(pc.yellow("No results found."));
@@ -371,6 +372,7 @@ export async function runInteractive(
         buildOutput(groups, query, org, excludedRepos, excludedExtractRefs, format, outputType, {
           includeArchived,
           groupByTeamPrefix,
+          regexHint: regexHint || undefined,
         }),
       );
       process.exit(0);

@@ -379,6 +379,7 @@ async function searchAction(
       outputType,
       includeArchived,
       opts.groupByTeamPrefix,
+      opts.regexHint,
     );
   }
 }

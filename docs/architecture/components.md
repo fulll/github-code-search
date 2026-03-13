@@ -41,6 +41,9 @@ C4Component
   Rel(cli, completions, "Generate<br/>script")
   UpdateRelStyle(cli, completions, $offsetX="-90", $offsetY="-17")
 
+  %% Colour palette — consistent with containers.md.
+  %% Mermaid C4 UpdateElementStyle only accepts literal hex values (CSS variables are not supported).
+  %% #FFCC33 = CLI / orchestration layer   #9933FF = pure-function core   #0000CC = border/line
   UpdateElementStyle(cli, $bgColor="#FFCC33", $borderColor="#0000CC", $fontColor="#000000")
   UpdateElementStyle(regexParser, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
   UpdateElementStyle(aggregate, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
@@ -102,6 +105,9 @@ C4Component
   Rel(selection, filterMatch, "Uses pattern<br/>matchers")
   UpdateRelStyle(selection, filterMatch, $offsetX="165", $offsetY="-25")
 
+  %% Colour palette — consistent with containers.md.
+  %% Mermaid C4 UpdateElementStyle only accepts literal hex values (CSS variables are not supported).
+  %% #FFCC33 = TUI / orchestration layer   #9933FF = pure-function core   #0000CC = border/line
   UpdateElementStyle(tui, $bgColor="#FFCC33", $borderColor="#0000CC", $fontColor="#000000")
   UpdateElementStyle(rows, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
   UpdateElementStyle(filterMatch, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
