@@ -287,9 +287,8 @@ async function searchAction(
       process.exit(1);
     }
     if (warn && !opts.regexHint) {
-      console.error(
-        pc.yellow(`⚠  Regex mode — ${warn}\n   Provide a manual hint with --regex-hint <term>.`),
-      );
+      // warn already contains the --regex-hint guidance; print it as-is.
+      console.error(pc.yellow(`⚠  Regex mode — ${warn}`));
       process.exit(1);
     }
     effectiveQuery = opts.regexHint ?? apiQuery;
@@ -329,6 +328,7 @@ async function searchAction(
       buildOutput(groups, query, org, excludedRepos, excludedExtractRefs, format, outputType, {
         includeArchived,
         groupByTeamPrefix: opts.groupByTeamPrefix,
+        regexHint: opts.regexHint,
       }),
     );
     // Check for a newer version and notify on stderr so it never pollutes piped output.

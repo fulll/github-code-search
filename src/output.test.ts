@@ -182,6 +182,20 @@ describe("buildReplayCommand", () => {
     const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
     expect(cmd).not.toContain("--group-by-team-prefix");
   });
+
+  it("includes --regex-hint when regexHint is set", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const opts: ReplayOptions = { regexHint: '"axios"' };
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
+    expect(cmd).toContain("--regex-hint");
+    expect(cmd).toContain("axios");
+  });
+
+  it("does not include --regex-hint when regexHint is not set (default)", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set());
+    expect(cmd).not.toContain("--regex-hint");
+  });
 });
 
 describe("buildReplayDetails", () => {

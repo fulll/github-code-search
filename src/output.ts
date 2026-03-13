@@ -26,6 +26,9 @@ export interface ReplayOptions {
   outputType?: OutputType;
   includeArchived?: boolean;
   groupByTeamPrefix?: string;
+  /** When set, appends `--regex-hint <term>` to the replay command so the
+   *  result set from a regex query can be reproduced exactly. */
+  regexHint?: string;
 }
 
 // ─── Replay command ───────────────────────────────────────────────────────────
@@ -39,7 +42,7 @@ export function buildReplayCommand(
   // Fix: forward all input options so the replay command is fully reproducible — see issue #11
   options: ReplayOptions = {},
 ): string {
-  const { format, outputType, includeArchived, groupByTeamPrefix } = options;
+  const { format, outputType, includeArchived, groupByTeamPrefix, regexHint } = options;
   const parts: string[] = [
     `github-code-search ${JSON.stringify(query)} --org ${org} --no-interactive`,
   ];
@@ -84,6 +87,9 @@ export function buildReplayCommand(
   }
   if (groupByTeamPrefix) {
     parts.push(`--group-by-team-prefix ${groupByTeamPrefix}`);
+  }
+  if (regexHint) {
+    parts.push(`--regex-hint ${JSON.stringify(regexHint)}`);
   }
 
   return `# Replay:\n${parts.join(" \\\n  ")}`;
@@ -253,7 +259,7 @@ export function buildOutput(
   excludedExtractRefs: Set<string>,
   format: OutputFormat,
   outputType: OutputType = "repo-and-matches",
-  extraOptions: Pick<ReplayOptions, "includeArchived" | "groupByTeamPrefix"> = {},
+  extraOptions: Pick<ReplayOptions, "includeArchived" | "groupByTeamPrefix" | "regexHint"> = {},
 ): string {
   const options: ReplayOptions = { format, outputType, ...extraOptions };
   if (format === "json") {
