@@ -238,4 +238,77 @@ describe("aggregate — regexFilter", () => {
     aggregate(matches, new Set(), new Set(), false, regex);
     expect(regex.lastIndex).toBe(savedIndex);
   });
+
+  it("recomputes segments to point at the actual regex match (not the API literal)", () => {
+    // Simulate: regex /axios": "1\.12/, API literal "axios", API gives segment
+    // at [9,14] (pointing at "axios" only). After aggregation the segment must
+    // cover the full regex match.
+    //
+    // Fragment offsets:  d e p s : \n     " a  x  i  o  s  "  :     "  1  .  1  2  .  0  "
+    //                    0 1 2 3 4  5  6 7 8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24
+    // regex match: 'axios": "1.12' starts at offset 9, ends at 22
+    const fragment = 'deps:\n  "axios": "1.12.0"';
+    const matches: CodeMatch[] = [
+      {
+        path: "package.json",
+        repoFullName: "myorg/repoA",
+        htmlUrl: "https://github.com/myorg/repoA/blob/main/package.json",
+        archived: false,
+        textMatches: [
+          {
+            fragment,
+            // API-provided segment: only covers "axios" at offset 9..14
+            matches: [{ text: "axios", indices: [9, 14], line: 2, col: 4 }],
+          },
+        ],
+      },
+    ];
+
+    const groups = aggregate(matches, new Set(), new Set(), false, /axios": "1\.12/);
+    expect(groups).toHaveLength(1);
+
+    const seg = groups[0].matches[0].textMatches[0].matches[0];
+    // The regex matches 'axios": "1.12' starting at offset 9 in the fragment
+    expect(seg.text).toBe('axios": "1.12');
+    expect(seg.indices[0]).toBe(9);
+    expect(seg.indices[1]).toBe(22);
+    expect(seg.line).toBe(2); // second line of the fragment
+    expect(seg.col).toBe(4); // after the leading '  "'
+  });
+
+  it("recomputes correct line and col for multiline fragments", () => {
+    const fragment = "line1\nline2\nfoo bar\nline4";
+    //                01234 5 67890 1 234567 8 9012
+    //                                ^ "foo" at offset 12 = line 3, col 1
+    const matches: CodeMatch[] = [makeMatchWithFragments("myorg/repoA", "src/a.ts", [fragment])];
+
+    const groups = aggregate(matches, new Set(), new Set(), false, /foo/);
+    const seg = groups[0].matches[0].textMatches[0].matches[0];
+    expect(seg.text).toBe("foo");
+    expect(seg.indices).toEqual([12, 15]);
+    expect(seg.line).toBe(3);
+    expect(seg.col).toBe(1);
+  });
+
+  it("filters out textMatches where the regex does not match, keeps those where it does", () => {
+    // One file with two textMatches: only the second one matches the regex.
+    const matches: CodeMatch[] = [
+      {
+        path: "src/a.ts",
+        repoFullName: "myorg/repoA",
+        htmlUrl: "",
+        archived: false,
+        textMatches: [
+          { fragment: "unrelated code", matches: [] },
+          { fragment: "import axios from 'axios'", matches: [] },
+        ],
+      },
+    ];
+
+    const groups = aggregate(matches, new Set(), new Set(), false, /axios/);
+    expect(groups).toHaveLength(1);
+    // Only the matching textMatch is kept
+    expect(groups[0].matches[0].textMatches).toHaveLength(1);
+    expect(groups[0].matches[0].textMatches[0].fragment).toBe("import axios from 'axios'");
+  });
 });

@@ -60,6 +60,13 @@ const ROWS: Row[] = [
     docLink: "/usage/interactive-mode",
   },
   {
+    feature: "Regex queries (/pattern/flags)",
+    desc: "Use full regular expressions in queries — top-level alternation (A|B|C) maps to GitHub OR, client-side filtering applies the real pattern. GitHub supports regex in the web UI only, not in the REST API or gh CLI.",
+    gh: false,
+    gcs: true,
+    docLink: "/usage/search-syntax",
+  },
+  {
     feature: "Pagination (up to 1\u202f000 results)",
     desc: "Both tools auto-paginate the GitHub search API \u2014 up to 1\u202f000 results per query.",
     gh: true,

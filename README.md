@@ -83,6 +83,14 @@ github-code-search query "useFeatureFlag" --org my-org --group-by-team-prefix pl
 
 Get a team-scoped view of every usage site before refactoring a shared hook or utility.
 
+**Regex search — pattern-based code audit**
+
+```bash
+github-code-search query "/from.*['\"\`]axios/" --org my-org
+```
+
+Use `/pattern/` syntax to run a regex search. The CLI automatically derives a safe API query term and filters results locally — no manual post-processing needed. Use `--regex-hint` to override the derived term when auto-extraction is too broad.
+
 ## Why not `gh search code`?
 
 The official [`gh` CLI](https://cli.github.com/) does support `gh search code`, but it returns a **flat paginated list** — one result per line, no grouping, no interactive selection, no structured output.

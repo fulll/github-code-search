@@ -21,11 +21,21 @@ export function shortExtractRef(full: string, org: string): string {
 // ─── Replay options ───────────────────────────────────────────────────────────
 
 /** Options that affect the generated replay command. */
+/** Wraps `s` in POSIX single quotes, escaping any embedded single quotes as '\''.
+ *  Produces output that is safe to paste into bash / zsh regardless of the
+ *  content (no `$()`, backtick, or glob expansion). */
+function shellQuote(s: string): string {
+  return "'" + s.replace(/'/g, "'\\''") + "'";
+}
+
 export interface ReplayOptions {
   format?: OutputFormat;
   outputType?: OutputType;
   includeArchived?: boolean;
   groupByTeamPrefix?: string;
+  /** When set, appends `--regex-hint <term>` to the replay command so the
+   *  result set from a regex query can be reproduced exactly. */
+  regexHint?: string;
 }
 
 // ─── Replay command ───────────────────────────────────────────────────────────
@@ -39,10 +49,8 @@ export function buildReplayCommand(
   // Fix: forward all input options so the replay command is fully reproducible — see issue #11
   options: ReplayOptions = {},
 ): string {
-  const { format, outputType, includeArchived, groupByTeamPrefix } = options;
-  const parts: string[] = [
-    `github-code-search ${JSON.stringify(query)} --org ${org} --no-interactive`,
-  ];
+  const { format, outputType, includeArchived, groupByTeamPrefix, regexHint } = options;
+  const parts: string[] = [`github-code-search ${shellQuote(query)} --org ${org} --no-interactive`];
 
   const excludedReposList: string[] = [...excludedRepos].map((r) => shortRepo(r, org));
   for (const group of groups) {
@@ -84,6 +92,9 @@ export function buildReplayCommand(
   }
   if (groupByTeamPrefix) {
     parts.push(`--group-by-team-prefix ${groupByTeamPrefix}`);
+  }
+  if (regexHint) {
+    parts.push(`--regex-hint ${shellQuote(regexHint)}`);
   }
 
   return `# Replay:\n${parts.join(" \\\n  ")}`;
@@ -253,7 +264,7 @@ export function buildOutput(
   excludedExtractRefs: Set<string>,
   format: OutputFormat,
   outputType: OutputType = "repo-and-matches",
-  extraOptions: Pick<ReplayOptions, "includeArchived" | "groupByTeamPrefix"> = {},
+  extraOptions: Pick<ReplayOptions, "includeArchived" | "groupByTeamPrefix" | "regexHint"> = {},
 ): string {
   const options: ReplayOptions = { format, outputType, ...extraOptions };
   if (format === "json") {

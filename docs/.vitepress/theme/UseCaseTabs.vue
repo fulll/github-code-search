@@ -50,6 +50,14 @@ const USE_CASES: UseCase[] = [
       "Get a team-scoped view of every usage site before refactoring a shared hook or utility. Essential for onboarding or large-scale refactors.",
     command: `github-code-search query "useFeatureFlag" --org my-org --group-by-team-prefix platform/`,
   },
+  {
+    id: "semver",
+    label: "Semver / version audit",
+    headline: "Which repos are pinned to a vulnerable minor version?",
+    description:
+      "Use regex syntax to target a precise version range — something a plain keyword search cannot do. Find every repo still locked to axios 1.x, react 17.x, or any other outdated pin, then export the list to a migration issue.",
+    command: `github-code-search query '/"axios": "1\\./' --org my-org`,
+  },
 ];
 
 const active = ref(0);

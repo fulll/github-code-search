@@ -10,20 +10,24 @@ The three pure functions called by the CLI parser to transform raw API results
 into a filtered, grouped, formatted output.
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Poppins, Aestetico, Arial, sans-serif", "primaryColor": "#66CCFF", "primaryTextColor": "#000000", "lineColor": "#0000CC", "tertiaryColor": "#FFCC33"}, "themeCSS": ".label,.nodeLabel,.cluster-label > span{font-family:Poppins,Arial,sans-serif;letter-spacing:.2px} .cluster-label > span{font-weight:600;font-size:13px} .edgePath .path{stroke-width:2px}"}}%%
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Poppins, Aestetico, Arial, sans-serif", "primaryColor": "#9933FF", "primaryTextColor": "#ffffff", "lineColor": "#0000CC", "tertiaryColor": "#FFCC33"}, "themeCSS": ".label,.nodeLabel,.cluster-label > span{font-family:Poppins,Arial,sans-serif;letter-spacing:.2px} .cluster-label > span{font-weight:600;font-size:13px} .edgePath .path{stroke-width:2px}"}}%%
 C4Component
   title Level 3a: CLI data pipeline
 
-  UpdateLayoutConfig($c4ShapeInRow="4", $c4BoundaryInRow="1")
+  UpdateLayoutConfig($c4ShapeInRow="5", $c4BoundaryInRow="1")
 
   Container(cli, "CLI parser", "github-code-search.ts", "Orchestrates filter,<br/>group, output and<br/>shell completions")
 
   Container_Boundary(core, "Pure-function core — no I/O") {
+    Component(regexParser, "Query parser", "src/regex.ts", "isRegexQuery()<br/>buildApiQuery()")
     Component(aggregate, "Filter & aggregation", "src/aggregate.ts", "aggregate()<br/>exclude repos & extracts")
     Component(group, "Team grouping", "src/group.ts", "groupByTeamPrefix()<br/>flattenTeamSections()")
     Component(outputFn, "Output formatter", "src/output.ts", "buildOutput()<br/>markdown or JSON")
     Component(completions, "Shell completions", "src/completions.ts", "generateCompletion()<br/>detectShell()<br/>getCompletionFilePath()")
   }
+
+  Rel(cli, regexParser, "Parse regex<br/>query")
+  UpdateRelStyle(cli, regexParser, $offsetX="35", $offsetY="-17")
 
   Rel(cli, aggregate, "Filter<br/>CodeMatch[]")
   UpdateRelStyle(cli, aggregate, $offsetX="0", $offsetY="-17")
@@ -37,11 +41,6 @@ C4Component
   Rel(cli, completions, "Generate<br/>script")
   UpdateRelStyle(cli, completions, $offsetX="-90", $offsetY="-17")
 
-  UpdateElementStyle(cli, $bgColor="#FFCC33", $borderColor="#0000CC", $fontColor="#000000")
-  UpdateElementStyle(aggregate, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
-  UpdateElementStyle(group, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
-  UpdateElementStyle(outputFn, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
-  UpdateElementStyle(completions, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
 ```
 
 ## 3b — TUI render layer
@@ -52,7 +51,7 @@ The render-layer modules called by the TUI on every redraw. Most live in
 provides shared pattern-matching helpers used by several render modules.
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Poppins, Aestetico, Arial, sans-serif", "primaryColor": "#66CCFF", "primaryTextColor": "#000000", "lineColor": "#0000CC", "tertiaryColor": "#FFCC33"}, "themeCSS": ".label,.nodeLabel,.cluster-label > span{font-family:Poppins,Arial,sans-serif;letter-spacing:.2px} .cluster-label > span{font-weight:600;font-size:13px} .edgePath .path{stroke-width:2px}"}}%%
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Poppins, Aestetico, Arial, sans-serif", "primaryColor": "#9933FF", "primaryTextColor": "#ffffff", "lineColor": "#0000CC", "tertiaryColor": "#FFCC33"}, "themeCSS": ".label,.nodeLabel,.cluster-label > span{font-family:Poppins,Arial,sans-serif;letter-spacing:.2px} .cluster-label > span{font-weight:600;font-size:13px} .edgePath .path{stroke-width:2px}"}}%%
 C4Component
   title Level 3b: TUI render layer
 
@@ -97,14 +96,6 @@ C4Component
   Rel(selection, filterMatch, "Uses pattern<br/>matchers")
   UpdateRelStyle(selection, filterMatch, $offsetX="165", $offsetY="-25")
 
-  UpdateElementStyle(tui, $bgColor="#FFCC33", $borderColor="#0000CC", $fontColor="#000000")
-  UpdateElementStyle(rows, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
-  UpdateElementStyle(filterMatch, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
-  UpdateElementStyle(summary, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
-  UpdateElementStyle(filter, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
-  UpdateElementStyle(selection, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
-  UpdateElementStyle(highlight, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
-  UpdateElementStyle(outputFn, $bgColor="#9933FF", $borderColor="#0000CC", $fontColor="#ffffff")
 ```
 
 ## Component descriptions
