@@ -224,6 +224,20 @@ describe("buildApiQuery — special escape handling in longestLiteralSequence", 
     const r = buildApiQuery("/foobar\\tbaz/");
     expect(r.apiQuery).toBe("foobar");
   });
+
+  it("/foobar\\cAbaz/ → foobar (\\cA is a control escape, 'c' must not be accumulated)", () => {
+    // Regression: \cA matches control-character 0x01, not the letter 'c'.
+    // The sequence must be broken at \c so 'foobar' is extracted, not 'foobarcAbaz'.
+    const r = buildApiQuery("/foobar\\cAbaz/");
+    expect(r.apiQuery).toBe("foobar");
+  });
+
+  it("/foobar\\k<name>baz/ → foobar (\\k is a named back-reference, 'k' must not be accumulated)", () => {
+    // Regression: \k<name> is a named back-reference, not the letter 'k'.
+    // The sequence must be broken at \k so 'foobar' is extracted, not 'foobarknameabaz'.
+    const r = buildApiQuery("/foobar\\k<name>baz/");
+    expect(r.apiQuery).toBe("foobar");
+  });
 });
 
 describe("buildApiQuery — warn cases", () => {

@@ -244,8 +244,9 @@ function longestLiteralSequence(pattern: string): string {
       // Note: \a and \e are NOT in this list — in JS without u/v they are
       // identity escapes that simply match the literal letter ('a' or 'e'),
       // so they should be accumulated, not broken on.
+      // \c = control escape (\cA–\cZ), \k = named back-reference (\k<name>).
       const isWordLike = /[a-zA-Z0-9_-]/.test(next);
-      const isSpecialEscape = /[bBdDsSwWpPuUxX0-9nrtfv]/.test(next);
+      const isSpecialEscape = /[bBdDsSwWpPuUxX0-9nrtfvck]/.test(next);
       if (isWordLike && !isSpecialEscape) {
         current += next;
       } else {
