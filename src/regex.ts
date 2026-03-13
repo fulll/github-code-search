@@ -41,7 +41,7 @@ export function buildApiQuery(q: string): {
   //   y (sticky)  — makes RegExp.test() stateful via lastIndex, causing false
   //                 negatives when the same instance is reused across fragments.
   // Both are intentionally removed; all other flags (i, m, s, d, v, …) are kept.
-  const { pattern, flags, raw } = token;
+  const { pattern, flags, raw, index } = token;
   const safeFlags = flags.replace(/[gy]/g, "");
   let regexFilter: RegExp | null = null;
   try {
@@ -60,10 +60,12 @@ export function buildApiQuery(q: string): {
   // Derive the API search term from the regex pattern.
   const { term, warn } = extractApiTerm(pattern);
 
-  // Rebuild the API query by replacing the regex token in-place, preserving
-  // all other characters byte-for-byte — including quoted phrases (e.g.
-  // '"exact match" /pattern/') whose internal whitespace must not be split.
-  const apiQuery = q.replace(raw, term).trim();
+  // Rebuild the API query by splicing the derived term at the exact byte
+  // position of the matched token. Using q.replace(raw, term) would replace the
+  // first *substring* occurrence of `raw`, which may appear earlier in the query
+  // as a non-token prefix (e.g. inside a longer word). Using the stored index
+  // guarantees we replace only the boundary-validated token that was matched.
+  const apiQuery = (q.slice(0, index) + term + q.slice(index + raw.length)).trim();
 
   return { apiQuery, regexFilter, warn };
 }
@@ -77,6 +79,8 @@ interface RegexToken {
   pattern: string;
   /** Flags string (may be empty) */
   flags: string;
+  /** Start index of `raw` within the original query string. */
+  index: number;
 }
 
 /**
@@ -97,10 +101,14 @@ function extractRegexToken(q: string): RegexToken | null {
   const m = q.match(/(?:^|\s)(\/(?:[^/\\\r\n]|\\.)+\/[gimsuydv]*)(?=$|\s)/);
   if (!m || !m[1]) return null;
   const raw = m[1].trim();
+  // Compute the exact start position of the token within the original string.
+  // m.index is where the full match starts; the token (group 1) may be preceded
+  // by one whitespace character captured by (?:^|\s), hence the offset.
+  const tokenStart = m.index! + m[0].length - m[1].length;
   const lastSlash = raw.lastIndexOf("/");
   const pattern = raw.slice(1, lastSlash);
   const flags = raw.slice(lastSlash + 1);
-  return { raw, pattern, flags };
+  return { raw, pattern, flags, index: tokenStart };
 }
 
 /**

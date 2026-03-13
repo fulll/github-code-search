@@ -153,6 +153,16 @@ describe("buildApiQuery — qualifier preservation", () => {
     expect(r.regexFilter).not.toBeNull();
     expect(r.warn).toBeUndefined();
   });
+
+  it("replaces the matched token when the same raw text appears earlier as a prefix substring", () => {
+    // Regression: '/useState/i' is a substring of '/useState/iSomething' (not a
+    // valid token — fails boundary check). q.replace(raw, term) would wrongly
+    // replace the first occurrence inside the non-token prefix. The splice must
+    // target only the index-validated token.
+    const r = buildApiQuery("/useState/iSomething /useState/i");
+    expect(r.apiQuery).toBe("/useState/iSomething useState");
+    expect(r.regexFilter).not.toBeNull();
+  });
 });
 
 describe("buildApiQuery — flags", () => {
