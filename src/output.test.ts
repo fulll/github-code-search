@@ -189,6 +189,8 @@ describe("buildReplayCommand", () => {
     const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
     expect(cmd).toContain("--regex-hint");
     expect(cmd).toContain("axios");
+    // Must use single-quote shell escaping, not JSON.stringify
+    expect(cmd).toContain(`--regex-hint '"`);
   });
 
   it("does not include --regex-hint when regexHint is not set (default)", () => {

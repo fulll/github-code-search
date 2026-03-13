@@ -3,7 +3,8 @@
 export interface TextMatchSegment {
   text: string;
   indices: [number, number];
-  /** 1-based line within the fragment (fragment-relative, not absolute file line). */
+  /** 1-based absolute file line (computed by api.ts / recomputeSegments in aggregate.ts).
+   *  Used for `#L{line}` GitHub anchors in output.ts. */
   line: number;
   /** 1-based column within that line. */
   col: number;
