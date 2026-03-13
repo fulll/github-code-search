@@ -106,7 +106,7 @@ an `A OR B OR C` query to the GitHub API so that **all branches are covered** �
 
 If the extracted term is very short (fewer than 3 characters), the CLI will exit with a warning and ask you to provide a manual hint:
 
-```
+```text
 ⚠  Regex mode — could not extract a term longer than 2 chars from /[~^]?[0-9]/
    Provide a manual hint with --regex-hint <term>.
 ```

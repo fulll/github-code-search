@@ -38,17 +38,30 @@ export function extractRef(repoFullName: string, path: string, matchIndex: numbe
  * that `highlightFragment` can map them to the correct terminal lines.
  */
 function recomputeSegments(fragment: string, regex: RegExp): TextMatchSegment[] {
-  // Force global flag so exec() advances; strip it first to avoid double-g
-  const re = new RegExp(regex.source, regex.flags.replace("g", "") + "g");
+  // Force global flag so exec() advances; strip g and y first to avoid double-g
+  // and to prevent sticky mode from anchoring every match at lastIndex.
+  const re = new RegExp(regex.source, regex.flags.replace(/[gy]/g, "") + "g");
+  // Precompute newline positions once — O(n) — so per-match line/col lookup
+  // is O(log n) via binary search instead of O(n) per match (O(n²) overall).
+  const newlines: number[] = [];
+  for (let i = 0; i < fragment.length; i++) {
+    if (fragment[i] === "\n") newlines.push(i);
+  }
   const segments: TextMatchSegment[] = [];
   let m: RegExpExecArray | null;
   while ((m = re.exec(fragment)) !== null) {
     const start = m.index;
     const end = start + m[0].length;
-    const before = fragment.slice(0, start);
-    const nlIdx = before.lastIndexOf("\n");
-    const line = (before.match(/\n/g)?.length ?? 0) + 1;
-    const col = (nlIdx === -1 ? start : start - nlIdx - 1) + 1;
+    // Binary-search for the number of newlines before `start`.
+    let lo = 0;
+    let hi = newlines.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (newlines[mid] < start) lo = mid + 1;
+      else hi = mid;
+    }
+    const line = lo + 1; // 1-based
+    const col = (lo === 0 ? start : start - newlines[lo - 1] - 1) + 1; // 1-based
     segments.push({ text: m[0], indices: [start, end], line, col });
     if (m[0].length === 0) re.lastIndex++; // guard against zero-width matches
   }
