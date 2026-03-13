@@ -28,6 +28,7 @@ describe("generateCompletion", () => {
       expect(script).toContain("--format");
       expect(script).toContain("--output-type");
       expect(script).toContain("--no-interactive");
+      expect(script).toContain("--regex-hint");
     });
 
     it("contains format values (markdown, json)", () => {
@@ -71,6 +72,7 @@ describe("generateCompletion", () => {
       expect(script).toContain("--org");
       expect(script).toContain("--format");
       expect(script).toContain("--output-type");
+      expect(script).toContain("--regex-hint");
     });
 
     it("contains a 'compdef' directive (zsh-style)", () => {
@@ -102,6 +104,7 @@ describe("generateCompletion", () => {
       expect(script).toContain("org");
       expect(script).toContain("format");
       expect(script).toContain("output-type");
+      expect(script).toContain("regex-hint");
     });
 
     it("uses fish 'complete -c' syntax", () => {

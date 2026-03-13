@@ -280,6 +280,12 @@ async function searchAction(
   let regexFilter: RegExp | undefined;
   if (isRegexQuery(query)) {
     const { apiQuery, regexFilter: rf, warn } = buildApiQuery(query);
+    if (rf === null) {
+      // Compile error — always fatal, even if --regex-hint is provided,
+      // because no local regex filter can be applied.
+      console.error(pc.yellow(`⚠  Regex mode — ${warn}`));
+      process.exit(1);
+    }
     if (warn && !opts.regexHint) {
       console.error(
         pc.yellow(`⚠  Regex mode — ${warn}\n   Provide a manual hint with --regex-hint <term>.`),

@@ -241,7 +241,7 @@ describe("aggregate — regexFilter", () => {
 
   it("recomputes segments to point at the actual regex match (not the API literal)", () => {
     // Simulate: regex /axios": "1\.12/, API literal "axios", API gives segment
-    // at [8,13] (pointing at "axios" only). After aggregation the segment must
+    // at [9,14] (pointing at "axios" only). After aggregation the segment must
     // cover the full regex match.
     //
     // Fragment offsets:  d e p s : \n     " a  x  i  o  s  "  :     "  1  .  1  2  .  0  "

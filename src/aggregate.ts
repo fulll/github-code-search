@@ -34,10 +34,16 @@ export function extractRef(repoFullName: string, path: string, matchIndex: numbe
  * match — replacing the API-provided segments (which point at the literal
  * search term) with the actual regex match positions.
  *
- * Line (1-based) and col (1-based) are computed from the fragment text so
- * that `highlightFragment` can map them to the correct terminal lines.
+ * `fragmentStartLine` is the 1-based absolute file line where the fragment
+ * starts (derived from the existing API segments or falling back to 1). It is
+ * used to produce absolute `line` values that match those stored by the API
+ * path so that `output.ts` generates correct `#L{line}` GitHub anchors.
  */
-function recomputeSegments(fragment: string, regex: RegExp): TextMatchSegment[] {
+function recomputeSegments(
+  fragment: string,
+  regex: RegExp,
+  fragmentStartLine: number,
+): TextMatchSegment[] {
   // Force global flag so exec() advances; strip g and y first to avoid double-g
   // and to prevent sticky mode from anchoring every match at lastIndex.
   const re = new RegExp(regex.source, regex.flags.replace(/[gy]/g, "") + "g");
@@ -60,7 +66,9 @@ function recomputeSegments(fragment: string, regex: RegExp): TextMatchSegment[] 
       if (newlines[mid] < start) lo = mid + 1;
       else hi = mid;
     }
-    const line = lo + 1; // 1-based
+    // `lo` = number of fragment-local lines before `start` (0-based offset).
+    // Add `fragmentStartLine - 1` to make it absolute.
+    const line = fragmentStartLine + lo;
     const col = (lo === 0 ? start : start - newlines[lo - 1] - 1) + 1; // 1-based
     segments.push({ text: m[0], indices: [start, end], line, col });
     if (m[0].length === 0) re.lastIndex++; // guard against zero-width matches
@@ -91,7 +99,18 @@ export function aggregate(
       const savedLastIndex = regexFilter.lastIndex;
       const updatedTextMatches: TextMatch[] = m.textMatches
         .map((tm) => {
-          const segs = recomputeSegments(tm.fragment, regexFilter);
+          // Derive the absolute start line of this fragment from the first API
+          // segment. If no API segment is available, fall back to 1 so that
+          // recomputeSegments emits fragment-relative lines (which equal
+          // absolute lines when the fragment starts at line 1).
+          let fragmentStartLine = 1;
+          const firstApiSeg = tm.matches[0];
+          if (firstApiSeg) {
+            const before = tm.fragment.slice(0, firstApiSeg.indices[0]);
+            const fragLine = (before.match(/\n/g)?.length ?? 0) + 1;
+            fragmentStartLine = firstApiSeg.line - fragLine + 1;
+          }
+          const segs = recomputeSegments(tm.fragment, regexFilter, fragmentStartLine);
           return segs.length > 0 ? { fragment: tm.fragment, matches: segs } : null;
         })
         .filter((tm): tm is TextMatch => tm !== null);

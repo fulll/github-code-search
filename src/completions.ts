@@ -63,6 +63,12 @@ const OPTIONS = [
     takesArg: false,
     values: [],
   },
+  {
+    flag: "regex-hint",
+    description: "Override the API search term for regex queries",
+    takesArg: true,
+    values: [],
+  },
 ] as const;
 
 // ─── Bash completion script ───────────────────────────────────────────────────
