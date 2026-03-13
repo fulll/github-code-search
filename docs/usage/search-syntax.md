@@ -88,7 +88,7 @@ Because the GitHub Code Search API does not natively support regex, the CLI auto
 github-code-search "/from.*['\"\`]axios/" --org fulll
 
 # Axios dependency in package.json (any semver prefix)
-github-code-search '"axios": "[~^]?[0-9]" filename:package.json' --org fulll
+github-code-search '/"axios": "[~^]?[0-9]"/ filename:package.json' --org fulll
 
 # Old library require() calls
 github-code-search "/require\\(['\"](old-lib)['\"]\\)/" --org fulll
@@ -107,8 +107,7 @@ an `A OR B OR C` query to the GitHub API so that **all branches are covered** �
 If the extracted term is very short (fewer than 3 characters), the CLI will exit with a warning and ask you to provide a manual hint:
 
 ```text
-⚠  Regex mode — could not extract a term longer than 2 chars from /[~^]?[0-9]/
-   Provide a manual hint with --regex-hint <term>.
+⚠  Regex mode — No meaningful search term could be extracted from the regex pattern. Use --regex-hint <term> to specify the term to send to the GitHub API.
 ```
 
 Use `--regex-hint` to override the API search term while still applying the full regex filter locally:

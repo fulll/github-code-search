@@ -41,12 +41,13 @@ export function extractRef(repoFullName: string, path: string, matchIndex: numbe
  */
 function recomputeSegments(
   fragment: string,
-  regex: RegExp,
+  re: RegExp,
   fragmentStartLine: number,
 ): TextMatchSegment[] {
-  // Force global flag so exec() advances; strip g and y first to avoid double-g
-  // and to prevent sticky mode from anchoring every match at lastIndex.
-  const re = new RegExp(regex.source, regex.flags.replace(/[gy]/g, "") + "g");
+  // Reset lastIndex so exec() always searches from the start of the fragment.
+  // The caller is responsible for providing a global (g) regex constructed once
+  // per aggregate() call — not recompiled per fragment.
+  re.lastIndex = 0;
   // Precompute newline positions once — O(n) — so per-match line/col lookup
   // is O(log n) via binary search instead of O(n) per match (O(n²) overall).
   const newlines: number[] = [];
@@ -85,6 +86,13 @@ export function aggregate(
   includeArchived = false,
   regexFilter?: RegExp | null,
 ): RepoGroup[] {
+  // Compile the global regex once per aggregate() call rather than once per
+  // fragment inside recomputeSegments — avoids repeated RegExp construction
+  // on large result sets.  Strip g and y first to prevent double-flag and
+  // sticky-mode issues; recomputeSegments resets lastIndex per call.
+  const globalRe = regexFilter
+    ? new RegExp(regexFilter.source, regexFilter.flags.replace(/[gy]/g, "") + "g")
+    : null;
   const map = new Map<string, CodeMatch[]>();
   for (const m of matches) {
     if (excludedRepos.has(m.repoFullName)) continue;
@@ -93,10 +101,10 @@ export function aggregate(
     // segments (which point at the literal search term) with segments derived
     // from the actual regex match positions — see issue #111 / fix highlight bug
     let matchToAdd: CodeMatch = m;
-    if (regexFilter != null) {
+    if (globalRe != null) {
       // Preserve the caller's lastIndex: aggregate() must not have observable
       // side-effects on the passed-in RegExp instance.
-      const savedLastIndex = regexFilter.lastIndex;
+      const savedLastIndex = regexFilter!.lastIndex;
       const updatedTextMatches: TextMatch[] = m.textMatches
         .map((tm) => {
           // Derive the absolute start line of this fragment from the first API
@@ -110,13 +118,13 @@ export function aggregate(
             const fragLine = (before.match(/\n/g)?.length ?? 0) + 1;
             fragmentStartLine = firstApiSeg.line - fragLine + 1;
           }
-          const segs = recomputeSegments(tm.fragment, regexFilter, fragmentStartLine);
+          const segs = recomputeSegments(tm.fragment, globalRe, fragmentStartLine);
           return segs.length > 0 ? { fragment: tm.fragment, matches: segs } : null;
         })
         .filter((tm): tm is TextMatch => tm !== null);
       // Restore the caller's original lastIndex (rather than hard-coding 0),
       // so aggregate() doesn't have observable side effects on its inputs.
-      regexFilter.lastIndex = savedLastIndex;
+      regexFilter!.lastIndex = savedLastIndex;
       if (updatedTextMatches.length === 0) continue;
       matchToAdd = { ...m, textMatches: updatedTextMatches };
     }
