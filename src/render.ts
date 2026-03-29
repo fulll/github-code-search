@@ -547,8 +547,20 @@ export function renderGroups(
         lines.push(`${pc.magenta(pc.bold("── "))}${bar}`);
       } else if (isActiveSectionCursor) {
         const isMultiTeam = (row.sectionLabel ?? "").includes(" + ");
-        const hint = isMultiTeam ? pc.dim("  [p: pick team]") : "";
-        lines.push(`${pc.bgMagenta(pc.bold(`── ${label} `))}${hint}`);
+        if (isMultiTeam) {
+          // Fix: reduce label budget when showing the hint so the combined line never wraps — see issue #121.
+          const hintPlain = "  [p: pick team]";
+          const maxCharsWithHint = Math.max(0, termWidth - SECTION_FIXED - hintPlain.length);
+          const activeLabel =
+            maxCharsWithHint === 0
+              ? ""
+              : row.sectionLabel.length > maxCharsWithHint
+                ? row.sectionLabel.slice(0, Math.max(1, maxCharsWithHint - 1)) + "…"
+                : row.sectionLabel;
+          lines.push(`${pc.bgMagenta(pc.bold(`── ${activeLabel} `))}${pc.dim(hintPlain)}`);
+        } else {
+          lines.push(pc.bgMagenta(pc.bold(`── ${label} `)));
+        }
       } else {
         lines.push(pc.magenta(pc.bold(`── ${label} `)));
       }

@@ -331,6 +331,13 @@ async function searchAction(
 
   // ─── Team-prefix grouping ─────────────────────────────────────────────────
   const pickTeams: Record<string, string> = {};
+  if (!opts.groupByTeamPrefix && opts.pickTeam && opts.pickTeam.length > 0) {
+    process.stderr.write(
+      pc.yellow(
+        "⚠  --pick-team has no effect without --group-by-team-prefix; picks are being ignored.\n",
+      ),
+    );
+  }
   if (opts.groupByTeamPrefix) {
     const prefixes = opts.groupByTeamPrefix
       .split(",")
@@ -353,8 +360,14 @@ async function searchAction(
           );
           continue;
         }
-        const combined = assignment.slice(0, eqIndex);
-        const chosen = assignment.slice(eqIndex + 1);
+        const combined = assignment.slice(0, eqIndex).trim();
+        const chosen = assignment.slice(eqIndex + 1).trim();
+        if (!combined || !chosen) {
+          process.stderr.write(
+            `warning: --pick-team "${assignment}" must have non-empty combined and chosen labels; skipping\n`,
+          );
+          continue;
+        }
         const updated = applyTeamPick(sections, combined, chosen);
         if (updated === sections) {
           // applyTeamPick returns the same reference when the combined label is not found.
