@@ -557,7 +557,19 @@ export function renderGroups(
               : row.sectionLabel.length > maxCharsWithHint
                 ? row.sectionLabel.slice(0, Math.max(1, maxCharsWithHint - 1)) + "…"
                 : row.sectionLabel;
-          lines.push(`${pc.bgMagenta(pc.bold(`── ${activeLabel} `))}${pc.dim(hintPlain)}`);
+          // Fix: clip the hint itself when it doesn't fit in the remaining space — see issue #121.
+          const remainingWidth = termWidth - SECTION_FIXED - activeLabel.length;
+          let hint = "";
+          if (remainingWidth > 0) {
+            if (hintPlain.length <= remainingWidth) {
+              hint = hintPlain;
+            } else if (remainingWidth === 1) {
+              hint = "…";
+            } else {
+              hint = hintPlain.slice(0, remainingWidth - 1) + "…";
+            }
+          }
+          lines.push(`${pc.bgMagenta(pc.bold(`── ${activeLabel} `))}${hint ? pc.dim(hint) : ""}`);
         } else {
           lines.push(pc.bgMagenta(pc.bold(`── ${label} `)));
         }

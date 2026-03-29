@@ -332,11 +332,27 @@ async function searchAction(
   // ─── Team-prefix grouping ─────────────────────────────────────────────────
   const pickTeams: Record<string, string> = {};
   if (!opts.groupByTeamPrefix && opts.pickTeam && opts.pickTeam.length > 0) {
-    process.stderr.write(
-      pc.yellow(
-        "warning: --pick-team has no effect without --group-by-team-prefix; picks are being ignored.\n",
-      ),
-    );
+    // Emit per-assignment warnings (same validation as when grouping is enabled) — see issue #121.
+    for (const assignment of opts.pickTeam) {
+      const eqIndex = assignment.indexOf("=");
+      if (eqIndex === -1) {
+        process.stderr.write(
+          `warning: --pick-team "${assignment}" is missing the = separator; skipping\n`,
+        );
+        continue;
+      }
+      const combined = assignment.slice(0, eqIndex).trim();
+      const chosen = assignment.slice(eqIndex + 1).trim();
+      if (!combined || !chosen) {
+        process.stderr.write(
+          `warning: --pick-team "${assignment}" must have non-empty combined and chosen labels; skipping\n`,
+        );
+        continue;
+      }
+      process.stderr.write(
+        `warning: --pick-team: no section found with label "${combined}"\n  (no combined sections remain)\n`,
+      );
+    }
   }
   if (opts.groupByTeamPrefix) {
     const prefixes = opts.groupByTeamPrefix
@@ -365,6 +381,18 @@ async function searchAction(
         if (!combined || !chosen) {
           process.stderr.write(
             `warning: --pick-team "${assignment}" must have non-empty combined and chosen labels; skipping\n`,
+          );
+          continue;
+        }
+        // Validate that chosen is one of the teams in the combined label — see issue #121.
+        const combinedCandidates = combined
+          .split(" + ")
+          .map((part) => part.trim())
+          .filter((part) => part.length > 0);
+        if (combinedCandidates.length > 1 && !combinedCandidates.includes(chosen)) {
+          process.stderr.write(
+            `warning: --pick-team "${assignment}" has chosen label "${chosen}" which is not one of the teams in ` +
+              `"${combined}". Allowed choices: ${combinedCandidates.map((c) => `"${c}"`).join(", ")}; skipping\n`,
           );
           continue;
         }
