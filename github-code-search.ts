@@ -384,12 +384,18 @@ async function searchAction(
           );
           continue;
         }
-        // Validate that chosen is one of the teams in the combined label — see issue #121.
+        // Fix: require the combined label to be a multi-team label (must contain " + ") — see issue #121.
         const combinedCandidates = combined
           .split(" + ")
           .map((part) => part.trim())
           .filter((part) => part.length > 0);
-        if (combinedCandidates.length > 1 && !combinedCandidates.includes(chosen)) {
+        if (combinedCandidates.length < 2) {
+          process.stderr.write(
+            `warning: --pick-team "${assignment}" has combined label "${combined}" which is not a multi-team section; skipping\n`,
+          );
+          continue;
+        }
+        if (!combinedCandidates.includes(chosen)) {
           process.stderr.write(
             `warning: --pick-team "${assignment}" has chosen label "${chosen}" which is not one of the teams in ` +
               `"${combined}". Allowed choices: ${combinedCandidates.map((c) => `"${c}"`).join(", ")}; skipping\n`,
