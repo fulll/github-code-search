@@ -1,6 +1,6 @@
 # Filtering
 
-`github-code-search` provides four pre-query filtering options so you can exclude noise before results ever appear in the TUI or output.
+`github-code-search` provides four result filtering options so you can exclude noise from what appears in the TUI or output.
 
 ## `--exclude-repositories`
 

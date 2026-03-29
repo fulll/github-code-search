@@ -84,7 +84,7 @@ describe("buildReplayCommand", () => {
     const groups = [makeGroup("myorg/repoA", ["a.ts"])];
     const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set());
     expect(cmd).toContain(`github-code-search`);
-    expect(cmd).toContain(`--org ${ORG}`);
+    expect(cmd).toContain(`--org '${ORG}'`);
     expect(cmd).toContain(`--no-interactive`);
   });
 

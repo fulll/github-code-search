@@ -52,7 +52,9 @@ export function buildReplayCommand(
 ): string {
   const { format, outputType, includeArchived, excludeTemplates, groupByTeamPrefix, regexHint } =
     options;
-  const parts: string[] = [`github-code-search ${shellQuote(query)} --org ${org} --no-interactive`];
+  const parts: string[] = [
+    `github-code-search ${shellQuote(query)} --org ${shellQuote(org)} --no-interactive`,
+  ];
 
   const excludedReposList: string[] = [...excludedRepos].map((r) => shortRepo(r, org));
   for (const group of groups) {
