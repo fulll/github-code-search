@@ -21,7 +21,7 @@ export interface CodeMatch {
   htmlUrl: string;
   textMatches: TextMatch[];
   archived: boolean;
-  isTemplate: boolean;
+  isTemplate?: boolean;
 }
 
 export interface RepoGroup {

@@ -1,6 +1,6 @@
 # Filtering
 
-`github-code-search` provides three pre-query filtering options so you can exclude noise before results ever appear in the TUI or output.
+`github-code-search` provides four pre-query filtering options so you can exclude noise before results ever appear in the TUI or output.
 
 ## `--exclude-repositories`
 
@@ -73,7 +73,7 @@ github-code-search "useFeatureFlag" --org fulll --exclude-template-repositories
 ```
 
 ::: info
-Template repositories (marked as templates on GitHub) are filtered out in the aggregation step before the TUI is shown. Useful when your organisation uses template repos for boilerplate that should not appear in search results.
+Template repositories (marked as templates on GitHub) are filtered out in the aggregation step — both in interactive and non-interactive mode. Useful when your organisation uses template repos for boilerplate that should not appear in search results.
 :::
 
 ## Combining filters

@@ -96,7 +96,7 @@ export function buildReplayCommand(
     parts.push("--exclude-template-repositories");
   }
   if (groupByTeamPrefix) {
-    parts.push(`--group-by-team-prefix ${groupByTeamPrefix}`);
+    parts.push(`--group-by-team-prefix ${shellQuote(groupByTeamPrefix)}`);
   }
   if (regexHint) {
     parts.push(`--regex-hint ${shellQuote(regexHint)}`);

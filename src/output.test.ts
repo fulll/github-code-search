@@ -169,11 +169,25 @@ describe("buildReplayCommand", () => {
     expect(cmd).not.toContain("--include-archived");
   });
 
+  it("includes --exclude-template-repositories when excludeTemplates is true", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const opts: ReplayOptions = { excludeTemplates: true };
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
+    expect(cmd).toContain("--exclude-template-repositories");
+  });
+
+  it("does not include --exclude-template-repositories when excludeTemplates is false (default)", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const opts: ReplayOptions = { excludeTemplates: false };
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
+    expect(cmd).not.toContain("--exclude-template-repositories");
+  });
+
   it("includes --group-by-team-prefix when groupByTeamPrefix is set", () => {
     const groups = [makeGroup("myorg/repoA", ["a.ts"])];
     const opts: ReplayOptions = { groupByTeamPrefix: "squad-,chapter-" };
     const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
-    expect(cmd).toContain("--group-by-team-prefix squad-,chapter-");
+    expect(cmd).toContain("--group-by-team-prefix 'squad-,chapter-'");
   });
 
   it("does not include --group-by-team-prefix when groupByTeamPrefix is empty (default)", () => {
@@ -567,6 +581,6 @@ describe("buildOutput", () => {
       groupByTeamPrefix: "squad-",
     });
     const parsed = JSON.parse(out);
-    expect(parsed.replayCommand).toContain("--group-by-team-prefix squad-");
+    expect(parsed.replayCommand).toContain("--group-by-team-prefix 'squad-'");
   });
 });
