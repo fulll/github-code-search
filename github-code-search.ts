@@ -334,7 +334,7 @@ async function searchAction(
   if (!opts.groupByTeamPrefix && opts.pickTeam && opts.pickTeam.length > 0) {
     process.stderr.write(
       pc.yellow(
-        "⚠  --pick-team has no effect without --group-by-team-prefix; picks are being ignored.\n",
+        "warning: --pick-team has no effect without --group-by-team-prefix; picks are being ignored.\n",
       ),
     );
   }
