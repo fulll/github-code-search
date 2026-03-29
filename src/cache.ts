@@ -1,6 +1,17 @@
-import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import {
+  closeSync,
+  constants,
+  fstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { randomBytes } from "node:crypto";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 // ─── Team-list cache ──────────────────────────────────────────────────────────
 //
@@ -67,15 +78,33 @@ export function getCacheKey(org: string, prefixes: string[]): string {
  * - the file is older than `CACHE_TTL_MS`
  */
 export function readCache<T>(key: string): T | null {
-  const filePath = join(getCacheDir(), key);
+  // Reject keys containing path separators or absolute-path markers
+  // before any filesystem operation (defence-in-depth for static analysers).
+  if (key.includes("/") || key.includes("\\") || isAbsolute(key)) return null;
+  const base = resolve(getCacheDir());
+  const target = resolve(base, key);
+  const rel = relative(base, target);
+  if (rel === ".." || rel.startsWith(".." + sep) || isAbsolute(rel)) return null;
+  // Fix: open the file once and use fstatSync on the same fd to avoid a
+  // TOCTOU race condition between the age check and the read.
+  // O_NOFOLLOW prevents symlink hijacking in world-writable directories
+  // (CWE-377). On Windows the constant is undefined so we fall back to 0.
+  const O_NOFOLLOW = constants.O_NOFOLLOW ?? 0;
+  let fd: number | null = null;
   try {
-    const stat = statSync(filePath);
+    fd = openSync(target, constants.O_RDONLY | O_NOFOLLOW);
+    const stat = fstatSync(fd);
+    // Verify the descriptor points to a regular file — prevents reading from
+    // FIFOs or device files that could block or expose unintended data (CWE-377).
+    if (!stat.isFile()) return null;
     const ageMs = Date.now() - stat.mtimeMs;
     if (ageMs > CACHE_TTL_MS) return null;
-    const raw = readFileSync(filePath, "utf8");
+    const raw = readFileSync(fd, "utf8");
     return JSON.parse(raw) as T;
   } catch {
     return null;
+  } finally {
+    if (fd !== null) closeSync(fd);
   }
 }
 
@@ -86,10 +115,34 @@ export function readCache<T>(key: string): T | null {
  * best-effort and must never crash the CLI.
  */
 export function writeCache<T>(key: string, data: T): void {
+  // Fix: write to a randomly-named temp file first, then rename atomically to
+  // the target path. This avoids symlink/race attacks on the cache directory
+  // and ensures readers never observe a partially-written file.
   try {
+    // Reject keys containing path separators or absolute-path markers
+    // before any filesystem operation (defence-in-depth for static analysers).
+    if (key.includes("/") || key.includes("\\") || isAbsolute(key)) return;
     const dir = getCacheDir();
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, key), JSON.stringify(data), "utf8");
+    const base = resolve(dir);
+    const target = resolve(base, key);
+    const rel = relative(base, target);
+    if (rel === ".." || rel.startsWith(".." + sep) || isAbsolute(rel)) return;
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    const tmpPath = `${target}.${randomBytes(6).toString("hex")}.tmp`;
+    // mode 0o600: owner-only read/write, so the temp file is private even
+    // when the parent directory is world-writable (CWE-377).
+    writeFileSync(tmpPath, JSON.stringify(data), { encoding: "utf8", flag: "wx", mode: 0o600 });
+    // Fix: on Windows, renameSync fails if the destination already exists
+    // (unlike POSIX where it is atomic). Unlink the target first on win32
+    // to restore replace semantics without sacrificing atomicity on POSIX.
+    if (process.platform === "win32") {
+      try {
+        unlinkSync(target);
+      } catch {
+        // Target may not exist yet — ignore
+      }
+    }
+    renameSync(tmpPath, target);
   } catch {
     // Best-effort: ignore write errors
   }

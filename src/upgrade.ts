@@ -121,11 +121,51 @@ export async function fetchLatestRelease(
  * Uses a ".tmp" sibling file so the replacement is atomic on the same FS.
  */
 async function downloadBinary(url: string, dest: string, debug = false): Promise<void> {
+  // Validate URL to prevent SSRF attacks — initial URL must come from github.com.
+  try {
+    const parsedUrl = new URL(url);
+    if (parsedUrl.hostname !== "github.com") {
+      throw new Error("Invalid host");
+    }
+    if (parsedUrl.protocol !== "https:") {
+      throw new Error("Invalid protocol");
+    }
+  } catch {
+    throw new Error("Invalid URL");
+  }
+
   if (debug) process.stdout.write(`[debug] downloading from ${url}\n`);
-  const res = await fetch(url);
+  // Follow redirects manually to validate each hop — prevents redirect-based SSRF.
+  // GitHub release assets redirect from github.com to *.githubusercontent.com, so both
+  // are allowed redirect targets; all other hosts are blocked.
+  let currentUrl = url;
+  let res!: Response;
+  const maxRedirects = 10;
+  for (let redirectCount = 0; ; redirectCount++) {
+    if (redirectCount > maxRedirects) throw new Error("Too many redirects");
+    res = await fetch(currentUrl, { redirect: "manual" });
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get("location");
+      if (!location) break;
+      let nextUrl: URL;
+      try {
+        nextUrl = new URL(location, currentUrl);
+      } catch {
+        throw new Error("Redirect blocked: invalid Location header");
+      }
+      const h = nextUrl.hostname;
+      const isAllowedHost = h === "github.com" || h.endsWith(".githubusercontent.com");
+      if (!isAllowedHost || nextUrl.protocol !== "https:") {
+        throw new Error("Redirect blocked");
+      }
+      currentUrl = nextUrl.toString();
+      continue;
+    }
+    break;
+  }
   if (debug)
     process.stdout.write(
-      `[debug] fetch response: status=${res.status} ok=${res.ok} url=${res.url}\n`,
+      `[debug] fetch response: status=${res.status} ok=${res.ok} url=${currentUrl}\n`,
     );
   if (!res.ok) {
     throw new Error(`Download failed (${res.status}): ${url}`);
