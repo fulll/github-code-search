@@ -64,13 +64,26 @@ github-code-search "useFeatureFlag" --org fulll --include-archived
 Archived repos are silently filtered out in the aggregation step before the TUI is shown. This flag overrides that behaviour.
 :::
 
+## `--exclude-template-repositories`
+
+By default, template repositories are included in results. Pass `--exclude-template-repositories` to filter them out:
+
+```bash
+github-code-search "useFeatureFlag" --org fulll --exclude-template-repositories
+```
+
+::: info
+Template repositories (marked as templates on GitHub) are filtered out in the aggregation step before the TUI is shown. Useful when your organisation uses template repos for boilerplate that should not appear in search results.
+:::
+
 ## Combining filters
 
-All three flags can be combined freely:
+All four flags can be combined freely:
 
 ```bash
 github-code-search "useFeatureFlag" --org fulll \
   --include-archived \
+  --exclude-template-repositories \
   --exclude-repositories legacy-monolith \
   --exclude-extracts billing-api:src/flags.ts:0
 ```

@@ -85,6 +85,7 @@ export function aggregate(
   excludedExtractRefs: Set<string>,
   includeArchived = false,
   regexFilter?: RegExp | null,
+  excludeTemplates = false,
 ): RepoGroup[] {
   // Compile the global regex once per aggregate() call rather than once per
   // fragment inside recomputeSegments — avoids repeated RegExp construction
@@ -97,6 +98,7 @@ export function aggregate(
   for (const m of matches) {
     if (excludedRepos.has(m.repoFullName)) continue;
     if (!includeArchived && m.archived) continue;
+    if (excludeTemplates && m.isTemplate) continue;
     // Fix: when a regex filter is active, replace each TextMatch's API-provided
     // segments (which point at the literal search term) with segments derived
     // from the actual regex match positions — see issue #111 / fix highlight bug

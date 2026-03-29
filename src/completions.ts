@@ -58,6 +58,12 @@ const OPTIONS = [
     values: [],
   },
   {
+    flag: "exclude-template-repositories",
+    description: "Exclude template repositories",
+    takesArg: false,
+    values: [],
+  },
+  {
     flag: "no-cache",
     description: "Bypass the 24 h team-list cache",
     takesArg: false,
