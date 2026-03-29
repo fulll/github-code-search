@@ -32,17 +32,43 @@ runs:
   steps:
     - name: Start VitePress preview
       shell: bash
-      run: bun run docs:preview -- --port ${{ inputs.port }} &
+      env:
+        PORT: ${{ inputs.port }}
+      run: bun run docs:preview -- --port "$PORT" &
 
     - name: Wait for preview server to be ready
       shell: bash
+      env:
+        PORT: ${{ inputs.port }}
+        BASE: ${{ inputs.base }}
+        TIMEOUT: ${{ inputs.timeout }}
       run: |
-        URL="http://localhost:${{ inputs.port }}${{ inputs.base }}"
+        # Validate TIMEOUT is a strictly positive integer to prevent arithmetic injection
+        if ! printf '%s' "${TIMEOUT}" | grep -qE '^[1-9][0-9]*$'; then
+          echo "::error::timeout input must be a strictly positive integer, got: ${TIMEOUT}"
+          exit 1
+        fi
+        # Validate PORT is a strictly positive integer to prevent userinfo injection (e.g. 80@attacker.tld)
+        if ! printf '%s' "${PORT}" | grep -qE '^[1-9][0-9]*$'; then
+          echo "::error::port input must be a strictly positive integer, got: ${PORT}"
+          exit 1
+        fi
+        # Validate PORT is within the valid TCP port range to avoid unreachable URLs
+        if [ "${PORT}" -lt 1 ] || [ "${PORT}" -gt 65535 ]; then
+          echo "::error::port input must be between 1 and 65535, got: ${PORT}"
+          exit 1
+        fi
+        # Validate BASE starts with / and contains no spaces to prevent URL injection
+        if ! printf '%s' "${BASE}" | grep -qE '^/[^ ]*$'; then
+          echo "::error::base input must start with / and contain no spaces, got: ${BASE}"
+          exit 1
+        fi
+        URL="http://localhost:${PORT}${BASE}"
         echo "Waiting for ${URL} …"
-        DEADLINE=$(( $(date +%s) + ${{ inputs.timeout }} ))
+        DEADLINE=$(( $(date +%s) + TIMEOUT ))
         until curl -sf "${URL}" > /dev/null 2>&1; do
           if [ "$(date +%s)" -ge "${DEADLINE}" ]; then
-            echo "::error::Preview server did not respond within ${{ inputs.timeout }} s on ${URL}."
+            echo "::error::Preview server did not respond within ${TIMEOUT} s on ${URL}."
             exit 1
           fi
           echo "… retrying in 2 s"

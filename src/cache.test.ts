@@ -1,15 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CACHE_TTL_MS, getCacheDir, getCacheKey, readCache, writeCache } from "./cache.ts";
 
-// Use env-var override to redirect the cache to an isolated temp directory
-const TEST_CACHE_DIR = join(tmpdir(), `gcs-cache-test-${process.pid}`);
+// Use env-var override to redirect the cache to a process-private temp directory.
+// mkdtempSync creates the directory with 0o700 permissions (owner-only access),
+// which is the safe temp-dir pattern recognised by static analysers (CWE-377).
+let TEST_CACHE_DIR: string;
 
 beforeEach(() => {
+  TEST_CACHE_DIR = mkdtempSync(join(tmpdir(), "gcs-cache-test-"));
   process.env.GITHUB_CODE_SEARCH_CACHE_DIR = TEST_CACHE_DIR;
-  mkdirSync(TEST_CACHE_DIR, { recursive: true });
 });
 
 afterEach(() => {
@@ -47,7 +49,10 @@ describe("getCacheDir", () => {
     const originalPlatform = Object.getOwnPropertyDescriptor(process, "platform");
     const originalLocalAppData = process.env.LOCALAPPDATA;
     try {
-      Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+      Object.defineProperty(process, "platform", {
+        value: "win32",
+        configurable: true,
+      });
       process.env.LOCALAPPDATA = "C:\\Users\\user\\AppData\\Local";
       const dir = getCacheDir();
       // path.join uses the host OS separator in tests (macOS: /), so we just
@@ -67,7 +72,10 @@ describe("getCacheDir", () => {
     const originalPlatform = Object.getOwnPropertyDescriptor(process, "platform");
     const originalLocalAppData = process.env.LOCALAPPDATA;
     try {
-      Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+      Object.defineProperty(process, "platform", {
+        value: "win32",
+        configurable: true,
+      });
       delete process.env.LOCALAPPDATA;
       const dir = getCacheDir();
       expect(dir).toContain("AppData");
@@ -84,7 +92,10 @@ describe("getCacheDir", () => {
     const originalPlatform = Object.getOwnPropertyDescriptor(process, "platform");
     const originalXdg = process.env.XDG_CACHE_HOME;
     try {
-      Object.defineProperty(process, "platform", { value: "linux", configurable: true });
+      Object.defineProperty(process, "platform", {
+        value: "linux",
+        configurable: true,
+      });
       process.env.XDG_CACHE_HOME = "/custom/xdg/cache";
       const dir = getCacheDir();
       expect(dir).toContain("custom");
@@ -102,7 +113,10 @@ describe("getCacheDir", () => {
     const originalPlatform = Object.getOwnPropertyDescriptor(process, "platform");
     const originalXdg = process.env.XDG_CACHE_HOME;
     try {
-      Object.defineProperty(process, "platform", { value: "linux", configurable: true });
+      Object.defineProperty(process, "platform", {
+        value: "linux",
+        configurable: true,
+      });
       delete process.env.XDG_CACHE_HOME;
       const dir = getCacheDir();
       expect(dir).toContain(".cache");
@@ -117,7 +131,10 @@ describe("getCacheDir", () => {
     delete process.env.GITHUB_CODE_SEARCH_CACHE_DIR;
     const originalPlatform = Object.getOwnPropertyDescriptor(process, "platform");
     try {
-      Object.defineProperty(process, "platform", { value: "freebsd", configurable: true });
+      Object.defineProperty(process, "platform", {
+        value: "freebsd",
+        configurable: true,
+      });
       const dir = getCacheDir();
       expect(dir).toContain(".github-code-search");
       expect(dir).toContain("cache");
@@ -222,5 +239,63 @@ describe("writeCache / readCache round-trip", () => {
     process.env.GITHUB_CODE_SEARCH_CACHE_DIR = "/nonexistent/readonly/path";
     // writeCache must not throw even on filesystem errors
     expect(() => writeCache("key.json", { data: 1 })).not.toThrow();
+  });
+});
+
+// ─── Path Traversal Security Tests ────────────────────────────────────────────
+
+describe("Path traversal vulnerability mitigation", () => {
+  it("rejects readCache with relative parent directory traversal (../)", () => {
+    // Attempt to read outside the cache directory using ../
+    const maliciousKey = "../../../etc/passwd";
+    const result = readCache(maliciousKey);
+    expect(result).toBeNull();
+  });
+
+  it("rejects writeCache with relative parent directory traversal (../)", () => {
+    // Use a subdirectory as cache dir so we have a writable location just above it
+    const cacheSubDir = join(TEST_CACHE_DIR, "sub");
+    mkdirSync(cacheSubDir, { recursive: true });
+    process.env.GITHUB_CODE_SEARCH_CACHE_DIR = cacheSubDir;
+    // This key resolves to TEST_CACHE_DIR/escaped.json — one level above cacheSubDir
+    const maliciousKey = "../escaped.json";
+    const outsidePath = join(TEST_CACHE_DIR, "escaped.json");
+    expect(() => writeCache(maliciousKey, { exploit: true })).not.toThrow();
+    // Prove the file was NOT created at the resolved outside location
+    expect(existsSync(outsidePath)).toBe(false);
+  });
+
+  it("rejects readCache with absolute path", () => {
+    // Attempt to read an absolute path outside the cache directory
+    // Use a portable OS temp path that exists on all platforms
+    const maliciousKey = join(tmpdir(), "gcs-read-absolute-test.json");
+    const result = readCache(maliciousKey);
+    expect(result).toBeNull();
+  });
+
+  it("rejects writeCache with absolute path", () => {
+    // Attempt to write to an absolute path outside the cache directory
+    const outsidePath = join(tmpdir(), `gcs-write-absolute-test-${process.pid}.json`);
+    expect(() => writeCache(outsidePath, { exploit: "absolute" })).not.toThrow();
+    // Prove the file was NOT created at the absolute outside location
+    expect(existsSync(outsidePath)).toBe(false);
+  });
+
+  it("rejects readCache with encoded path traversal (%2e%2e/)", () => {
+    // URL-encoded path traversal attempt
+    const maliciousKey = "%2e%2e/%2e%2e/etc/passwd";
+    const result = readCache(maliciousKey);
+    // URL-encoded ".." segments that also contain a literal "/" path separator.
+    // readCache rejects it because the key contains a literal "/" (separator check),
+    // not because it decodes the percent-encoded characters.
+    expect(result).toBeNull();
+  });
+
+  it("allows reading legitimate cache files with safe names", () => {
+    // Verify that normal operation still works
+    const safeKey = "teams__myorg__squad-.json";
+    const data = { teams: ["squad-alpha"] };
+    writeCache(safeKey, data);
+    expect(readCache(safeKey)).toEqual(data);
   });
 });

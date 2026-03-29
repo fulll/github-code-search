@@ -80,7 +80,7 @@ describe("isNewerVersion", () => {
 function makeAsset(name: string): ReleaseAsset {
   return {
     name,
-    browser_download_url: `https://example.com/releases/${name}`,
+    browser_download_url: `https://github.com/fulll/github-code-search/releases/download/v9.9.9/${name}`,
   };
 }
 
@@ -435,6 +435,126 @@ describe("performUpgrade — download path", () => {
     expect(stdoutWrites.some((s) => s.includes("blog/release-v9-9-9"))).toBe(true);
     expect(stdoutWrites.some((s) => s.includes("Commit log"))).toBe(true);
     expect(stdoutWrites.some((s) => s.includes("Report a bug"))).toBe(true);
+  });
+
+  /** Sets up a release API mock and returns the per-platform asset name. */
+  function mockReleaseApi(): string {
+    const platformMap: Record<string, string> = { darwin: "macos", win32: "windows" };
+    const p = platformMap[process.platform] ?? process.platform;
+    const suffix = p === "windows" ? ".exe" : "";
+    const assetName = `github-code-search-${p}-${process.arch}${suffix}`;
+    let firstCall = true;
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (firstCall) {
+        firstCall = false;
+        return new Response(
+          JSON.stringify({
+            tag_name: "v9.9.9",
+            html_url: "https://github.com/fulll/github-code-search/releases/tag/v9.9.9",
+            assets: [makeAsset(assetName)],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      return origFetch(url, init);
+    }) as typeof fetch;
+    return assetName;
+  }
+
+  it("throws when the binary download redirects to a non-allowed host", async () => {
+    mockReleaseApi();
+    // Override fetch so the download returns a redirect to an attacker-controlled host
+    const origFetch = globalThis.fetch;
+    let releaseApiDone = false;
+    globalThis.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (!releaseApiDone) {
+        releaseApiDone = true;
+        return origFetch(url, init);
+      }
+      return new Response(null, {
+        status: 302,
+        headers: { location: "https://attacker.example.com/evil-binary" },
+      });
+    }) as typeof fetch;
+
+    await expect(performUpgrade("1.0.0", "/tmp/gcs-test-ssrf-redirect")).rejects.toThrow(
+      "Redirect blocked",
+    );
+  });
+
+  it("throws when the binary download redirects to an http (non-https) URL", async () => {
+    mockReleaseApi();
+    const origFetch = globalThis.fetch;
+    let releaseApiDone = false;
+    globalThis.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (!releaseApiDone) {
+        releaseApiDone = true;
+        return origFetch(url, init);
+      }
+      return new Response(null, {
+        status: 302,
+        headers: { location: "http://github.com/downgrade-attack" },
+      });
+    }) as typeof fetch;
+
+    await expect(performUpgrade("1.0.0", "/tmp/gcs-test-http-redirect")).rejects.toThrow(
+      "Redirect blocked",
+    );
+  });
+
+  it("throws when the download exceeds the maximum number of redirects", async () => {
+    mockReleaseApi();
+    const origFetch = globalThis.fetch;
+    let releaseApiDone = false;
+    globalThis.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (!releaseApiDone) {
+        releaseApiDone = true;
+        return origFetch(url, init);
+      }
+      // Always redirect to an allowed host to hit the redirect limit
+      return new Response(null, {
+        status: 302,
+        headers: {
+          location: "https://github.com/fulll/github-code-search/releases/download/v9.9.9/binary",
+        },
+      });
+    }) as typeof fetch;
+
+    await expect(performUpgrade("1.0.0", "/tmp/gcs-test-too-many-redirects")).rejects.toThrow(
+      "Too many redirects",
+    );
+  });
+
+  it("follows a redirect to githubusercontent.com and completes successfully", async () => {
+    mockReleaseApi();
+    const origFetch = globalThis.fetch;
+    let releaseApiDone = false;
+    let redirectDone = false;
+    globalThis.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (!releaseApiDone) {
+        releaseApiDone = true;
+        return origFetch(url, init);
+      }
+      if (!redirectDone) {
+        redirectDone = true;
+        // Simulate github.com → objects.githubusercontent.com redirect
+        return new Response(null, {
+          status: 302,
+          headers: { location: "https://objects.githubusercontent.com/v9.9.9/binary" },
+        });
+      }
+      return new Response(new Uint8Array([1, 2, 3]).buffer, { status: 200 });
+    }) as typeof fetch;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (Bun as any).write = async () => 3;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (Bun as any).spawnSync = () => ({ exitCode: 0, stderr: { toString: () => "" } });
+
+    await expect(
+      performUpgrade("1.0.0", "/tmp/gcs-test-githubusercontent-redirect"),
+    ).resolves.toBeUndefined();
   });
 });
 
