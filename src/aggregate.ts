@@ -98,7 +98,7 @@ export function aggregate(
   for (const m of matches) {
     if (excludedRepos.has(m.repoFullName)) continue;
     if (!includeArchived && m.archived) continue;
-    if (excludeTemplates && m.isTemplate) continue;
+    if (excludeTemplates && m.isTemplate === true) continue;
     // Fix: when a regex filter is active, replace each TextMatch's API-provided
     // segments (which point at the literal search term) with segments derived
     // from the actual regex match positions — see issue #111 / fix highlight bug

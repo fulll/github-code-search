@@ -82,7 +82,7 @@ export function buildReplayCommand(
     }
   }
   if (excludedExtractsList.length > 0) {
-    parts.push(`--exclude-extracts ${excludedExtractsList.join(",")}`);
+    parts.push(`--exclude-extracts ${shellQuote(excludedExtractsList.join(","))}`);
   }
 
   if (format && format !== "markdown") {

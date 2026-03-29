@@ -117,7 +117,7 @@ describe("buildReplayCommand", () => {
       }),
     ];
     const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set());
-    expect(cmd).toContain("--exclude-extracts repoA:b.ts:1");
+    expect(cmd).toContain("--exclude-extracts 'repoA:b.ts:1'");
   });
 
   it("does not double-add pre-existing exclusions", () => {
