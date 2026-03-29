@@ -109,6 +109,7 @@ if ($Version -eq "latest") {
   try {
     $Response = Invoke-RestMethod -Uri $ApiUrl -Headers @{ "Accept" = "application/vnd.github.v3+json" }
     $Tag = $Response.tag_name
+    $ReleaseAssets = $Response.assets | ForEach-Object { $_.name }
   } catch {
     Write-Output "Install Failed:"
     Write-Output "  Could not determine the latest release from the GitHub API."
@@ -118,6 +119,18 @@ if ($Version -eq "latest") {
   }
 } else {
   $Tag = $Version
+  $ApiUrl = "https://api.github.com/repos/${Repo}/releases/tags/${Tag}"
+
+  try {
+    $Response = Invoke-RestMethod -Uri $ApiUrl -Headers @{ "Accept" = "application/vnd.github.v3+json" }
+    $ReleaseAssets = $Response.assets | ForEach-Object { $_.name }
+  } catch {
+    Write-Output "Install Failed:"
+    Write-Output "  Could not fetch release ${Tag} from the GitHub API."
+    Write-Output "  URL: $ApiUrl"
+    Write-Output "  $_"
+    exit 1
+  }
 }
 
 # ── Resolve artifact name with automatic x64 fallback ────────────────────────
@@ -127,6 +140,10 @@ if ($Version -eq "latest") {
 #   github-code-search-windows-x64-baseline.exe — compatible with any x86-64 CPU
 #   github-code-search-windows-x64.exe           — legacy alias kept for back-compat
 #   github-code-search-windows-arm64.exe         — ARM64
+#
+# Artifact availability is checked against the GitHub release asset list already
+# fetched above — no extra network request needed, and no Invoke-WebRequest
+# which triggers a security warning on Windows PowerShell 5.1.
 
 $CandidateTargets = @($Target)
 if ($Target -eq "x64-modern") {
@@ -139,22 +156,21 @@ if ($Target -eq "x64-modern") {
 $Artifact = $null
 foreach ($Candidate in $CandidateTargets) {
   $CandidateArtifact = "${BinaryName}-windows-${Candidate}.exe"
-  $CheckUrl = "https://github.com/${Repo}/releases/download/${Tag}/${CandidateArtifact}"
-  try {
-    # -UseBasicParsing is removed in PowerShell 6+ (pwsh); omit it for compat.
-    $Null = Invoke-WebRequest -Uri $CheckUrl -Method Head -ErrorAction Stop
+  if ($ReleaseAssets -contains $CandidateArtifact) {
     $Artifact = $CandidateArtifact
     $Target = $Candidate
     break
-  } catch {
-    Write-Output "  Variant windows-${Candidate} not found in release ${Tag}, trying next..."
   }
 }
 
 if ($null -eq $Artifact) {
+  $AvailableWindows = $ReleaseAssets | Where-Object { $_ -like "*windows*" }
   Write-Output "Install Failed:"
   Write-Output "  No compatible Windows binary found for ${Tag}."
   Write-Output "  Tried: $($CandidateTargets -join ', ')"
+  if ($AvailableWindows) {
+    Write-Output "  Available Windows assets: $($AvailableWindows -join ', ')"
+  }
   exit 1
 }
 
