@@ -542,7 +542,8 @@ export function renderGroups(
       // Feat: team pick mode — show pick bar when active for this section — see issue #85.
       const pickMode = opts.teamPickMode;
       if (pickMode?.active && pickMode.sectionLabel === row.sectionLabel) {
-        const bar = renderTeamPickHeader(pickMode.candidates, pickMode.focusedIndex);
+        // Fix: clip pick bar to (termWidth - 3) so "── " + bar never wraps — see issue #121.
+        const bar = renderTeamPickHeader(pickMode.candidates, pickMode.focusedIndex, termWidth - 3);
         lines.push(`${pc.magenta(pc.bold("── "))}${bar}`);
       } else if (isActiveSectionCursor) {
         const isMultiTeam = (row.sectionLabel ?? "").includes(" + ");

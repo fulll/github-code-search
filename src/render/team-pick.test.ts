@@ -42,3 +42,41 @@ describe("renderTeamPickHeader — focused team rendering", () => {
     expect(result).toBe("[ squad-only ]");
   });
 });
+
+describe("renderTeamPickHeader — maxWidth clipping", () => {
+  it("returns the full bar when maxWidth is undefined", () => {
+    const result = strip(renderTeamPickHeader(["squad-a", "squad-b"], 0));
+    expect(result).toBe("[ squad-a ]  squad-b");
+  });
+
+  it("returns the full bar when it fits within maxWidth", () => {
+    // "[ squad-a ]  squad-b" = 20 visible chars
+    const result = strip(renderTeamPickHeader(["squad-a", "squad-b"], 0, 20));
+    expect(result).toBe("[ squad-a ]  squad-b");
+  });
+
+  it("clips and appends … when bar exceeds maxWidth", () => {
+    // "[ squad-a ]" = 11 chars; "  squad-b" = 9 more = 20 total; limit to 15
+    const result = strip(renderTeamPickHeader(["squad-a", "squad-b"], 0, 15));
+    expect(result).toContain("[ squad-a ]");
+    expect(result).toContain("…");
+    expect(result).not.toContain("squad-b");
+  });
+
+  it("omits … when even the ellipsis does not fit", () => {
+    // maxWidth=0: no room for any char, not even "…"
+    const result = strip(renderTeamPickHeader(["squad-a", "squad-b"], 0, 0));
+    expect(result).not.toContain("…");
+    expect(result).toBe("");
+  });
+
+  it("clips three candidates to two + ellipsis", () => {
+    // "[ squad-a ]" = 11, "  squad-b" = 9 → 20 total; "  …" = 3 → needs maxWidth ≥ 23
+    // With maxWidth=23: squad-a + squad-b + "  …" fits; squad-c does not
+    const result = strip(renderTeamPickHeader(["squad-a", "squad-b", "squad-c"], 0, 23));
+    expect(result).toContain("[ squad-a ]");
+    expect(result).toContain("squad-b");
+    expect(result).toContain("…");
+    expect(result).not.toContain("squad-c");
+  });
+});

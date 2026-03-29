@@ -220,7 +220,7 @@ describe("buildReplayCommand", () => {
       pickTeams: { "squad-frontend + squad-mobile": "squad-frontend" },
     };
     const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
-    expect(cmd).toContain('--pick-team "squad-frontend + squad-mobile"=squad-frontend');
+    expect(cmd).toContain("--pick-team 'squad-frontend + squad-mobile=squad-frontend'");
   });
 
   it("emits multiple --pick-team flags when pickTeams has multiple entries", () => {
@@ -233,8 +233,8 @@ describe("buildReplayCommand", () => {
       },
     };
     const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
-    expect(cmd).toContain('--pick-team "squad-a + squad-b"=squad-a');
-    expect(cmd).toContain('--pick-team "squad-c + squad-d"=squad-c');
+    expect(cmd).toContain("--pick-team 'squad-a + squad-b=squad-a'");
+    expect(cmd).toContain("--pick-team 'squad-c + squad-d=squad-c'");
   });
 });
 

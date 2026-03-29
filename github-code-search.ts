@@ -380,7 +380,7 @@ async function searchAction(
       if (unresolved.length > 0 && opts.pickTeam.length > 0) {
         process.stderr.write(
           `note: ${unresolved.length} combined section${unresolved.length !== 1 ? "s" : ""} still unresolved ` +
-            `(use -p in TUI or --pick-team to assign):\n` +
+            `(press "p" in TUI or use --pick-team to assign):\n` +
             unresolved.map((s) => `  "${s.label}"`).join("\n") +
             "\n",
         );

@@ -114,7 +114,7 @@ export function buildReplayCommand(
   }
   if (pickTeams) {
     for (const [combined, chosen] of Object.entries(pickTeams)) {
-      parts.push(`--pick-team "${combined}"=${chosen}`);
+      parts.push(`--pick-team ${shellQuote(`${combined}=${chosen}`)}`);
     }
   }
 

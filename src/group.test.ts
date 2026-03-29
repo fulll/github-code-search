@@ -229,7 +229,7 @@ describe("applyTeamPick — two-team combined section", () => {
 
   it("returns sections unchanged when combinedLabel is not found", () => {
     const result = applyTeamPick(sections, "squad-ops + squad-mobile", "squad-ops");
-    expect(result).toEqual(sections);
+    expect(result).toBe(sections);
   });
 
   it("preserves the order of other sections and inserts new section at the same position", () => {
