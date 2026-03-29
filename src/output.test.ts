@@ -84,7 +84,7 @@ describe("buildReplayCommand", () => {
     const groups = [makeGroup("myorg/repoA", ["a.ts"])];
     const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set());
     expect(cmd).toContain(`github-code-search`);
-    expect(cmd).toContain(`--org ${ORG}`);
+    expect(cmd).toContain(`--org '${ORG}'`);
     expect(cmd).toContain(`--no-interactive`);
   });
 
@@ -117,7 +117,7 @@ describe("buildReplayCommand", () => {
       }),
     ];
     const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set());
-    expect(cmd).toContain("--exclude-extracts repoA:b.ts:1");
+    expect(cmd).toContain("--exclude-extracts 'repoA:b.ts:1'");
   });
 
   it("does not double-add pre-existing exclusions", () => {
@@ -169,11 +169,25 @@ describe("buildReplayCommand", () => {
     expect(cmd).not.toContain("--include-archived");
   });
 
+  it("includes --exclude-template-repositories when excludeTemplates is true", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const opts: ReplayOptions = { excludeTemplates: true };
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
+    expect(cmd).toContain("--exclude-template-repositories");
+  });
+
+  it("does not include --exclude-template-repositories when excludeTemplates is false (default)", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const opts: ReplayOptions = { excludeTemplates: false };
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
+    expect(cmd).not.toContain("--exclude-template-repositories");
+  });
+
   it("includes --group-by-team-prefix when groupByTeamPrefix is set", () => {
     const groups = [makeGroup("myorg/repoA", ["a.ts"])];
     const opts: ReplayOptions = { groupByTeamPrefix: "squad-,chapter-" };
     const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
-    expect(cmd).toContain("--group-by-team-prefix squad-,chapter-");
+    expect(cmd).toContain("--group-by-team-prefix 'squad-,chapter-'");
   });
 
   it("does not include --group-by-team-prefix when groupByTeamPrefix is empty (default)", () => {
@@ -197,6 +211,30 @@ describe("buildReplayCommand", () => {
     const groups = [makeGroup("myorg/repoA", ["a.ts"])];
     const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set());
     expect(cmd).not.toContain("--regex-hint");
+  });
+
+  it("emits --pick-team for each entry in pickTeams", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const opts: ReplayOptions = {
+      groupByTeamPrefix: "squad-",
+      pickTeams: { "squad-frontend + squad-mobile": "squad-frontend" },
+    };
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
+    expect(cmd).toContain("--pick-team 'squad-frontend + squad-mobile=squad-frontend'");
+  });
+
+  it("emits multiple --pick-team flags when pickTeams has multiple entries", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const opts: ReplayOptions = {
+      groupByTeamPrefix: "squad-",
+      pickTeams: {
+        "squad-a + squad-b": "squad-a",
+        "squad-c + squad-d": "squad-c",
+      },
+    };
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
+    expect(cmd).toContain("--pick-team 'squad-a + squad-b=squad-a'");
+    expect(cmd).toContain("--pick-team 'squad-c + squad-d=squad-c'");
   });
 });
 
@@ -567,6 +605,6 @@ describe("buildOutput", () => {
       groupByTeamPrefix: "squad-",
     });
     const parsed = JSON.parse(out);
-    expect(parsed.replayCommand).toContain("--group-by-team-prefix squad-");
+    expect(parsed.replayCommand).toContain("--group-by-team-prefix 'squad-'");
   });
 });

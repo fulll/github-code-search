@@ -12,6 +12,7 @@ import {
   type FilterStats,
 } from "./render.ts";
 import { buildOutput } from "./output.ts";
+import { applyTeamPick, flattenTeamSections, rebuildTeamSections } from "./group.ts";
 import type { FilterTarget, OutputFormat, OutputType, RepoGroup, Row } from "./types.ts";
 
 // ─── Key binding constants ────────────────────────────────────────────────────
@@ -108,8 +109,10 @@ export async function runInteractive(
   format: OutputFormat,
   outputType: OutputType = "repo-and-matches",
   includeArchived = false,
+  excludeTemplates = false,
   groupByTeamPrefix = "",
   regexHint = "",
+  initialPickTeams: Record<string, string> = {},
 ): Promise<void> {
   if (groups.length === 0) {
     console.log(pc.yellow("No results found."));
@@ -179,6 +182,18 @@ export async function runInteractive(
   // Track first 'g' keypress so that a second consecutive 'g' jumps to the top.
   let pendingFirstG = false;
 
+  // ─── Team pick mode state ───────────────────────────────────────────────────────
+  // Feat: team pick mode — resolve multi-team section ownership — see issue #85
+  let teamPickMode = {
+    active: false,
+    sectionLabel: "",
+    candidates: [] as string[],
+    focusedIndex: 0,
+  };
+  /** Maps combined section label → chosen team; pre-seeded with CLI --pick-team flags
+   *  so they are included in the replay command even if no additional interactive picks are made. */
+  const confirmedPicks: Record<string, string> = { ...initialPickTeams };
+
   /** Schedule a debounced stats recompute (while typing in filter bar). */
   const scheduleStatsUpdate = () => {
     if (statsDebounceTimer !== null) clearTimeout(statsDebounceTimer);
@@ -219,6 +234,7 @@ export async function runInteractive(
       termWidth: process.stdout.columns ?? 80,
       filterTarget,
       filterRegex,
+      teamPickMode: teamPickMode.active ? teamPickMode : undefined,
     });
     process.stdout.write(ANSI_CLEAR);
     process.stdout.write(rendered);
@@ -235,10 +251,50 @@ export async function runInteractive(
     // in the gg shortcut without interfering with any other shortcut.
     if (!/^g+$/.test(key)) pendingFirstG = false;
 
+    // ── Team pick mode key handler ───────────────────────────────────────────
+    // Feat: team pick mode — resolve multi-team section ownership — see issue #85
+    if (teamPickMode.active) {
+      if (key === KEY_CTRL_C) {
+        process.stdout.write(ANSI_CLEAR);
+        process.stdin.setRawMode(false);
+        process.exit(0);
+      } else if (key === ANSI_ARROW_LEFT) {
+        // ← — cycle candidate teams backwards
+        teamPickMode = {
+          ...teamPickMode,
+          focusedIndex:
+            (teamPickMode.focusedIndex - 1 + teamPickMode.candidates.length) %
+            teamPickMode.candidates.length,
+        };
+      } else if (key === ANSI_ARROW_RIGHT) {
+        // → — cycle candidate teams forwards
+        teamPickMode = {
+          ...teamPickMode,
+          focusedIndex: (teamPickMode.focusedIndex + 1) % teamPickMode.candidates.length,
+        };
+      } else if (key === KEY_ENTER_CR || key === KEY_ENTER_LF) {
+        // Enter — confirm pick, reassign repos, exit pick mode
+        const chosen = teamPickMode.candidates[teamPickMode.focusedIndex];
+        const sections = rebuildTeamSections(groups);
+        const updated = applyTeamPick(sections, teamPickMode.sectionLabel, chosen);
+        groups = flattenTeamSections(updated);
+        confirmedPicks[teamPickMode.sectionLabel] = chosen;
+        teamPickMode = { active: false, sectionLabel: "", candidates: [], focusedIndex: 0 };
+        // Clamp cursor after row count may have changed
+        const newRows = buildRows(groups, filterPath, filterTarget, filterRegex);
+        cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
+        scrollOffset = Math.min(scrollOffset, cursor);
+      } else if (key === "\x1b" && !key.startsWith("\x1b[") && !key.startsWith("\x1b\x1b")) {
+        // Esc — cancel with no change
+        teamPickMode = { active: false, sectionLabel: "", candidates: [], focusedIndex: 0 };
+      }
+      redraw();
+      continue;
+    }
+
     // ── Filter input mode ────────────────────────────────────────────────────
     if (filterMode) {
       if (key === KEY_CTRL_C) {
-        // safety exit even in filter mode
         process.stdout.write(ANSI_CLEAR);
         process.stdin.setRawMode(false);
         process.exit(0);
@@ -349,7 +405,7 @@ export async function runInteractive(
       continue;
     }
 
-    // ── Normal mode ─────────────────────────────────────────────────────────
+    // ── Normal mode ───────────────────────────────────────────────────────────────
     const rows = buildRows(groups, filterPath, filterTarget, filterRegex);
     const row = rows[cursor];
 
@@ -371,8 +427,10 @@ export async function runInteractive(
       console.log(
         buildOutput(groups, query, org, excludedRepos, excludedExtractRefs, format, outputType, {
           includeArchived,
+          excludeTemplates,
           groupByTeamPrefix,
           regexHint: regexHint || undefined,
+          pickTeams: Object.keys(confirmedPicks).length > 0 ? confirmedPicks : undefined,
         }),
       );
       process.exit(0);
@@ -396,6 +454,15 @@ export async function runInteractive(
       } else {
         filterLiveStats = null;
       }
+      redraw();
+      continue;
+    }
+
+    // `p` — enter team pick mode (only on multi-team section headers)
+    // Feat: team pick mode — resolve multi-team section ownership — see issue #85
+    if (key === "p" && row?.type === "section" && row.sectionLabel?.includes(" + ")) {
+      const candidates = row.sectionLabel.split(" + ");
+      teamPickMode = { active: true, sectionLabel: row.sectionLabel, candidates, focusedIndex: 0 };
       redraw();
       continue;
     }
@@ -439,17 +506,15 @@ export async function runInteractive(
     }
 
     if (key === ANSI_ARROW_UP || key === "k") {
-      // Arrow up — skip section-header rows
-      let next = Math.max(0, cursor - 1);
-      while (next > 0 && rows[next]?.type === "section") next--;
+      // Arrow up — section-header rows are navigable (needed for `p`)
+      const next = Math.max(0, cursor - 1);
       cursor = next;
       if (cursor < scrollOffset) scrollOffset = cursor;
     }
 
     if (key === ANSI_ARROW_DOWN || key === "j") {
-      // Arrow down — skip section-header rows
-      let next = Math.min(rows.length - 1, cursor + 1);
-      while (next < rows.length - 1 && rows[next]?.type === "section") next++;
+      // Arrow down — section-header rows are navigable (needed for `p`)
+      const next = Math.min(rows.length - 1, cursor + 1);
       cursor = next;
       while (
         scrollOffset < cursor &&

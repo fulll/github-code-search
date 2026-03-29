@@ -32,10 +32,13 @@ export interface ReplayOptions {
   format?: OutputFormat;
   outputType?: OutputType;
   includeArchived?: boolean;
+  excludeTemplates?: boolean;
   groupByTeamPrefix?: string;
   /** When set, appends `--regex-hint <term>` to the replay command so the
    *  result set from a regex query can be reproduced exactly. */
   regexHint?: string;
+  /** Team-pick assignments to replay: maps combined label → chosen team. */
+  pickTeams?: Record<string, string>;
 }
 
 // ─── Replay command ───────────────────────────────────────────────────────────
@@ -49,8 +52,18 @@ export function buildReplayCommand(
   // Fix: forward all input options so the replay command is fully reproducible — see issue #11
   options: ReplayOptions = {},
 ): string {
-  const { format, outputType, includeArchived, groupByTeamPrefix, regexHint } = options;
-  const parts: string[] = [`github-code-search ${shellQuote(query)} --org ${org} --no-interactive`];
+  const {
+    format,
+    outputType,
+    includeArchived,
+    excludeTemplates,
+    groupByTeamPrefix,
+    regexHint,
+    pickTeams,
+  } = options;
+  const parts: string[] = [
+    `github-code-search ${shellQuote(query)} --org ${shellQuote(org)} --no-interactive`,
+  ];
 
   const excludedReposList: string[] = [...excludedRepos].map((r) => shortRepo(r, org));
   for (const group of groups) {
@@ -78,7 +91,7 @@ export function buildReplayCommand(
     }
   }
   if (excludedExtractsList.length > 0) {
-    parts.push(`--exclude-extracts ${excludedExtractsList.join(",")}`);
+    parts.push(`--exclude-extracts ${shellQuote(excludedExtractsList.join(","))}`);
   }
 
   if (format && format !== "markdown") {
@@ -90,11 +103,19 @@ export function buildReplayCommand(
   if (includeArchived) {
     parts.push("--include-archived");
   }
+  if (excludeTemplates) {
+    parts.push("--exclude-template-repositories");
+  }
   if (groupByTeamPrefix) {
-    parts.push(`--group-by-team-prefix ${groupByTeamPrefix}`);
+    parts.push(`--group-by-team-prefix ${shellQuote(groupByTeamPrefix)}`);
   }
   if (regexHint) {
     parts.push(`--regex-hint ${shellQuote(regexHint)}`);
+  }
+  if (pickTeams) {
+    for (const [combined, chosen] of Object.entries(pickTeams)) {
+      parts.push(`--pick-team ${shellQuote(`${combined}=${chosen}`)}`);
+    }
   }
 
   return `# Replay:\n${parts.join(" \\\n  ")}`;
@@ -264,7 +285,10 @@ export function buildOutput(
   excludedExtractRefs: Set<string>,
   format: OutputFormat,
   outputType: OutputType = "repo-and-matches",
-  extraOptions: Pick<ReplayOptions, "includeArchived" | "groupByTeamPrefix" | "regexHint"> = {},
+  extraOptions: Pick<
+    ReplayOptions,
+    "includeArchived" | "excludeTemplates" | "groupByTeamPrefix" | "regexHint" | "pickTeams"
+  > = {},
 ): string {
   const options: ReplayOptions = { format, outputType, ...extraOptions };
   if (format === "json") {

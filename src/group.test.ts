@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { flattenTeamSections, groupByTeamPrefix } from "./group.ts";
+import {
+  applyTeamPick,
+  flattenTeamSections,
+  groupByTeamPrefix,
+  rebuildTeamSections,
+} from "./group.ts";
 import type { RepoGroup, TeamSection } from "./types.ts";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -173,5 +178,104 @@ describe("flattenTeamSections", () => {
 
   it("returns empty array for empty sections", () => {
     expect(flattenTeamSections([])).toEqual([]);
+  });
+});
+// ─── applyTeamPick ───────────────────────────────────────────────────────────────
+
+describe("applyTeamPick — two-team combined section", () => {
+  const sections: TeamSection[] = [
+    { label: "squad-frontend", groups: [makeGroup("org/a", ["squad-frontend"])] },
+    {
+      label: "squad-frontend + squad-mobile",
+      groups: [makeGroup("org/shared", ["squad-frontend", "squad-mobile"])],
+    },
+    { label: "squad-mobile", groups: [makeGroup("org/b", ["squad-mobile"])] },
+  ];
+
+  it("assigns repos to chosen team's existing section when it exists", () => {
+    const result = applyTeamPick(sections, "squad-frontend + squad-mobile", "squad-frontend");
+    const labels = result.map((s) => s.label);
+    // Combined section removed
+    expect(labels).not.toContain("squad-frontend + squad-mobile");
+    // Repos moved into squad-frontend
+    const fe = result.find((s) => s.label === "squad-frontend");
+    expect(fe?.groups).toHaveLength(2);
+    expect(fe?.groups.map((g) => g.repoFullName)).toContain("org/shared");
+  });
+
+  it("sets pickedFrom on moved repos with the original combined label", () => {
+    const result = applyTeamPick(sections, "squad-frontend + squad-mobile", "squad-frontend");
+    const fe = result.find((s) => s.label === "squad-frontend");
+    // The repo that was originally in the combined section should have pickedFrom set
+    const movedRepo = fe?.groups.find((g) => g.repoFullName === "org/shared");
+    expect(movedRepo?.pickedFrom).toBe("squad-frontend + squad-mobile");
+    // Repos that were already in squad-frontend should not have pickedFrom set
+    const originalRepo = fe?.groups.find((g) => g.repoFullName === "org/a");
+    expect(originalRepo?.pickedFrom).toBeUndefined();
+  });
+
+  it("creates a new section when chosen team has no existing section", () => {
+    const isolated: TeamSection[] = [
+      {
+        label: "squad-frontend + squad-mobile",
+        groups: [makeGroup("org/shared")],
+      },
+    ];
+    const result = applyTeamPick(isolated, "squad-frontend + squad-mobile", "squad-frontend");
+    expect(result).toHaveLength(1);
+    expect(result[0].label).toBe("squad-frontend");
+    expect(result[0].groups[0].repoFullName).toBe("org/shared");
+  });
+
+  it("returns sections unchanged when combinedLabel is not found", () => {
+    const result = applyTeamPick(sections, "squad-ops + squad-mobile", "squad-ops");
+    expect(result).toBe(sections);
+  });
+
+  it("preserves the order of other sections and inserts new section at the same position", () => {
+    const s: TeamSection[] = [
+      { label: "squad-a", groups: [makeGroup("org/a")] },
+      { label: "squad-a + squad-b", groups: [makeGroup("org/shared")] },
+      { label: "squad-c", groups: [makeGroup("org/c")] },
+    ];
+    // Pick squad-b which has no existing section — new section inserted at index 1
+    const result = applyTeamPick(s, "squad-a + squad-b", "squad-b");
+    expect(result.map((r) => r.label)).toEqual(["squad-a", "squad-b", "squad-c"]);
+  });
+});
+
+describe("applyTeamPick — three-team combined section", () => {
+  it("resolves a three-team section to a single team", () => {
+    const sections: TeamSection[] = [
+      {
+        label: "squad-a + squad-b + squad-c",
+        groups: [makeGroup("org/shared")],
+      },
+    ];
+    const result = applyTeamPick(sections, "squad-a + squad-b + squad-c", "squad-b");
+    expect(result).toHaveLength(1);
+    expect(result[0].label).toBe("squad-b");
+  });
+});
+
+// ─── rebuildTeamSections ───────────────────────────────────────────────────────────
+
+describe("rebuildTeamSections", () => {
+  it("reconstructs sections from a flat RepoGroup[] produced by flattenTeamSections", () => {
+    const original: TeamSection[] = [
+      { label: "squad-frontend", groups: [makeGroup("org/a"), makeGroup("org/b")] },
+      { label: "squad-mobile", groups: [makeGroup("org/c")] },
+    ];
+    const flat = flattenTeamSections(original);
+    const rebuilt = rebuildTeamSections(flat);
+    expect(rebuilt).toHaveLength(2);
+    expect(rebuilt[0].label).toBe("squad-frontend");
+    expect(rebuilt[0].groups).toHaveLength(2);
+    expect(rebuilt[1].label).toBe("squad-mobile");
+    expect(rebuilt[1].groups).toHaveLength(1);
+  });
+
+  it("returns empty array for empty input", () => {
+    expect(rebuildTeamSections([])).toEqual([]);
   });
 });

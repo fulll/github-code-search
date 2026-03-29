@@ -46,6 +46,12 @@ const OPTIONS = [
     values: [],
   },
   {
+    flag: "pick-team",
+    description: "Assign a combined team section to a single owner (repeatable)",
+    takesArg: true,
+    values: [],
+  },
+  {
     flag: "no-interactive",
     description: "Disable interactive mode",
     takesArg: false,
@@ -54,6 +60,12 @@ const OPTIONS = [
   {
     flag: "include-archived",
     description: "Include archived repositories",
+    takesArg: false,
+    values: [],
+  },
+  {
+    flag: "exclude-template-repositories",
+    description: "Exclude template repositories",
     takesArg: false,
     values: [],
   },
