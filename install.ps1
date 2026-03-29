@@ -125,11 +125,11 @@ if ($Version -eq "latest") {
     $Response = Invoke-RestMethod -Uri $ApiUrl -Headers @{ "Accept" = "application/vnd.github.v3+json" }
     $ReleaseAssets = $Response.assets | ForEach-Object { $_.name }
   } catch {
-    Write-Output "Install Failed:"
-    Write-Output "  Could not fetch release ${Tag} from the GitHub API."
-    Write-Output "  URL: $ApiUrl"
-    Write-Output "  $_"
-    exit 1
+    # GitHub API unreachable (blocked, rate-limited, …) — fall back to probing
+    # candidate artifacts directly with curl.exe HEAD requests. curl.exe ships
+    # with Windows 10 1803+ and is already used for the binary download below.
+    Write-Output "  GitHub API unavailable ($ApiUrl); falling back to direct artifact probing..."
+    $ReleaseAssets = $null
   }
 }
 
@@ -144,6 +144,8 @@ if ($Version -eq "latest") {
 # Artifact availability is checked against the GitHub release asset list already
 # fetched above — no extra network request needed, and no Invoke-WebRequest
 # which triggers a security warning on Windows PowerShell 5.1.
+# When the API was unreachable ($ReleaseAssets is $null), we fall back to
+# probing candidate URLs with curl.exe HEAD requests instead.
 
 $CandidateTargets = @($Target)
 if ($Target -eq "x64-modern") {
@@ -156,7 +158,16 @@ if ($Target -eq "x64-modern") {
 $Artifact = $null
 foreach ($Candidate in $CandidateTargets) {
   $CandidateArtifact = "${BinaryName}-windows-${Candidate}.exe"
-  if ($ReleaseAssets -contains $CandidateArtifact) {
+  $Found = $false
+  if ($null -ne $ReleaseAssets) {
+    $Found = $ReleaseAssets -contains $CandidateArtifact
+  } else {
+    # Fallback: probe via curl.exe HEAD (no Invoke-WebRequest, no PS5.1 warning).
+    $CheckUrl = "https://github.com/${Repo}/releases/download/${Tag}/${CandidateArtifact}"
+    $null = curl.exe -fsI $CheckUrl 2>$null
+    $Found = $LASTEXITCODE -eq 0
+  }
+  if ($Found) {
     $Artifact = $CandidateArtifact
     $Target = $Candidate
     break
@@ -164,7 +175,7 @@ foreach ($Candidate in $CandidateTargets) {
 }
 
 if ($null -eq $Artifact) {
-  $AvailableWindows = $ReleaseAssets | Where-Object { $_ -like "*windows*" }
+  $AvailableWindows = if ($null -ne $ReleaseAssets) { $ReleaseAssets | Where-Object { $_ -like "*windows*" } } else { @() }
   Write-Output "Install Failed:"
   Write-Output "  No compatible Windows binary found for ${Tag}."
   Write-Output "  Tried: $($CandidateTargets -join ', ')"
