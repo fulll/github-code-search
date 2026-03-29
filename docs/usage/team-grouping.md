@@ -73,7 +73,47 @@ In the TUI, team sections appear as separator lines between repository rows:
 ▶ ◉  fulll/legacy-monolith  (1 match)
 ```
 
-Navigation (`↑` / `↓`) automatically skips section header rows.
+Section header rows **are navigable** — `↑` / `↓` can land on them. Pressing `p` while the cursor rests on a multi-team section header enters [team pick mode](#team-pick-mode).
+
+## Team pick mode
+
+When a section header shows multiple teams (e.g. `squad-frontend + squad-mobile`), pressing `p` on it enters **team pick mode**. Use this to assign the entire section to a single owner before exporting results to downstream tooling.
+
+### In the TUI
+
+The section header switches to a horizontal pick bar:
+
+```
+── [ squad-frontend ]  squad-mobile
+```
+
+The highlighted team (bold, full colour, wrapped in `[ ]`) is the current selection. The others are dimmed.
+
+| Key       | Action                                   |
+| --------- | ---------------------------------------- |
+| `←` / `→` | Move focus between candidate teams       |
+| `Enter`   | Confirm — section label updates in place |
+| `Esc`     | Cancel — no change                       |
+
+`p` on a section that already has a single team label does nothing.
+
+Repos moved into a team by pick mode are annotated with a `◈` badge next to their name.
+
+### Non-interactive — `--pick-team`
+
+```bash
+github-code-search query "useFeatureFlag" --org fulll \
+  --group-by-team-prefix squad- \
+  --pick-team "squad-frontend + squad-mobile"=squad-frontend
+```
+
+The flag is repeatable — add one `--pick-team` per combined section to resolve. The replay command emits `--pick-team` automatically when a pick was confirmed in the TUI.
+
+If the combined label is not found (typo, or the section was not formed), a warning is emitted on stderr listing the available combined sections — the run continues without error.
+
+::: tip Combined with --dispatch
+`--pick-team` resolves ownership at the **section level** (all repos in the section move to one team). For finer-grained control — assigning individual repos or extracts to different teams — see `--dispatch`.
+:::
 
 ## Team list cache
 

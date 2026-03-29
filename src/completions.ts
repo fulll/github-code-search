@@ -46,6 +46,12 @@ const OPTIONS = [
     values: [],
   },
   {
+    flag: "pick-team",
+    description: "Assign a combined team section to a single owner (repeatable)",
+    takesArg: true,
+    values: [],
+  },
+  {
     flag: "no-interactive",
     description: "Disable interactive mode",
     takesArg: false,

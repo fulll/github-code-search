@@ -79,7 +79,8 @@ src/
   aggregate.ts           # Result grouping & filtering (applyFiltersAndExclusions)
   completions.ts         # Pure shell-completion generators: generateCompletion(),
                          #   detectShell(), getCompletionFilePath() — no I/O
-  group.ts               # groupByTeamPrefix — team-prefix grouping logic
+  group.ts               # groupByTeamPrefix, applyTeamPick, rebuildTeamSections,
+                         #   flattenTeamSections — team-prefix grouping + pick logic
   regex.ts               # Pure query parser: isRegexQuery(), buildApiQuery()
                          #   Detects /pattern/ syntax, derives safe API term,
                          #   returns RegExp for local client-side filtering — no I/O
@@ -94,9 +95,11 @@ src/
   render/
     highlight.ts         # Syntax highlighting (language detection + token rules)
     filter.ts            # FilterStats + buildFilterStats
+    filter-match.ts      # Pure pattern matchers — makeExtractMatcher, makeRepoMatcher
     rows.ts              # buildRows, rowTerminalLines, isCursorVisible
     summary.ts           # buildSummary, buildSummaryFull, buildSelectionSummary
     selection.ts         # applySelectAll, applySelectNone
+    team-pick.ts         # renderTeamPickHeader — pick-mode candidate bar (pure, no I/O)
 
   *.test.ts              # Unit tests co-located with source files
   test-setup.ts          # Global test setup (Bun preload)
@@ -254,3 +257,6 @@ For minor/major releases update `docs/blog/index.md` to add a row in the version
 - Shell-integration tests for `install.sh` live in `install.test.bats` and require `bats-core`. Run them with `bun run test:bats`. The CI runs them in a dedicated `test-bats` job using `bats-core/bats-action`.
 - `picocolors` is the only styling dependency; do not add `chalk` or similar.
 - Keep `knip` clean: every exported symbol must be used; every import must resolve.
+- The `--pick-team` option is repeatable (Commander collect function); each assignment resolves one combined section label to a single team. A warning is emitted on stderr when a label is not found.
+- `src/render/team-pick.ts` is a pure module (no I/O) and must be consumed only via the `src/render.ts` façade — it is imported **directly** inside `render.ts` for internal use but is not re-exported publicly (knip would flag it).
+- `RepoGroup.pickedFrom` (optional field in `src/types.ts`) tracks the combined label a repo was moved from; future split-mode features will use this to offer re-assignment.

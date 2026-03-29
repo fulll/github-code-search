@@ -20,7 +20,7 @@ import { aggregate, normaliseExtractRef, normaliseRepo } from "./src/aggregate.t
 import { fetchAllResults, fetchRepoTeams } from "./src/api.ts";
 import { formatRetryWait } from "./src/api-utils.ts";
 import { buildOutput } from "./src/output.ts";
-import { groupByTeamPrefix, flattenTeamSections } from "./src/group.ts";
+import { groupByTeamPrefix, flattenTeamSections, applyTeamPick } from "./src/group.ts";
 import { checkForUpdate } from "./src/upgrade.ts";
 import { runInteractive } from "./src/tui.ts";
 import { generateCompletion, detectShell } from "./src/completions.ts";
@@ -183,6 +183,19 @@ function addSearchOptions(cmd: Command): Command {
       "",
     )
     .option(
+      "--pick-team <assignment>",
+      [
+        "Assign a combined team section to a single owner.",
+        'Format: "combined label"=chosenTeam  (the = separator is required).',
+        'Example: --pick-team "squad-frontend + squad-mobile"=squad-frontend',
+        "Repeatable — one flag per combined section to resolve.",
+        "Only applies with --group-by-team-prefix.",
+        "Docs: https://fulll.github.io/github-code-search/usage/team-grouping#team-pick-mode",
+      ].join("\n"),
+      (val: string, list: string[]) => [...list, val],
+      [] as string[],
+    )
+    .option(
       "--no-cache",
       "Bypass the 24 h team-list cache and re-fetch teams from GitHub (only applies with --group-by-team-prefix).",
     )
@@ -210,6 +223,7 @@ async function searchAction(
     includeArchived: boolean;
     excludeTemplateRepositories: boolean;
     groupByTeamPrefix: string;
+    pickTeam: string[];
     cache: boolean;
     regexHint?: string;
   },
@@ -316,6 +330,30 @@ async function searchAction(
   );
 
   // ─── Team-prefix grouping ─────────────────────────────────────────────────
+  const pickTeams: Record<string, string> = {};
+  if (!opts.groupByTeamPrefix && opts.pickTeam && opts.pickTeam.length > 0) {
+    // Emit per-assignment warnings (same validation as when grouping is enabled) — see issue #121.
+    for (const assignment of opts.pickTeam) {
+      const eqIndex = assignment.indexOf("=");
+      if (eqIndex === -1) {
+        process.stderr.write(
+          `warning: --pick-team "${assignment}" is missing the = separator; skipping\n`,
+        );
+        continue;
+      }
+      const combined = assignment.slice(0, eqIndex).trim();
+      const chosen = assignment.slice(eqIndex + 1).trim();
+      if (!combined || !chosen) {
+        process.stderr.write(
+          `warning: --pick-team "${assignment}" must have non-empty combined and chosen labels; skipping\n`,
+        );
+        continue;
+      }
+      process.stderr.write(
+        `warning: --pick-team: no section found with label "${combined}"\n  (no combined sections remain)\n`,
+      );
+    }
+  }
   if (opts.groupByTeamPrefix) {
     const prefixes = opts.groupByTeamPrefix
       .split(",")
@@ -327,7 +365,74 @@ async function searchAction(
       for (const g of groups) {
         g.teams = teamMap.get(g.repoFullName) ?? [];
       }
-      groups = flattenTeamSections(groupByTeamPrefix(groups, prefixes));
+      let sections = groupByTeamPrefix(groups, prefixes);
+      // Apply --pick-team assignments before flattening.
+      // Fix: detect non-matching picks and warn on stderr so the user can correct labels.
+      for (const assignment of opts.pickTeam) {
+        const eqIndex = assignment.indexOf("=");
+        if (eqIndex === -1) {
+          process.stderr.write(
+            `warning: --pick-team "${assignment}" is missing the = separator; skipping\n`,
+          );
+          continue;
+        }
+        const combined = assignment.slice(0, eqIndex).trim();
+        const chosen = assignment.slice(eqIndex + 1).trim();
+        if (!combined || !chosen) {
+          process.stderr.write(
+            `warning: --pick-team "${assignment}" must have non-empty combined and chosen labels; skipping\n`,
+          );
+          continue;
+        }
+        // Fix: require the combined label to be a multi-team label (must contain " + ") — see issue #121.
+        const combinedCandidates = combined
+          .split(" + ")
+          .map((part) => part.trim())
+          .filter((part) => part.length > 0);
+        if (combinedCandidates.length < 2) {
+          process.stderr.write(
+            `warning: --pick-team "${assignment}" has combined label "${combined}" which is not a multi-team section; skipping\n`,
+          );
+          continue;
+        }
+        if (!combinedCandidates.includes(chosen)) {
+          process.stderr.write(
+            `warning: --pick-team "${assignment}" has chosen label "${chosen}" which is not one of the teams in ` +
+              `"${combined}". Allowed choices: ${combinedCandidates.map((c) => `"${c}"`).join(", ")}; skipping\n`,
+          );
+          continue;
+        }
+        const updated = applyTeamPick(sections, combined, chosen);
+        if (updated === sections) {
+          // applyTeamPick returns the same reference when the combined label is not found.
+          const available = sections
+            .map((s) => s.label)
+            .filter((l) => l.includes(" + "))
+            .map((l) => `  "${l}"`)
+            .join("\n");
+          process.stderr.write(
+            `warning: --pick-team: no section found with label "${combined}"\n` +
+              (available
+                ? `  Available combined sections:\n${available}\n`
+                : "  (no combined sections remain)\n"),
+          );
+        } else {
+          sections = updated;
+          pickTeams[combined] = chosen;
+        }
+      }
+      // Warn about combined sections that still have no pick assigned, so the user
+      // knows which labels to add to the next replay command or interactive session.
+      const unresolved = sections.filter((s) => s.label.includes(" + "));
+      if (unresolved.length > 0 && opts.pickTeam.length > 0) {
+        process.stderr.write(
+          `note: ${unresolved.length} combined section${unresolved.length !== 1 ? "s" : ""} still unresolved ` +
+            `(press "p" in TUI or use --pick-team to assign):\n` +
+            unresolved.map((s) => `  "${s.label}"`).join("\n") +
+            "\n",
+        );
+      }
+      groups = flattenTeamSections(sections);
     }
   }
 
@@ -338,6 +443,7 @@ async function searchAction(
         excludeTemplates,
         groupByTeamPrefix: opts.groupByTeamPrefix,
         regexHint: opts.regexHint,
+        pickTeams: Object.keys(pickTeams).length > 0 ? pickTeams : undefined,
       }),
     );
     // Check for a newer version and notify on stderr so it never pollutes piped output.
@@ -390,6 +496,7 @@ async function searchAction(
       excludeTemplates,
       opts.groupByTeamPrefix,
       opts.regexHint ?? "",
+      Object.keys(pickTeams).length > 0 ? pickTeams : {},
     );
   }
 }
