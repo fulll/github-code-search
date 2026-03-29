@@ -80,7 +80,9 @@ export function groupByTeamPrefix(groups: RepoGroup[], prefixes: string[]): Team
  * Otherwise a new single-team section is inserted at the position the combined
  * section occupied.
  *
- * Returns a new `TeamSection[]` without mutating the input.
+ * If no section with `combinedLabel` exists, returns the original `sections`
+ * array unchanged (no-op). Otherwise returns a new `TeamSection[]` without
+ * mutating the input array or its elements.
  */
 export function applyTeamPick(
   sections: TeamSection[],
