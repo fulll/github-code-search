@@ -40,12 +40,13 @@ describe("extractRef", () => {
 
 // ─── aggregate ───────────────────────────────────────────────────────────────
 
-function makeMatch(repo: string, path: string, archived = false): CodeMatch {
+function makeMatch(repo: string, path: string, archived = false, isTemplate = false): CodeMatch {
   return {
     path,
     repoFullName: repo,
     htmlUrl: `https://github.com/${repo}/blob/main/${path}`,
     archived,
+    isTemplate,
     textMatches: [],
   };
 }
@@ -136,6 +137,26 @@ describe("aggregate", () => {
     const groups = aggregate(matches, new Set(), new Set());
     expect(groups).toHaveLength(0);
   });
+
+  it("excludes template repos when excludeTemplates = true", () => {
+    const matches: CodeMatch[] = [
+      makeMatch("myorg/repoA", "src/a.ts", false, false),
+      makeMatch("myorg/templateRepo", "src/b.ts", false, true),
+    ];
+    const groups = aggregate(matches, new Set(), new Set(), false, null, true);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].repoFullName).toBe("myorg/repoA");
+  });
+
+  it("includes template repos when excludeTemplates = false (default)", () => {
+    const matches: CodeMatch[] = [
+      makeMatch("myorg/repoA", "src/a.ts", false, false),
+      makeMatch("myorg/templateRepo", "src/b.ts", false, true),
+    ];
+    const groups = aggregate(matches, new Set(), new Set());
+    expect(groups).toHaveLength(2);
+    expect(groups.map((g) => g.repoFullName)).toContain("myorg/templateRepo");
+  });
 });
 
 // ─── aggregate with regexFilter ───────────────────────────────────────────────
@@ -146,6 +167,7 @@ function makeMatchWithFragments(repo: string, path: string, fragments: string[])
     repoFullName: repo,
     htmlUrl: `https://github.com/${repo}/blob/main/${path}`,
     archived: false,
+    isTemplate: false,
     textMatches: fragments.map((fragment) => ({ fragment, matches: [] })),
   };
 }

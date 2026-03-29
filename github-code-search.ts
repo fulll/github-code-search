@@ -167,6 +167,11 @@ function addSearchOptions(cmd: Command): Command {
       false,
     )
     .option(
+      "--exclude-template-repositories",
+      "Exclude template repositories from results (default: false)",
+      false,
+    )
+    .option(
       "--group-by-team-prefix <prefixes>",
       [
         "Comma-separated team-name prefixes used to group result repos by GitHub team.",
@@ -203,6 +208,7 @@ async function searchAction(
     format: string;
     outputType: string;
     includeArchived: boolean;
+    excludeTemplateRepositories: boolean;
     groupByTeamPrefix: string;
     cache: boolean;
     regexHint?: string;
@@ -219,6 +225,7 @@ async function searchAction(
   const format: OutputFormat = opts.format === "json" ? "json" : "markdown";
   const outputType: OutputType = opts.outputType === "repo-only" ? "repo-only" : "repo-and-matches";
   const includeArchived = Boolean(opts.includeArchived);
+  const excludeTemplates = Boolean(opts.excludeTemplateRepositories);
 
   const excludedRepos = new Set(
     opts.excludeRepositories
@@ -305,6 +312,7 @@ async function searchAction(
     excludedExtractRefs,
     includeArchived,
     regexFilter,
+    excludeTemplates,
   );
 
   // ─── Team-prefix grouping ─────────────────────────────────────────────────
@@ -327,6 +335,7 @@ async function searchAction(
     console.log(
       buildOutput(groups, query, org, excludedRepos, excludedExtractRefs, format, outputType, {
         includeArchived,
+        excludeTemplates,
         groupByTeamPrefix: opts.groupByTeamPrefix,
         regexHint: opts.regexHint,
       }),
@@ -378,6 +387,7 @@ async function searchAction(
       format,
       outputType,
       includeArchived,
+      excludeTemplates,
       opts.groupByTeamPrefix,
       opts.regexHint ?? "",
     );

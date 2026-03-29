@@ -18,7 +18,7 @@ interface RawTextMatch {
 interface RawCodeItem {
   path: string;
   html_url: string;
-  repository: { full_name: string; archived?: boolean };
+  repository: { full_name: string; archived?: boolean; is_template?: boolean };
   text_matches?: RawTextMatch[];
 }
 
@@ -277,6 +277,7 @@ export async function fetchAllResults(
       repoFullName: item.repository.full_name,
       htmlUrl: item.html_url,
       archived: item.repository.archived === true,
+      isTemplate: item.repository.is_template === true,
       textMatches: (item.text_matches ?? []).map((m) => {
         const fragment: string = m.fragment ?? "";
         const fragmentStartLine = fileContent ? computeFragmentStartLine(fileContent, fragment) : 1;

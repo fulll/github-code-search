@@ -108,6 +108,7 @@ export async function runInteractive(
   format: OutputFormat,
   outputType: OutputType = "repo-and-matches",
   includeArchived = false,
+  excludeTemplates = false,
   groupByTeamPrefix = "",
   regexHint = "",
 ): Promise<void> {
@@ -371,6 +372,7 @@ export async function runInteractive(
       console.log(
         buildOutput(groups, query, org, excludedRepos, excludedExtractRefs, format, outputType, {
           includeArchived,
+          excludeTemplates,
           groupByTeamPrefix,
           regexHint: regexHint || undefined,
         }),

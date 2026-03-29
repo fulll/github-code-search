@@ -83,6 +83,14 @@ github-code-search query "useFeatureFlag" --org my-org --group-by-team-prefix pl
 
 Get a team-scoped view of every usage site before refactoring a shared hook or utility.
 
+**Skip template repositories**
+
+```bash
+github-code-search query "TODO" --org my-org --exclude-template-repositories
+```
+
+Exclude repositories that are marked as GitHub templates, so boilerplate repos don't clutter your results.
+
 **Regex search — pattern-based code audit**
 
 ```bash
