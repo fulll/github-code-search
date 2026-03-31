@@ -12,7 +12,13 @@ import {
   type FilterStats,
 } from "./render.ts";
 import { buildOutput } from "./output.ts";
-import { applyTeamPick, flattenTeamSections, rebuildTeamSections } from "./group.ts";
+import {
+  applyTeamPick,
+  moveRepoToSection,
+  undoPickedRepo,
+  flattenTeamSections,
+  rebuildTeamSections,
+} from "./group.ts";
 import type { FilterTarget, OutputFormat, OutputType, RepoGroup, Row } from "./types.ts";
 
 // ─── Key binding constants ────────────────────────────────────────────────────
@@ -194,6 +200,15 @@ export async function runInteractive(
    *  so they are included in the replay command even if no additional interactive picks are made. */
   const confirmedPicks: Record<string, string> = { ...initialPickTeams };
 
+  // ─── Team dispatch (re-pick) mode state ───────────────────────────────────────
+  // Feat: re-pick mode — re-assign a picked (◈) repo to a different team — see issue #87
+  let dispatchMode: {
+    active: boolean;
+    repoIndex: number;
+    candidates: string[];
+    focusedIndex: number;
+  } = { active: false, repoIndex: -1, candidates: [], focusedIndex: 0 };
+
   /** Schedule a debounced stats recompute (while typing in filter bar). */
   const scheduleStatsUpdate = () => {
     if (statsDebounceTimer !== null) clearTimeout(statsDebounceTimer);
@@ -235,6 +250,7 @@ export async function runInteractive(
       filterTarget,
       filterRegex,
       teamPickMode: teamPickMode.active ? teamPickMode : undefined,
+      dispatchMode: dispatchMode.active ? dispatchMode : undefined,
     });
     process.stdout.write(ANSI_CLEAR);
     process.stdout.write(rendered);
@@ -287,6 +303,58 @@ export async function runInteractive(
       } else if (key === "\x1b" && !key.startsWith("\x1b[") && !key.startsWith("\x1b\x1b")) {
         // Esc — cancel with no change
         teamPickMode = { active: false, sectionLabel: "", candidates: [], focusedIndex: 0 };
+      }
+      redraw();
+      continue;
+    }
+
+    // ── Team re-pick mode key handler ─────────────────────────────────────────
+    // Feat: re-pick mode — re-assign a picked (◈) repo to a different team — see issue #87
+    if (dispatchMode.active) {
+      if (key === KEY_CTRL_C) {
+        process.stdout.write(ANSI_CLEAR);
+        process.stdin.setRawMode(false);
+        process.exit(0);
+      } else if (key === ANSI_ARROW_LEFT) {
+        // ← — cycle candidate teams backwards
+        dispatchMode = {
+          ...dispatchMode,
+          focusedIndex:
+            (dispatchMode.focusedIndex - 1 + dispatchMode.candidates.length) %
+            dispatchMode.candidates.length,
+        };
+      } else if (key === ANSI_ARROW_RIGHT) {
+        // → — cycle candidate teams forwards
+        dispatchMode = {
+          ...dispatchMode,
+          focusedIndex: (dispatchMode.focusedIndex + 1) % dispatchMode.candidates.length,
+        };
+      } else if (key === KEY_ENTER_CR || key === KEY_ENTER_LF) {
+        // Enter — confirm re-pick, move repo to the focused candidate team
+        const targetTeam = dispatchMode.candidates[dispatchMode.focusedIndex];
+        const g = groups[dispatchMode.repoIndex];
+        groups = moveRepoToSection(groups, g.repoFullName, targetTeam);
+        const newRows = buildRows(groups, filterPath, filterTarget, filterRegex);
+        cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
+        scrollOffset = Math.min(scrollOffset, cursor);
+        dispatchMode = { active: false, repoIndex: -1, candidates: [], focusedIndex: 0 };
+      } else if (key === "0" || key === "u") {
+        // 0 / u — undo pick, restore repo to its original combined section.
+        // Remove the confirmedPick entry for the combined label so the replay
+        // command no longer emits --pick-team for that section.
+        const combinedLabel = groups[dispatchMode.repoIndex]?.pickedFrom;
+        if (combinedLabel) delete confirmedPicks[combinedLabel];
+        groups = undoPickedRepo(groups, dispatchMode.repoIndex);
+        const newRows = buildRows(groups, filterPath, filterTarget, filterRegex);
+        cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
+        scrollOffset = Math.min(scrollOffset, cursor);
+        dispatchMode = { active: false, repoIndex: -1, candidates: [], focusedIndex: 0 };
+      } else if (key === "\x1b" && !key.startsWith("\x1b[") && !key.startsWith("\x1b\x1b")) {
+        // Esc — cancel re-pick mode
+        dispatchMode = { active: false, repoIndex: -1, candidates: [], focusedIndex: 0 };
+      } else if (key === "t") {
+        // t — toggle re-pick mode off
+        dispatchMode = { active: false, repoIndex: -1, candidates: [], focusedIndex: 0 };
       }
       redraw();
       continue;
@@ -467,15 +535,26 @@ export async function runInteractive(
       continue;
     }
 
-    // `t` — cycle filter target: path → content → repo → path
+    // `t` — on a picked repo (◈, has pickedFrom): enter dispatch mode to re-assign to a
+    // different team. Otherwise cycle the filter target: path → content → repo → path.
+    // Feat: team dispatch mode — see issue #86
     if (key === "t") {
-      filterTarget =
-        filterTarget === "path" ? "content" : filterTarget === "content" ? "repo" : "path";
-      if (filterPath) {
-        // Rebuild rows with new target
-        const newRows = buildRows(groups, filterPath, filterTarget, filterRegex);
-        cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
-        scrollOffset = Math.min(scrollOffset, cursor);
+      const isPickedRepo =
+        groupByTeamPrefix && row?.type === "repo" && !!groups[row.repoIndex]?.pickedFrom;
+      if (isPickedRepo) {
+        // Enter dispatch mode — candidates come from the original combined label
+        const pickedFrom = groups[row!.repoIndex].pickedFrom!;
+        const candidates = pickedFrom.split(" + ").map((c) => c.trim());
+        dispatchMode = { active: true, repoIndex: row!.repoIndex, candidates, focusedIndex: 0 };
+      } else {
+        // Cycle filter target when not on a picked repo
+        filterTarget =
+          filterTarget === "path" ? "content" : filterTarget === "content" ? "repo" : "path";
+        if (filterPath) {
+          const newRows = buildRows(groups, filterPath, filterTarget, filterRegex);
+          cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
+          scrollOffset = Math.min(scrollOffset, cursor);
+        }
       }
       redraw();
       continue;

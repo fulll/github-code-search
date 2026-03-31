@@ -3,7 +3,9 @@ import {
   applyTeamPick,
   flattenTeamSections,
   groupByTeamPrefix,
+  moveRepoToSection,
   rebuildTeamSections,
+  undoPickedRepo,
 } from "./group.ts";
 import type { RepoGroup, TeamSection } from "./types.ts";
 
@@ -277,5 +279,166 @@ describe("rebuildTeamSections", () => {
 
   it("returns empty array for empty input", () => {
     expect(rebuildTeamSections([])).toEqual([]);
+  });
+});
+
+// ─── moveRepoToSection ────────────────────────────────────────────────────────
+
+function makeSimpleGroup(repo: string, teams: string[] = []): RepoGroup {
+  return {
+    repoFullName: repo,
+    matches: [],
+    folded: true,
+    repoSelected: true,
+    extractSelected: [],
+    teams,
+  };
+}
+
+describe("moveRepoToSection", () => {
+  it("moves a repo to an existing target section", () => {
+    const sections: TeamSection[] = [
+      {
+        label: "squad-frontend + squad-mobile",
+        groups: [makeSimpleGroup("org/shared", ["squad-frontend", "squad-mobile"])],
+      },
+      { label: "squad-mobile", groups: [makeSimpleGroup("org/b", ["squad-mobile"])] },
+    ];
+    const flat = flattenTeamSections(sections);
+    const result = moveRepoToSection(flat, "org/shared", "squad-mobile");
+    const labels = [...new Set(result.filter((g) => g.sectionLabel).map((g) => g.sectionLabel))];
+    expect(labels).not.toContain("squad-frontend + squad-mobile");
+    expect(labels).toContain("squad-mobile");
+    expect(result.find((g) => g.repoFullName === "org/shared")).toBeDefined();
+  });
+
+  it("creates a new section when target team has no existing section", () => {
+    const sections: TeamSection[] = [
+      { label: "squad-frontend + squad-mobile", groups: [makeSimpleGroup("org/shared")] },
+    ];
+    const flat = flattenTeamSections(sections);
+    const result = moveRepoToSection(flat, "org/shared", "squad-mobile");
+    expect(result.find((g) => g.sectionLabel === "squad-mobile")).toBeDefined();
+  });
+
+  it("is a no-op when the repo does not exist", () => {
+    const sections: TeamSection[] = [
+      { label: "squad-frontend", groups: [makeSimpleGroup("org/a")] },
+    ];
+    const flat = flattenTeamSections(sections);
+    const result = moveRepoToSection(flat, "org/nonexistent", "squad-mobile");
+    expect(result).toBe(flat);
+  });
+});
+
+// ─── undoPickedRepo ───────────────────────────────────────────────────────────
+
+function makePicked(
+  repo: string,
+  pickedFrom: string,
+  currentSection: string,
+  teams: string[] = [],
+): RepoGroup {
+  return {
+    repoFullName: repo,
+    matches: [],
+    folded: true,
+    repoSelected: true,
+    extractSelected: [],
+    teams,
+    pickedFrom,
+    sectionLabel: currentSection,
+  };
+}
+
+describe("undoPickedRepo", () => {
+  it("restores a picked repo back to its original combined section", () => {
+    // squad-frontend + squad-mobile was picked to squad-frontend
+    const groups: RepoGroup[] = [
+      { ...makePicked("org/repoA", "squad-frontend + squad-mobile", "squad-frontend") },
+      {
+        repoFullName: "org/repoB",
+        matches: [],
+        folded: true,
+        repoSelected: true,
+        extractSelected: [],
+        teams: [],
+        pickedFrom: "squad-frontend + squad-mobile",
+      },
+    ];
+    const result = undoPickedRepo(groups, 0);
+    const a = result.find((g) => g.repoFullName === "org/repoA");
+    expect(a).toBeDefined();
+    expect(a!.pickedFrom).toBeUndefined();
+    // Must appear in the restored combined section
+    const sectionRow = result.find((g) => g.sectionLabel === "squad-frontend + squad-mobile");
+    expect(sectionRow).toBeDefined();
+    expect(sectionRow!.repoFullName).toBe("org/repoA");
+  });
+
+  it("no-op when repo has no pickedFrom", () => {
+    const groups: RepoGroup[] = [
+      {
+        repoFullName: "org/repoA",
+        matches: [],
+        folded: true,
+        repoSelected: true,
+        extractSelected: [],
+        teams: [],
+      },
+    ];
+    const result = undoPickedRepo(groups, 0);
+    expect(result).toBe(groups); // same reference — no change
+  });
+
+  it("drops the current section when it becomes empty after undo", () => {
+    const groups: RepoGroup[] = [
+      { ...makePicked("org/repoA", "squad-frontend + squad-mobile", "squad-frontend") },
+    ];
+    const result = undoPickedRepo(groups, 0);
+    // squad-frontend section should be gone (it had only repoA)
+    const frontendSection = result.find((g) => g.sectionLabel === "squad-frontend");
+    expect(frontendSection).toBeUndefined();
+    // Combined section should exist
+    const combinedSection = result.find((g) => g.sectionLabel === "squad-frontend + squad-mobile");
+    expect(combinedSection).toBeDefined();
+  });
+
+  it("appends to the existing combined section if it already exists", () => {
+    // repoA was picked to squad-frontend, but the combined section still has repoC
+    const sections: TeamSection[] = [
+      {
+        label: "squad-frontend",
+        groups: [{ ...makePicked("org/repoA", "squad-frontend + squad-mobile", "squad-frontend") }],
+      },
+      {
+        label: "squad-frontend + squad-mobile",
+        groups: [
+          {
+            repoFullName: "org/repoC",
+            matches: [],
+            folded: true,
+            repoSelected: true,
+            extractSelected: [],
+            teams: ["squad-frontend", "squad-mobile"],
+          },
+        ],
+      },
+    ];
+    const flat = flattenTeamSections(sections);
+    const repoAIndex = flat.findIndex((g) => g.repoFullName === "org/repoA");
+    const result = undoPickedRepo(flat, repoAIndex);
+    const combinedGroups = (() => {
+      let inCombined = false;
+      const repos: string[] = [];
+      for (const g of result) {
+        if (g.sectionLabel === "squad-frontend + squad-mobile") inCombined = true;
+        else if (g.sectionLabel !== undefined) inCombined = false;
+        if (inCombined) repos.push(g.repoFullName);
+      }
+      return repos;
+    })();
+    expect(combinedGroups).toContain("org/repoA");
+    expect(combinedGroups).toContain("org/repoC");
   });
 });

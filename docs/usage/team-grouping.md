@@ -111,9 +111,45 @@ The flag is repeatable — add one `--pick-team` per combined section to resolve
 
 If the combined label is not found (typo, or the section was not formed), a warning is emitted on stderr listing the available combined sections — the run continues without error.
 
-::: tip Combined with --dispatch
-`--pick-team` resolves ownership at the **section level** (all repos in the section move to one team). For finer-grained control — assigning individual repos or extracts to different teams — see `--dispatch`.
-:::
+## Re-pick & undo pick
+
+After using `--pick-team` (or the interactive `p` shortcut) to assign a combined section to a team, individual repos marked `◈` can be re-assigned or restored to their original combined section at any time.
+
+### TUI — re-pick mode
+
+Navigate to any **picked repo** (marked `◈`) and press **`t`** to enter re-pick mode.
+
+```text
+── squad-frontend
+▶ ◈  fulll/frontend-app              ← press t here
+▶ ◈  fulll/mobile-sdk
+```
+
+The hints bar shows a horizontal pick bar — exactly like team pick mode — with the current focused team highlighted in `[ brackets ]`:
+
+```text
+Re-pick: [ squad-frontend ]  squad-mobile  0/u restore  ← → move  ↵ confirm  Esc cancel
+```
+
+| Key         | Action                                            |
+| ----------- | ------------------------------------------------- |
+| `←` / `→`   | Cycle through candidate teams                     |
+| `Enter`     | Confirm and move repo to the focused team         |
+| `0` / `u`   | Restore the repo to its original combined section |
+| `Esc` / `t` | Exit re-pick mode without changes                 |
+
+### Undoing a pick (merge)
+
+Pressing `0` or `u` in re-pick mode restores the repo to the combined section it came from (e.g. `squad-frontend + squad-mobile`). The `◈` badge is removed and the repo is treated as unassigned again.
+
+```text
+── squad-frontend + squad-mobile      ← restored
+▶ ◉  fulll/mobile-sdk
+── squad-frontend
+▶ ◈  fulll/frontend-app
+```
+
+In **non-interactive mode**, undoing a pick is implicit: simply omit the `--pick-team` flag for the repo in the replay command.
 
 ## Team list cache
 

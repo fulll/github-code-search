@@ -160,3 +160,93 @@ export function flattenTeamSections(sections: TeamSection[]): RepoGroup[] {
   }
   return result;
 }
+
+// ─── Undo pick helper ─────────────────────────────────────────────────────────
+
+/**
+ * Restores a previously picked repo back to its original combined section.
+ *
+ * The target repo is identified by `repoIndex` in the flat `groups` array.
+ * It must have a `pickedFrom` field set (otherwise the array is returned as-is).
+ * The repo is removed from its current section and placed in the `pickedFrom`
+ * combined section (which is created if it no longer exists).
+ * `pickedFrom` is stripped from the restored repo so it is treated as a plain
+ * unassigned entry again.
+ *
+ * Pure function — no mutation.
+ */
+export function undoPickedRepo(groups: RepoGroup[], repoIndex: number): RepoGroup[] {
+  const g = groups[repoIndex];
+  if (!g?.pickedFrom) return groups;
+
+  const combinedLabel = g.pickedFrom;
+  // Strip pick metadata from the repo being restored
+  const { pickedFrom: _p, ...restored } = g;
+  void _p;
+  const restoredRepo = restored as RepoGroup;
+
+  let sections = rebuildTeamSections(groups);
+
+  // Remove the repo from its current section (drop section if it becomes empty)
+  const srcIdx = sections.findIndex((s) => s.groups.some((r) => r.repoFullName === g.repoFullName));
+  if (srcIdx !== -1) {
+    const newSrcGroups = sections[srcIdx].groups.filter((r) => r.repoFullName !== g.repoFullName);
+    sections =
+      newSrcGroups.length > 0
+        ? sections.map((s, i) => (i === srcIdx ? { ...s, groups: newSrcGroups } : s))
+        : sections.filter((_, i) => i !== srcIdx);
+  }
+
+  // Place the repo into the original combined section (create if absent)
+  const dstIdx = sections.findIndex((s) => s.label === combinedLabel);
+  if (dstIdx !== -1) {
+    sections = sections.map((s, i) =>
+      i === dstIdx ? { ...s, groups: [...s.groups, restoredRepo] } : s,
+    );
+  } else {
+    // Re-insert at the position of the original source section (best-effort)
+    sections = [...sections, { label: combinedLabel, groups: [restoredRepo] }];
+  }
+
+  return flattenTeamSections(sections);
+}
+
+// ─── Re-pick move helper ──────────────────────────────────────────────────────
+
+/**
+ * Moves a single repo (identified by its full `org/repo` name) into the
+ * target team's section. Used by the TUI re-pick confirmation handler.
+ *
+ * The repo's `pickedFrom` field is preserved so an undo can restore it later.
+ *
+ * Returns a new `RepoGroup[]` without mutating the input.
+ */
+export function moveRepoToSection(
+  groups: RepoGroup[],
+  repoFullName: string,
+  targetTeam: string,
+): RepoGroup[] {
+  let sections = rebuildTeamSections(groups);
+
+  const srcIdx = sections.findIndex((s) => s.groups.some((g) => g.repoFullName === repoFullName));
+  if (srcIdx === -1) return groups;
+
+  const groupToMove = sections[srcIdx].groups.find((g) => g.repoFullName === repoFullName)!;
+  const newSrcGroups = sections[srcIdx].groups.filter((g) => g.repoFullName !== repoFullName);
+
+  const intermediate =
+    newSrcGroups.length > 0
+      ? sections.map((s, i) => (i === srcIdx ? { ...s, groups: newSrcGroups } : s))
+      : sections.filter((_, i) => i !== srcIdx);
+
+  const dstIdx = intermediate.findIndex((s) => s.label === targetTeam);
+  if (dstIdx !== -1) {
+    sections = intermediate.map((s, i) =>
+      i === dstIdx ? { ...s, groups: [...s.groups, groupToMove] } : s,
+    );
+  } else {
+    sections = [...intermediate, { label: targetTeam, groups: [groupToMove] }];
+  }
+
+  return flattenTeamSections(sections);
+}

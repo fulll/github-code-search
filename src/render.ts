@@ -320,6 +320,13 @@ interface RenderOptions {
     candidates: string[];
     focusedIndex: number;
   };
+  /** Active team dispatch (re-pick) mode state — when set, shows the re-pick bar in the hints line. */
+  dispatchMode?: {
+    active: boolean;
+    repoIndex: number;
+    candidates: string[];
+    focusedIndex: number;
+  };
 }
 
 export function renderGroups(
@@ -458,13 +465,29 @@ export function renderGroups(
   }
 
   // Fix: clip hints to termWidth visible chars so the line never wraps — see issue #105.
-  if (opts.teamPickMode?.active) {
+  if (opts.dispatchMode?.active) {
+    const dm = opts.dispatchMode;
+    // Re-pick bar: same layout as pick mode — focused team in [ brackets ], others dimmed.
+    // Suffix with 0/u undo and Esc/t cancel hints, clipped to one line with horizontal scroll.
+    const REPICK_PREFIX = "Re-pick: ";
+    const REPICK_SUFFIX = "  0/u restore  ← → move  ↵ confirm  Esc cancel";
+    const barWidth = Math.max(0, termWidth - REPICK_PREFIX.length - REPICK_SUFFIX.length);
+    const bar = renderTeamPickHeader(dm.candidates, dm.focusedIndex, barWidth);
+    const barPlain = stripAnsi(bar);
+    const suffix =
+      barPlain.length + REPICK_SUFFIX.length <= termWidth - REPICK_PREFIX.length
+        ? REPICK_SUFFIX
+        : barPlain.length < termWidth - REPICK_PREFIX.length
+          ? REPICK_SUFFIX.slice(0, termWidth - REPICK_PREFIX.length - barPlain.length)
+          : "";
+    lines.push(pc.dim(REPICK_PREFIX) + bar + pc.dim(`${suffix}\n`));
+  } else if (opts.teamPickMode?.active) {
     const PICK_HINTS = `Pick team: ← / → move focus  ↵ confirm  Esc cancel`;
     const clippedPick = PICK_HINTS.length > termWidth ? PICK_HINTS.slice(0, termWidth) : PICK_HINTS;
     lines.push(pc.dim(`${clippedPick}\n`));
   } else {
     const HINTS_TEXT =
-      "← / → fold/unfold  Z fold-all  ↑ / ↓ navigate  gg/G top/bot  PgUp/Dn page  spc select  a all  n none  o open  f filter  t target  p pick-team  h help  ↵ confirm  q quit";
+      "← / → fold/unfold  Z fold-all  ↑ / ↓ navigate  gg/G top/bot  PgUp/Dn page  spc select  a all  n none  o open  f filter  t target/re-pick  p pick-team  h help  ↵ confirm  q quit";
     const clippedHints =
       HINTS_TEXT.length > termWidth ? HINTS_TEXT.slice(0, termWidth) : HINTS_TEXT;
     lines.push(pc.dim(`${clippedHints}\n`));
