@@ -38,8 +38,13 @@ export function renderTeamPickHeader(
   maxWidth?: number,
 ): string {
   const n = candidateTeams.length;
+  // Guard: empty list — nothing to render.
+  if (n === 0) return "";
+  // Guard: clamp focusedIndex so an out-of-range value never reaches array indexing.
+  const safeIndex = Math.max(0, Math.min(focusedIndex, n - 1));
+
   // Pre-compute visible text for each candidate (focused gets [ ] brackets).
-  const texts = candidateTeams.map((t, i) => (i === focusedIndex ? `[ ${t} ]` : t));
+  const texts = candidateTeams.map((t, i) => (i === safeIndex ? `[ ${t} ]` : t));
   const widths = texts.map((t) => t.length);
 
   if (maxWidth === undefined) {
@@ -47,7 +52,7 @@ export function renderTeamPickHeader(
     return texts
       .map(
         (text, i) =>
-          (i > 0 ? SEP : "") + (i === focusedIndex ? pc.bold(pc.magenta(text)) : pc.dim(text)),
+          (i > 0 ? SEP : "") + (i === safeIndex ? pc.bold(pc.magenta(text)) : pc.dim(text)),
       )
       .join("");
   }
@@ -55,8 +60,8 @@ export function renderTeamPickHeader(
   if (maxWidth <= 0) return "";
 
   // If the focused item alone is wider than maxWidth, clip it.
-  if (widths[focusedIndex] > maxWidth) {
-    const clipped = texts[focusedIndex].slice(0, maxWidth - 1) + "…";
+  if (widths[safeIndex] > maxWidth) {
+    const clipped = texts[safeIndex].slice(0, maxWidth - 1) + "…";
     return pc.bold(pc.magenta(clipped));
   }
 
@@ -69,12 +74,12 @@ export function renderTeamPickHeader(
   //   • left ellipsis ("…" + SEP before first item):  EL_LEFT  = 3  (when start > 0)
   //   • right ellipsis (SEP + "…" after last item):   EL_RIGHT = 3  (when end < n-1)
   //
-  // Start with a single-item window at focusedIndex, then greedily expand
+  // Start with a single-item window at safeIndex, then greedily expand
   // right then left until neither direction fits any more.
 
-  let start = focusedIndex;
-  let end = focusedIndex;
-  let usedWidth = widths[focusedIndex]; // width of all items in [start,end] + inter-item SEPs
+  let start = safeIndex;
+  let end = safeIndex;
+  let usedWidth = widths[safeIndex]; // width of all items in [start,end] + inter-item SEPs
 
   const totalWidth = (s: number, e: number, itemsW: number): number =>
     itemsW + (s > 0 ? EL_LEFT : 0) + (e < n - 1 ? EL_RIGHT : 0);
@@ -114,7 +119,7 @@ export function renderTeamPickHeader(
   if (addLeftEl) parts.push(pc.dim("…"));
   for (let i = start; i <= end; i++) {
     if (i > start || addLeftEl) parts.push(SEP);
-    parts.push(i === focusedIndex ? pc.bold(pc.magenta(texts[i])) : pc.dim(texts[i]));
+    parts.push(i === safeIndex ? pc.bold(pc.magenta(texts[i])) : pc.dim(texts[i]));
   }
   if (addRightEl) parts.push(SEP + pc.dim("…"));
 

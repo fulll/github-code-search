@@ -153,3 +153,37 @@ describe("renderTeamPickHeader — windowed scrolling", () => {
     expect(result).not.toContain("…"); // all teams fit → no ellipsis
   });
 });
+
+// ─── renderTeamPickHeader — guard conditions ──────────────────────────────────
+
+describe("renderTeamPickHeader — guard conditions", () => {
+  it("returns empty string for empty candidateTeams (no maxWidth)", () => {
+    expect(renderTeamPickHeader([], 0)).toBe("");
+  });
+
+  it("returns empty string for empty candidateTeams (with maxWidth)", () => {
+    expect(renderTeamPickHeader([], 0, 80)).toBe("");
+  });
+
+  it("clamps negative focusedIndex to 0", () => {
+    const result = strip(renderTeamPickHeader(["squad-a", "squad-b"], -1));
+    expect(result).toContain("[ squad-a ]");
+    expect(result).not.toMatch(/\[\s*squad-b\s*\]/);
+  });
+
+  it("clamps out-of-bounds focusedIndex to last candidate", () => {
+    const result = strip(renderTeamPickHeader(["squad-a", "squad-b"], 99));
+    expect(result).toContain("[ squad-b ]");
+    expect(result).not.toMatch(/\[\s*squad-a\s*\]/);
+  });
+
+  it("clamps negative focusedIndex to first candidate with maxWidth", () => {
+    const result = strip(renderTeamPickHeader(["squad-a", "squad-b"], -1, 80));
+    expect(result).toContain("[ squad-a ]");
+  });
+
+  it("clamps out-of-bounds focusedIndex to last candidate with maxWidth", () => {
+    const result = strip(renderTeamPickHeader(["squad-a", "squad-b"], 99, 80));
+    expect(result).toContain("[ squad-b ]");
+  });
+});

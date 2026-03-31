@@ -88,12 +88,12 @@ When pick mode is active (after pressing `p` on a multi-team section header):
 
 When re-pick mode is active (after pressing `t` on a picked repo marked `◈`):
 
-| Key         | Action                                                                   |
-| ----------- | ------------------------------------------------------------------------ |
-| `←` / `→`   | Cycle through candidate teams (from the original combined section label) |
-| `Enter`     | Confirm and move the repo to the focused candidate team                  |
-| `0` / `u`   | Restore the repo to its original combined section (undo the pick)        |
-| `Esc` / `t` | Exit re-pick mode without changes                                        |
+| Key         | Action                                                                                              |
+| ----------- | --------------------------------------------------------------------------------------------------- |
+| `←` / `→`   | Cycle through candidate teams (from the original combined section label)                            |
+| `Enter`     | Confirm and move the repo to the focused candidate team                                             |
+| `0` / `u`   | Undo the entire section pick — restore all repos from that combined section to their original label |
+| `Esc` / `t` | Exit re-pick mode without changes                                                                   |
 
 ## Help and exit
 
