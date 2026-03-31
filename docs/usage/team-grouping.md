@@ -133,22 +133,21 @@ The hints bar shows a horizontal pick bar — exactly like team pick mode — wi
 Re-pick: [ squad-frontend ]  squad-mobile  0/u restore  ← → move  ↵ confirm  Esc/t cancel
 ```
 
-| Key         | Action                                            |
-| ----------- | ------------------------------------------------- |
-| `←` / `→`   | Cycle through candidate teams                     |
-| `Enter`     | Confirm and move repo to the focused team         |
-| `0` / `u`   | Restore the repo to its original combined section |
-| `Esc` / `t` | Exit re-pick mode without changes                 |
+| Key         | Action                                                          |
+| ----------- | --------------------------------------------------------------- |
+| `←` / `→`   | Cycle through candidate teams                                   |
+| `Enter`     | Confirm and move repo to the focused team                       |
+| `0` / `u`   | Restore **all** repos from the combined section (undo the pick) |
+| `Esc` / `t` | Exit re-pick mode without changes                               |
 
 ### Undoing a pick (merge)
 
-Pressing `0` or `u` in re-pick mode restores the repo to the combined section it came from (e.g. `squad-frontend + squad-mobile`). The `◈` badge is removed and the repo is treated as unassigned again.
+Pressing `0` or `u` in re-pick mode restores **all** repos from the same combined section back to where they came from (e.g. `squad-frontend + squad-mobile`). Every `◈` badge from that section is removed and all repos are treated as unassigned again.
 
 ```text
-── squad-frontend + squad-mobile      ← restored
+── squad-frontend + squad-mobile      ← all repos restored
+▶ ◉  fulll/frontend-app
 ▶ ◉  fulll/mobile-sdk
-── squad-frontend
-▶ ◈  fulll/frontend-app
 ```
 
 In **non-interactive mode**, undoing a pick is implicit: simply omit the `--pick-team` flag for that combined section in the replay command.

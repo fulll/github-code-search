@@ -15,7 +15,7 @@ import { buildOutput } from "./output.ts";
 import {
   applyTeamPick,
   moveRepoToSection,
-  undoPickedRepo,
+  undoSectionPick,
   flattenTeamSections,
   rebuildTeamSections,
 } from "./group.ts";
@@ -339,12 +339,15 @@ export async function runInteractive(
         scrollOffset = Math.min(scrollOffset, cursor);
         repickMode = { active: false, repoIndex: -1, candidates: [], focusedIndex: 0 };
       } else if (key === "0" || key === "u") {
-        // 0 / u — undo pick, restore repo to its original combined section.
-        // Remove the confirmedPick entry for the combined label so the replay
-        // command no longer emits --pick-team for that section.
+        // 0 / u — undo the entire section pick: restore ALL repos that were
+        // assigned from the same combined label back to the combined section.
+        // Deleting confirmedPicks keeps the replay command in sync — omitting
+        // --pick-team for that label is the exact non-interactive equivalent.
         const combinedLabel = groups[repickMode.repoIndex]?.pickedFrom;
-        if (combinedLabel) delete confirmedPicks[combinedLabel];
-        groups = undoPickedRepo(groups, repickMode.repoIndex);
+        if (combinedLabel) {
+          delete confirmedPicks[combinedLabel];
+          groups = undoSectionPick(groups, combinedLabel);
+        }
         const newRows = buildRows(groups, filterPath, filterTarget, filterRegex);
         cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
         scrollOffset = Math.min(scrollOffset, cursor);

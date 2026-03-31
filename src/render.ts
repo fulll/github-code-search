@@ -468,7 +468,9 @@ export function renderGroups(
   if (opts.repickMode?.active) {
     const dm = opts.repickMode;
     // Re-pick bar: same layout as pick mode — focused team in [ brackets ], others dimmed.
-    // Suffix with 0/u undo and Esc/t cancel hints, clipped to one line with horizontal scroll.
+    // Suffix with 0/u undo and Esc/t cancel hints. The entire constructed line is passed
+    // through clipAnsi() so it never wraps regardless of terminal width (including when
+    // termWidth is narrower than the "Re-pick: " prefix itself).
     const REPICK_PREFIX = "Re-pick: ";
     const REPICK_SUFFIX = "  0/u restore  ← → move  ↵ confirm  Esc/t cancel";
     const barWidth = Math.max(0, termWidth - REPICK_PREFIX.length - REPICK_SUFFIX.length);
@@ -480,7 +482,7 @@ export function renderGroups(
         : barPlain.length < termWidth - REPICK_PREFIX.length
           ? REPICK_SUFFIX.slice(0, termWidth - REPICK_PREFIX.length - barPlain.length)
           : "";
-    lines.push(pc.dim(REPICK_PREFIX) + bar + pc.dim(`${suffix}\n`));
+    lines.push(clipAnsi(pc.dim(REPICK_PREFIX) + bar + pc.dim(suffix), termWidth) + "\n");
   } else if (opts.teamPickMode?.active) {
     const PICK_HINTS = `Pick team: ← / → move focus  ↵ confirm  Esc cancel`;
     const clippedPick = PICK_HINTS.length > termWidth ? PICK_HINTS.slice(0, termWidth) : PICK_HINTS;
