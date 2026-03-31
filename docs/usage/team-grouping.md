@@ -130,7 +130,7 @@ Navigate to any **picked repo** (marked `◈`) and press **`t`** to enter re-pic
 The hints bar shows a horizontal pick bar — exactly like team pick mode — with the current focused team highlighted in `[ brackets ]`:
 
 ```text
-Re-pick: [ squad-frontend ]  squad-mobile  0/u restore  ← → move  ↵ confirm  Esc cancel
+Re-pick: [ squad-frontend ]  squad-mobile  0/u restore  ← → move  ↵ confirm  Esc/t cancel
 ```
 
 | Key         | Action                                            |
