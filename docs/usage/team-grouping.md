@@ -109,6 +109,8 @@ github-code-search query "useFeatureFlag" --org fulll \
 
 The flag is repeatable — add one `--pick-team` per combined section to resolve. The replay command emits `--pick-team` automatically when a pick was confirmed in the TUI.
 
+> **Note:** Per-repo re-picks performed in the TUI (pressing `t` on a `◈` repo) are **not** encoded in the replay command. They are interactive-only adjustments and must be repeated manually if you re-run the command.
+
 If the combined label is not found (typo, or the section was not formed), a warning is emitted on stderr listing the available combined sections — the run continues without error.
 
 ## Re-pick & undo pick
@@ -149,7 +151,7 @@ Pressing `0` or `u` in re-pick mode restores the repo to the combined section it
 ▶ ◈  fulll/frontend-app
 ```
 
-In **non-interactive mode**, undoing a pick is implicit: simply omit the `--pick-team` flag for the repo in the replay command.
+In **non-interactive mode**, undoing a pick is implicit: simply omit the `--pick-team` flag for that combined section in the replay command.
 
 ## Team list cache
 

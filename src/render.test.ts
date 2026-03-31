@@ -1981,3 +1981,82 @@ describe("normalizeScrollOffset", () => {
     expect(normalizeScrollOffset(1, rows, groups, 3)).toBe(1);
   });
 });
+
+// ─── renderGroups — re-pick mode hints bar ────────────────────────────────────
+
+describe("renderGroups — re-pick mode hints bar", () => {
+  it("shows Re-pick: prefix and candidate teams when repickMode is active", () => {
+    const groups = [makeGroup("org/repo", ["a.ts"])];
+    const rows = buildRows(groups);
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", {
+      repickMode: {
+        active: true,
+        repoIndex: 0,
+        candidates: ["squad-frontend", "squad-mobile"],
+        focusedIndex: 0,
+      },
+      termWidth: 120,
+    });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).toContain("Re-pick:");
+    expect(stripped).toContain("squad-frontend");
+    expect(stripped).toContain("0/u restore");
+    expect(stripped).toContain("Esc/t cancel");
+  });
+
+  it("re-pick hints line visible width never exceeds termWidth", () => {
+    // Fix: clip hints to termWidth so the line never wraps — see issue #105.
+    const groups = [makeGroup("org/repo", ["a.ts"])];
+    const rows = buildRows(groups);
+    const termWidth = 60;
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", {
+      repickMode: {
+        active: true,
+        repoIndex: 0,
+        candidates: ["squad-frontend", "squad-mobile"],
+        focusedIndex: 0,
+      },
+      termWidth,
+    });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    const repickLine = stripped.split("\n").find((l) => l.includes("Re-pick:"));
+    expect(repickLine).toBeDefined();
+    expect(repickLine!.length).toBeLessThanOrEqual(termWidth);
+  });
+
+  it("truncates suffix gracefully on very narrow terminal without crashing", () => {
+    const groups = [makeGroup("org/repo", ["a.ts"])];
+    const rows = buildRows(groups);
+    const termWidth = 25; // narrow — full suffix won't fit
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", {
+      repickMode: {
+        active: true,
+        repoIndex: 0,
+        candidates: ["squad-frontend", "squad-mobile"],
+        focusedIndex: 0,
+      },
+      termWidth,
+    });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    const repickLine = stripped.split("\n").find((l) => l.includes("Re-pick:"));
+    expect(repickLine).toBeDefined();
+    expect(repickLine!.length).toBeLessThanOrEqual(termWidth);
+  });
+
+  it("focuses the correct candidate in [ brackets ]", () => {
+    const groups = [makeGroup("org/repo", ["a.ts"])];
+    const rows = buildRows(groups);
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", {
+      repickMode: {
+        active: true,
+        repoIndex: 0,
+        candidates: ["squad-alpha", "squad-beta"],
+        focusedIndex: 1,
+      },
+      termWidth: 120,
+    });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    // focusedIndex=1 → squad-beta is focused → should appear in [ brackets ]
+    expect(stripped).toContain("[ squad-beta ]");
+  });
+});

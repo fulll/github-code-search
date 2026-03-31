@@ -204,7 +204,7 @@ export function undoPickedRepo(groups: RepoGroup[], repoIndex: number): RepoGrou
       i === dstIdx ? { ...s, groups: [...s.groups, restoredRepo] } : s,
     );
   } else {
-    // Re-insert at the position of the original source section (best-effort)
+    // No existing section found — append a new combined section at the end.
     sections = [...sections, { label: combinedLabel, groups: [restoredRepo] }];
   }
 

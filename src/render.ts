@@ -320,8 +320,8 @@ interface RenderOptions {
     candidates: string[];
     focusedIndex: number;
   };
-  /** Active team dispatch (re-pick) mode state — when set, shows the re-pick bar in the hints line. */
-  dispatchMode?: {
+  /** Active team re-pick mode state — when set, shows the re-pick bar in the hints line. */
+  repickMode?: {
     active: boolean;
     repoIndex: number;
     candidates: string[];
@@ -465,12 +465,12 @@ export function renderGroups(
   }
 
   // Fix: clip hints to termWidth visible chars so the line never wraps — see issue #105.
-  if (opts.dispatchMode?.active) {
-    const dm = opts.dispatchMode;
+  if (opts.repickMode?.active) {
+    const dm = opts.repickMode;
     // Re-pick bar: same layout as pick mode — focused team in [ brackets ], others dimmed.
     // Suffix with 0/u undo and Esc/t cancel hints, clipped to one line with horizontal scroll.
     const REPICK_PREFIX = "Re-pick: ";
-    const REPICK_SUFFIX = "  0/u restore  ← → move  ↵ confirm  Esc cancel";
+    const REPICK_SUFFIX = "  0/u restore  ← → move  ↵ confirm  Esc/t cancel";
     const barWidth = Math.max(0, termWidth - REPICK_PREFIX.length - REPICK_SUFFIX.length);
     const bar = renderTeamPickHeader(dm.candidates, dm.focusedIndex, barWidth);
     const barPlain = stripAnsi(bar);
