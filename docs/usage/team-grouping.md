@@ -109,11 +109,48 @@ github-code-search query "useFeatureFlag" --org fulll \
 
 The flag is repeatable — add one `--pick-team` per combined section to resolve. The replay command emits `--pick-team` automatically when a pick was confirmed in the TUI.
 
+> **Note:** Per-repo re-picks performed in the TUI (pressing `t` on a `◈` repo) are **not** encoded in the replay command. They are interactive-only adjustments and must be repeated manually if you re-run the command.
+
 If the combined label is not found (typo, or the section was not formed), a warning is emitted on stderr listing the available combined sections — the run continues without error.
 
-::: tip Combined with --dispatch
-`--pick-team` resolves ownership at the **section level** (all repos in the section move to one team). For finer-grained control — assigning individual repos or extracts to different teams — see `--dispatch`.
-:::
+## Re-pick & undo pick
+
+After using `--pick-team` (or the interactive `p` shortcut) to assign a combined section to a team, individual repos marked `◈` can be re-assigned or restored to their original combined section at any time.
+
+### TUI — re-pick mode
+
+Navigate to any **picked repo** (marked `◈`) and press **`t`** to enter re-pick mode.
+
+```text
+── squad-frontend
+▶ ◈  fulll/frontend-app              ← press t here
+▶ ◈  fulll/mobile-sdk
+```
+
+The hints bar shows a horizontal pick bar — exactly like team pick mode — with the current focused team highlighted in `[ brackets ]`:
+
+```text
+Re-pick: [ squad-frontend ]  squad-mobile  0/u restore  ← → move  ↵ confirm  Esc/t cancel
+```
+
+| Key         | Action                                                          |
+| ----------- | --------------------------------------------------------------- |
+| `←` / `→`   | Cycle through candidate teams                                   |
+| `Enter`     | Confirm and move repo to the focused team                       |
+| `0` / `u`   | Restore **all** repos from the combined section (undo the pick) |
+| `Esc` / `t` | Exit re-pick mode without changes                               |
+
+### Undoing a pick (merge)
+
+Pressing `0` or `u` in re-pick mode restores **all** repos from the same combined section back to where they came from (e.g. `squad-frontend + squad-mobile`). Every `◈` badge from that section is removed and all repos are treated as unassigned again.
+
+```text
+── squad-frontend + squad-mobile      ← all repos restored
+▶ ◉  fulll/frontend-app
+▶ ◉  fulll/mobile-sdk
+```
+
+In **non-interactive mode**, undoing a pick is implicit: simply omit the `--pick-team` flag for that combined section in the replay command.
 
 ## Team list cache
 

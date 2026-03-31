@@ -3,7 +3,10 @@ import {
   applyTeamPick,
   flattenTeamSections,
   groupByTeamPrefix,
+  moveRepoToSection,
   rebuildTeamSections,
+  undoPickedRepo,
+  undoSectionPick,
 } from "./group.ts";
 import type { RepoGroup, TeamSection } from "./types.ts";
 
@@ -277,5 +280,381 @@ describe("rebuildTeamSections", () => {
 
   it("returns empty array for empty input", () => {
     expect(rebuildTeamSections([])).toEqual([]);
+  });
+});
+
+// ─── moveRepoToSection ────────────────────────────────────────────────────────
+
+function makeSimpleGroup(repo: string, teams: string[] = []): RepoGroup {
+  return {
+    repoFullName: repo,
+    matches: [],
+    folded: true,
+    repoSelected: true,
+    extractSelected: [],
+    teams,
+  };
+}
+
+describe("moveRepoToSection", () => {
+  it("moves a repo to an existing target section", () => {
+    const sections: TeamSection[] = [
+      {
+        label: "squad-frontend + squad-mobile",
+        groups: [makeSimpleGroup("org/shared", ["squad-frontend", "squad-mobile"])],
+      },
+      { label: "squad-mobile", groups: [makeSimpleGroup("org/b", ["squad-mobile"])] },
+    ];
+    const flat = flattenTeamSections(sections);
+    const result = moveRepoToSection(flat, "org/shared", "squad-mobile");
+    const labels = [...new Set(result.filter((g) => g.sectionLabel).map((g) => g.sectionLabel))];
+    expect(labels).not.toContain("squad-frontend + squad-mobile");
+    expect(labels).toContain("squad-mobile");
+    expect(result.find((g) => g.repoFullName === "org/shared")).toBeDefined();
+  });
+
+  it("creates a new section when target team has no existing section", () => {
+    const sections: TeamSection[] = [
+      { label: "squad-frontend + squad-mobile", groups: [makeSimpleGroup("org/shared")] },
+    ];
+    const flat = flattenTeamSections(sections);
+    const result = moveRepoToSection(flat, "org/shared", "squad-mobile");
+    expect(result.find((g) => g.sectionLabel === "squad-mobile")).toBeDefined();
+  });
+
+  it("is a no-op when the repo does not exist", () => {
+    const sections: TeamSection[] = [
+      { label: "squad-frontend", groups: [makeSimpleGroup("org/a")] },
+    ];
+    const flat = flattenTeamSections(sections);
+    const result = moveRepoToSection(flat, "org/nonexistent", "squad-mobile");
+    expect(result).toBe(flat);
+  });
+});
+
+// ─── undoPickedRepo ───────────────────────────────────────────────────────────
+
+function makePicked(
+  repo: string,
+  pickedFrom: string,
+  currentSection: string,
+  teams: string[] = [],
+): RepoGroup {
+  return {
+    repoFullName: repo,
+    matches: [],
+    folded: true,
+    repoSelected: true,
+    extractSelected: [],
+    teams,
+    pickedFrom,
+    sectionLabel: currentSection,
+  };
+}
+
+describe("undoPickedRepo", () => {
+  it("restores a picked repo back to its original combined section", () => {
+    // squad-frontend + squad-mobile was picked to squad-frontend
+    const groups: RepoGroup[] = [
+      { ...makePicked("org/repoA", "squad-frontend + squad-mobile", "squad-frontend") },
+      {
+        repoFullName: "org/repoB",
+        matches: [],
+        folded: true,
+        repoSelected: true,
+        extractSelected: [],
+        teams: [],
+        pickedFrom: "squad-frontend + squad-mobile",
+      },
+    ];
+    const result = undoPickedRepo(groups, 0);
+    const a = result.find((g) => g.repoFullName === "org/repoA");
+    expect(a).toBeDefined();
+    expect(a!.pickedFrom).toBeUndefined();
+    // Must appear in the restored combined section
+    const sectionRow = result.find((g) => g.sectionLabel === "squad-frontend + squad-mobile");
+    expect(sectionRow).toBeDefined();
+    expect(sectionRow!.repoFullName).toBe("org/repoA");
+  });
+
+  it("no-op when repo has no pickedFrom", () => {
+    const groups: RepoGroup[] = [
+      {
+        repoFullName: "org/repoA",
+        matches: [],
+        folded: true,
+        repoSelected: true,
+        extractSelected: [],
+        teams: [],
+      },
+    ];
+    const result = undoPickedRepo(groups, 0);
+    expect(result).toBe(groups); // same reference — no change
+  });
+
+  it("drops the current section when it becomes empty after undo", () => {
+    const groups: RepoGroup[] = [
+      { ...makePicked("org/repoA", "squad-frontend + squad-mobile", "squad-frontend") },
+    ];
+    const result = undoPickedRepo(groups, 0);
+    // squad-frontend section should be gone (it had only repoA)
+    const frontendSection = result.find((g) => g.sectionLabel === "squad-frontend");
+    expect(frontendSection).toBeUndefined();
+    // Combined section should exist
+    const combinedSection = result.find((g) => g.sectionLabel === "squad-frontend + squad-mobile");
+    expect(combinedSection).toBeDefined();
+  });
+
+  it("appends to the existing combined section if it already exists", () => {
+    // repoA was picked to squad-frontend, but the combined section still has repoC
+    const sections: TeamSection[] = [
+      {
+        label: "squad-frontend",
+        groups: [{ ...makePicked("org/repoA", "squad-frontend + squad-mobile", "squad-frontend") }],
+      },
+      {
+        label: "squad-frontend + squad-mobile",
+        groups: [
+          {
+            repoFullName: "org/repoC",
+            matches: [],
+            folded: true,
+            repoSelected: true,
+            extractSelected: [],
+            teams: ["squad-frontend", "squad-mobile"],
+          },
+        ],
+      },
+    ];
+    const flat = flattenTeamSections(sections);
+    const repoAIndex = flat.findIndex((g) => g.repoFullName === "org/repoA");
+    const result = undoPickedRepo(flat, repoAIndex);
+    const combinedGroups = (() => {
+      let inCombined = false;
+      const repos: string[] = [];
+      for (const g of result) {
+        if (g.sectionLabel === "squad-frontend + squad-mobile") inCombined = true;
+        else if (g.sectionLabel !== undefined) inCombined = false;
+        if (inCombined) repos.push(g.repoFullName);
+      }
+      return repos;
+    })();
+    expect(combinedGroups).toContain("org/repoA");
+    expect(combinedGroups).toContain("org/repoC");
+  });
+
+  it("inserts new combined section before 'other' when other exists", () => {
+    // repoA was picked to squad-frontend; repoB lives in "other"
+    // After undo, the new combined section must appear before "other"
+    const sections: TeamSection[] = [
+      {
+        label: "squad-frontend",
+        groups: [{ ...makePicked("org/repoA", "squad-frontend + squad-mobile", "squad-frontend") }],
+      },
+      {
+        label: "other",
+        groups: [
+          {
+            repoFullName: "org/repoB",
+            matches: [],
+            folded: true,
+            repoSelected: true,
+            extractSelected: [],
+            teams: [],
+          },
+        ],
+      },
+    ];
+    const flat = flattenTeamSections(sections);
+    const repoAIndex = flat.findIndex((g) => g.repoFullName === "org/repoA");
+    const result = undoPickedRepo(flat, repoAIndex);
+    const sectionLabels = result
+      .filter((g) => g.sectionLabel !== undefined)
+      .map((g) => g.sectionLabel);
+    const combinedIdx = sectionLabels.indexOf("squad-frontend + squad-mobile");
+    const otherIdx = sectionLabels.indexOf("other");
+    expect(combinedIdx).not.toBe(-1);
+    expect(otherIdx).not.toBe(-1);
+    // Combined section must come before "other"
+    expect(combinedIdx).toBeLessThan(otherIdx);
+  });
+});
+
+// ─── moveRepoToSection ────────────────────────────────────────────────────────
+
+describe("moveRepoToSection — insert before other", () => {
+  it("inserts new target section before 'other' when other exists", () => {
+    // repoA (picked from combined) is moved to a new team section that doesn't exist yet
+    // "other" section is present — new section must appear before it
+    const sections: TeamSection[] = [
+      {
+        label: "squad-frontend + squad-mobile",
+        groups: [
+          {
+            ...makePicked(
+              "org/repoA",
+              "squad-frontend + squad-mobile",
+              "squad-frontend + squad-mobile",
+            ),
+            pickedFrom: undefined,
+          },
+        ],
+      },
+      {
+        label: "other",
+        groups: [
+          {
+            repoFullName: "org/repoB",
+            matches: [],
+            folded: true,
+            repoSelected: true,
+            extractSelected: [],
+            teams: [],
+          },
+        ],
+      },
+    ];
+    // Manually set pickedFrom so move is realistic
+    const flat = flattenTeamSections(sections).map((g) =>
+      g.repoFullName === "org/repoA" ? { ...g, pickedFrom: "squad-frontend + squad-mobile" } : g,
+    );
+    const result = moveRepoToSection(flat, "org/repoA", "squad-mobile");
+    const sectionLabels = result
+      .filter((g) => g.sectionLabel !== undefined)
+      .map((g) => g.sectionLabel);
+    const mobileIdx = sectionLabels.indexOf("squad-mobile");
+    const otherIdx = sectionLabels.indexOf("other");
+    expect(mobileIdx).not.toBe(-1);
+    expect(otherIdx).not.toBe(-1);
+    // New squad-mobile section must come before "other"
+    expect(mobileIdx).toBeLessThan(otherIdx);
+  });
+});
+
+// ─── undoSectionPick ──────────────────────────────────────────────────────────
+
+describe("undoSectionPick", () => {
+  it("no-op when no repos have the matching pickedFrom", () => {
+    const groups: RepoGroup[] = [
+      {
+        repoFullName: "org/repoA",
+        matches: [],
+        folded: true,
+        repoSelected: true,
+        extractSelected: [],
+        teams: [],
+      },
+    ];
+    const result = undoSectionPick(groups, "squad-frontend + squad-mobile");
+    expect(result).toBe(groups); // same reference — no change
+  });
+
+  it("restores all repos with matching pickedFrom to the combined section", () => {
+    // Two repos were both picked to different teams from the same combined section
+    const sections: TeamSection[] = [
+      {
+        label: "squad-frontend",
+        groups: [{ ...makePicked("org/repoA", "squad-frontend + squad-mobile", "squad-frontend") }],
+      },
+      {
+        label: "squad-mobile",
+        groups: [{ ...makePicked("org/repoB", "squad-frontend + squad-mobile", "squad-mobile") }],
+      },
+    ];
+    const flat = flattenTeamSections(sections);
+    const result = undoSectionPick(flat, "squad-frontend + squad-mobile");
+
+    // Both repos should appear in the restored combined section
+    const combinedSection = result.find((g) => g.sectionLabel === "squad-frontend + squad-mobile");
+    expect(combinedSection).toBeDefined();
+    const inCombined = (() => {
+      let collecting = false;
+      const repos: string[] = [];
+      for (const g of result) {
+        if (g.sectionLabel === "squad-frontend + squad-mobile") collecting = true;
+        else if (g.sectionLabel !== undefined) collecting = false;
+        if (collecting) repos.push(g.repoFullName);
+      }
+      return repos;
+    })();
+    expect(inCombined).toContain("org/repoA");
+    expect(inCombined).toContain("org/repoB");
+    // pickedFrom must be stripped
+    for (const g of result) {
+      expect(g.pickedFrom).toBeUndefined();
+    }
+    // Source sections should be gone (empty after restore)
+    expect(result.find((g) => g.sectionLabel === "squad-frontend")).toBeUndefined();
+    expect(result.find((g) => g.sectionLabel === "squad-mobile")).toBeUndefined();
+  });
+
+  it("inserts restored combined section before 'other'", () => {
+    // repoA was picked from combined to squad-frontend; repoB is in "other"
+    const sections: TeamSection[] = [
+      {
+        label: "squad-frontend",
+        groups: [{ ...makePicked("org/repoA", "squad-frontend + squad-mobile", "squad-frontend") }],
+      },
+      {
+        label: "other",
+        groups: [
+          {
+            repoFullName: "org/repoB",
+            matches: [],
+            folded: true,
+            repoSelected: true,
+            extractSelected: [],
+            teams: [],
+          },
+        ],
+      },
+    ];
+    const flat = flattenTeamSections(sections);
+    const result = undoSectionPick(flat, "squad-frontend + squad-mobile");
+    const sectionLabels = result
+      .filter((g) => g.sectionLabel !== undefined)
+      .map((g) => g.sectionLabel);
+    const combinedIdx = sectionLabels.indexOf("squad-frontend + squad-mobile");
+    const otherIdx = sectionLabels.indexOf("other");
+    expect(combinedIdx).not.toBe(-1);
+    expect(otherIdx).not.toBe(-1);
+    expect(combinedIdx).toBeLessThan(otherIdx);
+  });
+
+  it("appends to existing combined section when it still has other repos", () => {
+    // repoA was picked to squad-frontend, but repoC still lives in the combined section
+    const sections: TeamSection[] = [
+      {
+        label: "squad-frontend",
+        groups: [{ ...makePicked("org/repoA", "squad-frontend + squad-mobile", "squad-frontend") }],
+      },
+      {
+        label: "squad-frontend + squad-mobile",
+        groups: [
+          {
+            repoFullName: "org/repoC",
+            matches: [],
+            folded: true,
+            repoSelected: true,
+            extractSelected: [],
+            teams: ["squad-frontend", "squad-mobile"],
+          },
+        ],
+      },
+    ];
+    const flat = flattenTeamSections(sections);
+    const result = undoSectionPick(flat, "squad-frontend + squad-mobile");
+    const inCombined = (() => {
+      let collecting = false;
+      const repos: string[] = [];
+      for (const g of result) {
+        if (g.sectionLabel === "squad-frontend + squad-mobile") collecting = true;
+        else if (g.sectionLabel !== undefined) collecting = false;
+        if (collecting) repos.push(g.repoFullName);
+      }
+      return repos;
+    })();
+    expect(inCombined).toContain("org/repoA");
+    expect(inCombined).toContain("org/repoC");
   });
 });

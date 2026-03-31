@@ -29,11 +29,11 @@ Section header rows (shown when `--group-by-team-prefix` is active) are skipped 
 
 ## Filtering
 
-| Key | Action                                                                                                 |
-| --- | ------------------------------------------------------------------------------------------------------ |
-| `f` | Open the filter bar and enter filter mode                                                              |
-| `t` | Cycle the **filter target**: `path` → `content` → `repo` → `path`. Only works **outside** filter mode. |
-| `r` | Reset the active filter and return to showing all repos / extracts                                     |
+| Key | Action                                                                                                                                                                                 |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `f` | Open the filter bar and enter filter mode                                                                                                                                              |
+| `t` | Cycle the **filter target**: `path` → `content` → `repo` → `path`. Only works **outside** filter mode and when **not** on a picked repo (see [Team ownership](#team-ownership) below). |
+| `r` | Reset the active filter and return to showing all repos / extracts                                                                                                                     |
 
 ### Filter targets
 
@@ -69,9 +69,10 @@ Invalid regex patterns do not crash the TUI but are treated as matching nothing 
 
 Available only when `--group-by-team-prefix` is active.
 
-| Key | Action                                                                                                                                         |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `p` | On a **multi-team** section header: enter team pick mode to assign the section to a single owner. Does nothing on single-team section headers. |
+| Key | Action                                                                                                                                               |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `p` | On a **multi-team** section header: enter team pick mode to assign the section to a single owner. Does nothing on single-team section headers.       |
+| `t` | On a **picked repo** (marked `◈`, moved by a previous pick): enter re-pick mode to change its team assignment or restore it to the combined section. |
 
 ### Pick mode bindings
 
@@ -82,6 +83,17 @@ When pick mode is active (after pressing `p` on a multi-team section header):
 | `←` / `→` | Move focus between candidate teams (highlighted / dimmed) |
 | `Enter`   | Confirm the pick and exit pick mode                       |
 | `Esc`     | Cancel and exit pick mode without changes                 |
+
+### Re-pick mode bindings
+
+When re-pick mode is active (after pressing `t` on a picked repo marked `◈`):
+
+| Key         | Action                                                                                              |
+| ----------- | --------------------------------------------------------------------------------------------------- |
+| `←` / `→`   | Cycle through candidate teams (from the original combined section label)                            |
+| `Enter`     | Confirm and move the repo to the focused candidate team                                             |
+| `0` / `u`   | Undo the entire section pick — restore all repos from that combined section to their original label |
+| `Esc` / `t` | Exit re-pick mode without changes                                                                   |
 
 ## Help and exit
 

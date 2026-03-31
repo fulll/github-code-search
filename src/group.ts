@@ -160,3 +160,161 @@ export function flattenTeamSections(sections: TeamSection[]): RepoGroup[] {
   }
   return result;
 }
+
+// ─── Internal helpers ─────────────────────────────────────────────────────────
+
+/**
+ * Inserts `newSection` before the `"other"` section, or appends it at the end
+ * when no `"other"` section exists. Keeps `"other"` as the last section, which
+ * is an invariant established by `groupByTeamPrefix`.
+ */
+function insertBeforeOther(sections: TeamSection[], newSection: TeamSection): TeamSection[] {
+  const otherIdx = sections.findIndex((s) => s.label === "other");
+  return otherIdx === -1
+    ? [...sections, newSection]
+    : [...sections.slice(0, otherIdx), newSection, ...sections.slice(otherIdx)];
+}
+
+// ─── Undo pick helper ─────────────────────────────────────────────────────────
+
+/**
+ * Restores a previously picked repo back to its original combined section.
+ *
+ * The target repo is identified by `repoIndex` in the flat `groups` array.
+ * It must have a `pickedFrom` field set (otherwise the array is returned as-is).
+ * The repo is removed from its current section and placed in the `pickedFrom`
+ * combined section (which is created if it no longer exists).
+ * `pickedFrom` is stripped from the restored repo so it is treated as a plain
+ * unassigned entry again.
+ *
+ * Pure function — no mutation.
+ */
+export function undoPickedRepo(groups: RepoGroup[], repoIndex: number): RepoGroup[] {
+  const g = groups[repoIndex];
+  if (!g?.pickedFrom) return groups;
+
+  const combinedLabel = g.pickedFrom;
+  // Strip pick metadata from the repo being restored
+  const { pickedFrom: _p, ...restored } = g;
+  void _p;
+  const restoredRepo = restored as RepoGroup;
+
+  let sections = rebuildTeamSections(groups);
+
+  // Remove the repo from its current section (drop section if it becomes empty)
+  const srcIdx = sections.findIndex((s) => s.groups.some((r) => r.repoFullName === g.repoFullName));
+  if (srcIdx !== -1) {
+    const newSrcGroups = sections[srcIdx].groups.filter((r) => r.repoFullName !== g.repoFullName);
+    sections =
+      newSrcGroups.length > 0
+        ? sections.map((s, i) => (i === srcIdx ? { ...s, groups: newSrcGroups } : s))
+        : sections.filter((_, i) => i !== srcIdx);
+  }
+
+  // Place the repo into the original combined section (create if absent)
+  const dstIdx = sections.findIndex((s) => s.label === combinedLabel);
+  if (dstIdx !== -1) {
+    sections = sections.map((s, i) =>
+      i === dstIdx ? { ...s, groups: [...s.groups, restoredRepo] } : s,
+    );
+  } else {
+    // No existing section found — insert before "other" (which must remain last)
+    // or append at the end when "other" is absent.
+    sections = insertBeforeOther(sections, { label: combinedLabel, groups: [restoredRepo] });
+  }
+
+  return flattenTeamSections(sections);
+}
+
+// ─── Re-pick move helper ──────────────────────────────────────────────────────
+
+/**
+ * Moves a single repo (identified by its full `org/repo` name) into the
+ * target team's section. Used by the TUI re-pick confirmation handler.
+ *
+ * The repo's `pickedFrom` field is preserved so an undo can restore it later.
+ *
+ * Returns a new `RepoGroup[]` without mutating the input.
+ */
+export function moveRepoToSection(
+  groups: RepoGroup[],
+  repoFullName: string,
+  targetTeam: string,
+): RepoGroup[] {
+  let sections = rebuildTeamSections(groups);
+
+  const srcIdx = sections.findIndex((s) => s.groups.some((g) => g.repoFullName === repoFullName));
+  if (srcIdx === -1) return groups;
+
+  const groupToMove = sections[srcIdx].groups.find((g) => g.repoFullName === repoFullName)!;
+  const newSrcGroups = sections[srcIdx].groups.filter((g) => g.repoFullName !== repoFullName);
+
+  const intermediate =
+    newSrcGroups.length > 0
+      ? sections.map((s, i) => (i === srcIdx ? { ...s, groups: newSrcGroups } : s))
+      : sections.filter((_, i) => i !== srcIdx);
+
+  const dstIdx = intermediate.findIndex((s) => s.label === targetTeam);
+  if (dstIdx !== -1) {
+    sections = intermediate.map((s, i) =>
+      i === dstIdx ? { ...s, groups: [...s.groups, groupToMove] } : s,
+    );
+  } else {
+    // Target section doesn't exist yet — insert before "other" (which must remain last)
+    // or append at the end when "other" is absent.
+    sections = insertBeforeOther(intermediate, { label: targetTeam, groups: [groupToMove] });
+  }
+
+  return flattenTeamSections(sections);
+}
+
+// ─── Undo section pick helper ─────────────────────────────────────────────────
+
+/**
+ * Restores ALL repos that were assigned from `combinedLabel` (every repo whose
+ * `pickedFrom === combinedLabel`) back to the combined section in one operation.
+ *
+ * This is the inverse of the full `applyTeamPick` for that label — it removes
+ * all per-repo picks made from a combined section, so that the `confirmedPicks`
+ * entry and the replay `--pick-team` flag can be cleanly removed without leaving
+ * the interactive state in a partially-undone, non-replayable configuration.
+ *
+ * Pure function — no mutation.
+ */
+export function undoSectionPick(groups: RepoGroup[], combinedLabel: string): RepoGroup[] {
+  if (!groups.some((g) => g.pickedFrom === combinedLabel)) return groups;
+
+  let sections = rebuildTeamSections(groups);
+
+  // Collect all repos to restore (preserving their relative order across sections)
+  const toRestore: RepoGroup[] = [];
+  sections = sections
+    .map((s) => {
+      const keep: RepoGroup[] = [];
+      for (const g of s.groups) {
+        if (g.pickedFrom === combinedLabel) {
+          const { pickedFrom: _p, ...rest } = g;
+          void _p;
+          toRestore.push(rest as RepoGroup);
+        } else {
+          keep.push(g);
+        }
+      }
+      return { ...s, groups: keep };
+    })
+    .filter((s) => s.groups.length > 0);
+
+  if (toRestore.length === 0) return groups;
+
+  // Append to existing combined section or create a new one
+  const dstIdx = sections.findIndex((s) => s.label === combinedLabel);
+  if (dstIdx !== -1) {
+    sections = sections.map((s, i) =>
+      i === dstIdx ? { ...s, groups: [...s.groups, ...toRestore] } : s,
+    );
+  } else {
+    sections = insertBeforeOther(sections, { label: combinedLabel, groups: toRestore });
+  }
+
+  return flattenTeamSections(sections);
+}

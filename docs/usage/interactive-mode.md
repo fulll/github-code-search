@@ -33,20 +33,20 @@ github-code-search "useFeatureFlag" --org fulll
 
 ## Keyboard shortcuts
 
-| Key            | Action                                                                                                                            |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `↑` / `↓`      | Navigate between repos and extracts                                                                                               |
-| `←`            | Fold the repo under the cursor                                                                                                    |
-| `→`            | Unfold the repo under the cursor                                                                                                  |
-| `Space`        | Select / deselect the current repo or extract                                                                                     |
-| `a`            | Select **all** — on a repo row: all repos and extracts; on an extract row: all extracts in that repo. Respects any active filter. |
-| `n`            | Select **none** — same context rules as `a`. Respects any active filter.                                                          |
-| `f`            | Open the **filter bar** — type to narrow visible repos or files                                                                   |
-| `t`            | Cycle the **filter target**: `path` → `content` → `repo` → `path`                                                                 |
-| `r`            | **Reset** the active filter and show all repos / extracts                                                                         |
-| `h` / `?`      | Toggle the **help overlay**                                                                                                       |
-| `Enter`        | Confirm and print selected results (also closes the help overlay)                                                                 |
-| `q` / `Ctrl+C` | Quit without printing                                                                                                             |
+| Key            | Action                                                                                                                                                                  |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `↑` / `↓`      | Navigate between repos and extracts                                                                                                                                     |
+| `←`            | Fold the repo under the cursor                                                                                                                                          |
+| `→`            | Unfold the repo under the cursor                                                                                                                                        |
+| `Space`        | Select / deselect the current repo or extract                                                                                                                           |
+| `a`            | Select **all** — on a repo row: all repos and extracts; on an extract row: all extracts in that repo. Respects any active filter.                                       |
+| `n`            | Select **none** — same context rules as `a`. Respects any active filter.                                                                                                |
+| `f`            | Open the **filter bar** — type to narrow visible repos or files                                                                                                         |
+| `t`            | Cycle the **filter target**: `path` → `content` → `repo` → `path`. When on a **picked repo** (marked `◈`, `--group-by-team-prefix` active): enter re-pick mode instead. |
+| `r`            | **Reset** the active filter and show all repos / extracts                                                                                                               |
+| `h` / `?`      | Toggle the **help overlay**                                                                                                                                             |
+| `Enter`        | Confirm and print selected results (also closes the help overlay)                                                                                                       |
+| `q` / `Ctrl+C` | Quit without printing                                                                                                                                                   |
 
 ## Selection behaviour
 
