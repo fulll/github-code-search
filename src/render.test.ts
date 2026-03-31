@@ -2059,4 +2059,91 @@ describe("renderGroups — re-pick mode hints bar", () => {
     // focusedIndex=1 → squad-beta is focused → should appear in [ brackets ]
     expect(stripped).toContain("[ squad-beta ]");
   });
+
+  it("suffix is right-aligned: hints block always ends at the terminal edge", () => {
+    // With a wide terminal, the bar is short but the hints must still be at the right edge.
+    const groups = [makeGroup("org/repo", ["a.ts"])];
+    const rows = buildRows(groups);
+    const termWidth = 100;
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", {
+      repickMode: {
+        active: true,
+        repoIndex: 0,
+        candidates: ["squad-a", "squad-b"], // short names → bar << barWidth
+        focusedIndex: 0,
+      },
+      termWidth,
+    });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    const repickLine = stripped.split("\n").find((l) => l.includes("Re-pick:"));
+    expect(repickLine).toBeDefined();
+    // Line should extend to termWidth (padded) — suffix anchored at right edge.
+    expect(repickLine!.length).toBe(termWidth);
+    // Suffix must be present and not truncated.
+    expect(repickLine!).toContain("0/u restore");
+    expect(repickLine!).toContain("Esc/t cancel");
+  });
+
+  it("suffix position stays fixed as focusedIndex changes", () => {
+    // Switching focus must not shift the suffix — only the middle bar content changes.
+    const groups = [makeGroup("org/repo", ["a.ts"])];
+    const rows = buildRows(groups);
+    const termWidth = 120;
+    const candidates = ["squad-alpha", "squad-beta", "squad-gamma"];
+
+    const lineFor = (focusedIndex: number) => {
+      const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", {
+        repickMode: { active: true, repoIndex: 0, candidates, focusedIndex },
+        termWidth,
+      });
+      const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+      return stripped.split("\n").find((l) => l.includes("Re-pick:"))!;
+    };
+
+    const line0 = lineFor(0);
+    const line1 = lineFor(1);
+    const line2 = lineFor(2);
+
+    // All lines same length (padded to termWidth).
+    expect(line0.length).toBe(termWidth);
+    expect(line1.length).toBe(termWidth);
+    expect(line2.length).toBe(termWidth);
+
+    // "Esc/t cancel" always ends at the same column (right edge).
+    const suffix = "Esc/t cancel";
+    expect(line0.endsWith(suffix)).toBe(true);
+    expect(line1.endsWith(suffix)).toBe(true);
+    expect(line2.endsWith(suffix)).toBe(true);
+  });
+
+  it("focused team is always visible with many candidates (windowing)", () => {
+    // 8 teams — the bar is too narrow to show all at once.
+    // Every focusedIndex must produce a line containing that team in [ brackets ].
+    const groups = [makeGroup("org/repo", ["a.ts"])];
+    const rows = buildRows(groups);
+    const termWidth = 80; // narrow: barWidth = 80−9−49 = 22
+    const candidates = [
+      "chapter-a",
+      "chapter-b",
+      "chapter-c",
+      "chapter-d",
+      "chapter-e",
+      "chapter-f",
+      "chapter-g",
+      "chapter-h",
+    ];
+
+    for (let focusedIndex = 0; focusedIndex < candidates.length; focusedIndex++) {
+      const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", {
+        repickMode: { active: true, repoIndex: 0, candidates, focusedIndex },
+        termWidth,
+      });
+      const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+      const repickLine = stripped.split("\n").find((l) => l.includes("Re-pick:"));
+      expect(repickLine).toBeDefined();
+      expect(repickLine!.length).toBeLessThanOrEqual(termWidth);
+      // The focused team must be visible in [ brackets ] no matter where focus is.
+      expect(repickLine!).toContain(`[ ${candidates[focusedIndex]} ]`);
+    }
+  });
 });

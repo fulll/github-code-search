@@ -449,9 +449,7 @@ describe("undoPickedRepo", () => {
     const sections: TeamSection[] = [
       {
         label: "squad-frontend",
-        groups: [
-          { ...makePicked("org/repoA", "squad-frontend + squad-mobile", "squad-frontend") },
-        ],
+        groups: [{ ...makePicked("org/repoA", "squad-frontend + squad-mobile", "squad-frontend") }],
       },
       {
         label: "other",
@@ -493,7 +491,11 @@ describe("moveRepoToSection — insert before other", () => {
         label: "squad-frontend + squad-mobile",
         groups: [
           {
-            ...makePicked("org/repoA", "squad-frontend + squad-mobile", "squad-frontend + squad-mobile"),
+            ...makePicked(
+              "org/repoA",
+              "squad-frontend + squad-mobile",
+              "squad-frontend + squad-mobile",
+            ),
             pickedFrom: undefined,
           },
         ],
@@ -552,15 +554,11 @@ describe("undoSectionPick", () => {
     const sections: TeamSection[] = [
       {
         label: "squad-frontend",
-        groups: [
-          { ...makePicked("org/repoA", "squad-frontend + squad-mobile", "squad-frontend") },
-        ],
+        groups: [{ ...makePicked("org/repoA", "squad-frontend + squad-mobile", "squad-frontend") }],
       },
       {
         label: "squad-mobile",
-        groups: [
-          { ...makePicked("org/repoB", "squad-frontend + squad-mobile", "squad-mobile") },
-        ],
+        groups: [{ ...makePicked("org/repoB", "squad-frontend + squad-mobile", "squad-mobile") }],
       },
     ];
     const flat = flattenTeamSections(sections);
@@ -595,9 +593,7 @@ describe("undoSectionPick", () => {
     const sections: TeamSection[] = [
       {
         label: "squad-frontend",
-        groups: [
-          { ...makePicked("org/repoA", "squad-frontend + squad-mobile", "squad-frontend") },
-        ],
+        groups: [{ ...makePicked("org/repoA", "squad-frontend + squad-mobile", "squad-frontend") }],
       },
       {
         label: "other",
@@ -630,9 +626,7 @@ describe("undoSectionPick", () => {
     const sections: TeamSection[] = [
       {
         label: "squad-frontend",
-        groups: [
-          { ...makePicked("org/repoA", "squad-frontend + squad-mobile", "squad-frontend") },
-        ],
+        groups: [{ ...makePicked("org/repoA", "squad-frontend + squad-mobile", "squad-frontend") }],
       },
       {
         label: "squad-frontend + squad-mobile",

@@ -467,22 +467,22 @@ export function renderGroups(
   // Fix: clip hints to termWidth visible chars so the line never wraps — see issue #105.
   if (opts.repickMode?.active) {
     const dm = opts.repickMode;
-    // Re-pick bar: same layout as pick mode — focused team in [ brackets ], others dimmed.
-    // Suffix with 0/u undo and Esc/t cancel hints. The entire constructed line is passed
-    // through clipAnsi() so it never wraps regardless of terminal width (including when
-    // termWidth is narrower than the "Re-pick: " prefix itself).
+    // Re-pick bar layout:
+    //   "Re-pick: " | <scrollable candidate bar> | <padding> | "  0/u restore  ← → …"
+    //
+    // The candidate bar uses a sliding window (renderTeamPickHeader) so the
+    // focused team is always visible regardless of how many teams exist.
+    // The suffix is right-aligned by padding with spaces between the bar and
+    // the suffix so the hints block always sits at the right terminal edge.
     const REPICK_PREFIX = "Re-pick: ";
     const REPICK_SUFFIX = "  0/u restore  ← → move  ↵ confirm  Esc/t cancel";
     const barWidth = Math.max(0, termWidth - REPICK_PREFIX.length - REPICK_SUFFIX.length);
     const bar = renderTeamPickHeader(dm.candidates, dm.focusedIndex, barWidth);
     const barPlain = stripAnsi(bar);
-    const suffix =
-      barPlain.length + REPICK_SUFFIX.length <= termWidth - REPICK_PREFIX.length
-        ? REPICK_SUFFIX
-        : barPlain.length < termWidth - REPICK_PREFIX.length
-          ? REPICK_SUFFIX.slice(0, termWidth - REPICK_PREFIX.length - barPlain.length)
-          : "";
-    lines.push(clipAnsi(pc.dim(REPICK_PREFIX) + bar + pc.dim(suffix), termWidth) + "\n");
+    // Pad between bar content and suffix to keep suffix right-aligned.
+    const padLen = Math.max(0, barWidth - barPlain.length);
+    const line = pc.dim(REPICK_PREFIX) + bar + " ".repeat(padLen) + pc.dim(REPICK_SUFFIX);
+    lines.push(clipAnsi(line, termWidth) + "\n");
   } else if (opts.teamPickMode?.active) {
     const PICK_HINTS = `Pick team: ← / → move focus  ↵ confirm  Esc cancel`;
     const clippedPick = PICK_HINTS.length > termWidth ? PICK_HINTS.slice(0, termWidth) : PICK_HINTS;
