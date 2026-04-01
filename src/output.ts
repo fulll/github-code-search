@@ -247,8 +247,9 @@ export function buildMarkdownOutput(
     for (const m of matches) {
       // Use VS Code-ready path:line:col as link text and anchor the URL to the
       // line when location info is available (GitHub #Lline deeplink).
-      // Position is fragment-relative (GitHub Code Search API does not return
-      // absolute line numbers).
+      // seg.line/seg.col reflect absolute file line numbers resolved by api.ts
+      // (falling back to fragment-relative positions when raw content is
+      // unavailable).
       const seg = m.textMatches[0]?.matches[0];
       if (seg) {
         const matchedText = seg.text ? `: ${mdInlineCode(seg.text)}` : "";

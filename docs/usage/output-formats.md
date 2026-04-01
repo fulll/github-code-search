@@ -32,11 +32,15 @@ github-code-search "useFeatureFlag" --org fulll --no-interactive
 
 :::
 
-Each extract link points directly to the matching line on GitHub. When the GitHub API returns the exact matched token, it is appended inline in backticks (e.g. `` : `useFeatureFlag` ``).
+Each extract link points directly to the matching line on GitHub. When the GitHub API returns the exact matched token, it is appended inline after the link — for example:
+
+```text
+  - [ ] [src/foo.ts:3:5](https://github.com/org/repo/blob/main/src/foo.ts#L3): `useFeatureFlag`
+```
 
 ## Query title
 
-Every output (both Markdown and repo-only) is prefixed with a `# Results for` heading that identifies the search query. When active qualifiers are present, they are appended after a `·` separator:
+Every output — in both Markdown and JSON formats, and for both `repo-only` and `repo-and-matches` output types — is prefixed with a `# Results for` heading that identifies the search query. When active qualifiers are present, they are appended after a `·` separator:
 
 ```text
 # Results for "useFeatureFlag" · including archived · excluding templates
@@ -67,7 +71,7 @@ github-code-search "useFeatureFlag" --org fulll --format json --no-interactive
       "matches": [
         {
           "path": "src/middlewares/featureFlags.ts",
-          "url": "https://github.com/fulll/auth-service/blob/main/src/middlewares/featureFlags.ts#L2",
+          "url": "https://github.com/fulll/auth-service/blob/main/src/middlewares/featureFlags.ts",
           "line": 2,
           "col": 19,
           "matchedText": "useFeatureFlag"
