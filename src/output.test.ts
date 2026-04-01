@@ -299,6 +299,29 @@ describe("buildQueryTitle", () => {
       '# Results for "useFlag"',
     );
   });
+
+  it("handles a plain query with embedded double quotes without breaking the heading", () => {
+    const title = buildQueryTitle('from "axios"');
+    // JSON.stringify escapes the embedded quotes — heading stays on one line
+    expect(title.startsWith("# Results for ")).toBe(true);
+    expect(title).not.toContain("\n");
+    expect(title).toContain("axios");
+  });
+
+  it("handles a plain query with a newline without breaking the heading", () => {
+    const title = buildQueryTitle("line1\nline2");
+    // JSON.stringify converts \n to \\n — no actual newline in the heading
+    expect(title.startsWith("# Results for ")).toBe(true);
+    expect(title).not.toContain("\n");
+  });
+
+  it("handles a regex query with an embedded backtick without producing malformed inline code", () => {
+    const title = buildQueryTitle("/foo`bar/i");
+    expect(title.startsWith("# Results for ")).toBe(true);
+    expect(title).not.toContain("\n");
+    // Variable-length fence: at least two consecutive backticks used as delimiter
+    expect(title).toContain("``");
+  });
 });
 
 describe("buildMarkdownOutput", () => {
@@ -594,6 +617,34 @@ describe("buildJsonOutput — line/col fields", () => {
 
   it("omits matchedText when no text matches", () => {
     const groups = [makeGroup("myorg/repoA", ["src/foo.ts"])];
+    const parsed = JSON.parse(buildJsonOutput(groups, QUERY, ORG, new Set(), new Set()));
+    expect(parsed.results[0].matches[0].matchedText).toBeUndefined();
+  });
+
+  it("omits matchedText when seg.text is an empty string", () => {
+    // api.ts normalizes missing segment text to "" — matchedText must not be emitted
+    const groups: RepoGroup[] = [
+      {
+        repoFullName: "myorg/repoA",
+        matches: [
+          {
+            path: "src/foo.ts",
+            repoFullName: "myorg/repoA",
+            htmlUrl: "https://github.com/myorg/repoA/blob/main/src/foo.ts",
+            archived: false,
+            textMatches: [
+              {
+                fragment: "some snippet",
+                matches: [{ text: "", indices: [0, 0], line: 1, col: 1 }],
+              },
+            ],
+          },
+        ],
+        folded: true,
+        repoSelected: true,
+        extractSelected: [true],
+      },
+    ];
     const parsed = JSON.parse(buildJsonOutput(groups, QUERY, ORG, new Set(), new Set()));
     expect(parsed.results[0].matches[0].matchedText).toBeUndefined();
   });

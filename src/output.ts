@@ -151,6 +151,21 @@ export function buildReplayDetails(
   ].join("\n");
 }
 
+// ─── Markdown inline-code helper ────────────────────────────────────────────
+
+/**
+ * Wraps `s` in a Markdown inline-code span using a backtick fence long enough
+ * to safely contain any backticks already present in `s` (CommonMark §6.1).
+ * Adds surrounding spaces when `s` starts or ends with a backtick character.
+ */
+function mdInlineCode(s: string): string {
+  const runs = [...s.matchAll(/`+/g)].map((m) => m[0].length);
+  const maxRun = runs.length > 0 ? Math.max(...runs) : 0;
+  const fence = "`".repeat(maxRun + 1);
+  const padded = s.startsWith("`") || s.endsWith("`") ? ` ${s} ` : s;
+  return `${fence}${padded}${fence}`;
+}
+
 // ─── Query title ─────────────────────────────────────────────────────────────
 
 /**
@@ -159,11 +174,15 @@ export function buildReplayDetails(
  *
  * Examples:
  *   # Results for "useFlag"
- *   # Results for `useFlag/i`
+ *   # Results for `/useFlag/i`
  *   # Results for "axios" · including archived · excluding templates
  */
 export function buildQueryTitle(query: string, options: ReplayOptions = {}): string {
-  const queryDisplay = isRegexQuery(query) ? `\`${query}\`` : `"${query}"`;
+  // JSON.stringify handles embedded double quotes and converts newlines to \n
+  // so the heading always stays on a single line.
+  // mdInlineCode uses a variable-length backtick fence to safely display regex
+  // patterns that may themselves contain backtick characters.
+  const queryDisplay = isRegexQuery(query) ? mdInlineCode(query) : JSON.stringify(query);
   const qualifiers: string[] = [];
   if (options.includeArchived) qualifiers.push("including archived");
   if (options.excludeTemplates) qualifiers.push("excluding templates");
@@ -232,7 +251,7 @@ export function buildMarkdownOutput(
       // absolute line numbers).
       const seg = m.textMatches[0]?.matches[0];
       if (seg) {
-        const matchedText = seg.text ? `: \`${seg.text}\`` : "";
+        const matchedText = seg.text ? `: ${mdInlineCode(seg.text)}` : "";
         lines.push(
           `  - [ ] [${m.path}:${seg.line}:${seg.col}](${m.htmlUrl}#L${seg.line})${matchedText}`,
         );
@@ -269,7 +288,13 @@ export function buildJsonOutput(
         return {
           path: m.path,
           url: m.htmlUrl,
-          ...(seg !== undefined ? { line: seg.line, col: seg.col, matchedText: seg.text } : {}),
+          ...(seg !== undefined
+            ? {
+                line: seg.line,
+                col: seg.col,
+                ...(seg.text ? { matchedText: seg.text } : {}),
+              }
+            : {}),
         };
       });
       return { ...base, matches };
