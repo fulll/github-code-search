@@ -36,9 +36,10 @@ github-code-search query "TODO" --org my-org
 - **Per-repository aggregation** — results grouped by repo, not as a flat list; fold/unfold each repo to focus on what matters
 - **Keyboard-driven TUI** — navigate with arrow keys, toggle selections, filter by file path, confirm with Enter — without leaving the terminal
 - **Fine-grained selection** — pick exactly the repos and extracts you want; deselected items are recorded as exclusions in the replay command
-- **Structured output** — clean Markdown lists with GitHub links, or machine-readable JSON — ready to paste into docs, issues or scripts
+- **Structured output** — Markdown document with a `# Results for` query heading, GitHub deeplinks and the exact matched token per extract; or machine-readable JSON with `matchedText`, `line` and `col` fields — ready to paste into docs, issues or scripts
 - **Team-prefix grouping** — group results by team prefix (e.g. `platform/`, `data/`) using `--group-by-team-prefix`
 - **Replay command** — every session produces a one-liner you can run in CI to reproduce the exact same selection without the UI
+- **Regex search** — use `/pattern/flags` syntax for pattern-based searches; the CLI derives a safe API query and filters results locally
 - **Syntax highlighting** — code fragments rendered with language-aware coloring (TypeScript, Python, Go, Rust, YAML, JSON and more)
 
 ## Use cases
@@ -111,6 +112,7 @@ The official [`gh` CLI](https://cli.github.com/) does support `gh search code`, 
 | Markdown / JSON output                     |        ✗         |          ✓           |
 | Replay / CI command                        |        ✗         |          ✓           |
 | Team-prefix grouping                       |        ✗         |          ✓           |
+| Regex search                               |        ✗         |          ✓           |
 | Syntax highlighting in terminal            |        ✗         |          ✓           |
 | Pagination (up to 1 000 results)           |        ✓         |          ✓           |
 

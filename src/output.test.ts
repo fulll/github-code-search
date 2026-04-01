@@ -4,6 +4,7 @@ import {
   buildJsonOutput,
   buildMarkdownOutput,
   buildOutput,
+  buildQueryTitle,
   buildReplayCommand,
   buildReplayDetails,
   shortExtractRef,
@@ -266,12 +267,52 @@ describe("buildReplayDetails", () => {
   });
 });
 
+describe("buildQueryTitle", () => {
+  it("wraps a plain query in double quotes", () => {
+    expect(buildQueryTitle("useFlag")).toBe('# Results for "useFlag"');
+  });
+
+  it("wraps a regex query in backticks", () => {
+    expect(buildQueryTitle("/useFlag/i")).toBe("# Results for `/useFlag/i`");
+  });
+
+  it("appends · including archived when includeArchived is true", () => {
+    expect(buildQueryTitle("useFlag", { includeArchived: true })).toBe(
+      '# Results for "useFlag" · including archived',
+    );
+  });
+
+  it("appends · excluding templates when excludeTemplates is true", () => {
+    expect(buildQueryTitle("useFlag", { excludeTemplates: true })).toBe(
+      '# Results for "useFlag" · excluding templates',
+    );
+  });
+
+  it("appends both qualifiers in order when both are set", () => {
+    expect(buildQueryTitle("useFlag", { includeArchived: true, excludeTemplates: true })).toBe(
+      '# Results for "useFlag" · including archived · excluding templates',
+    );
+  });
+
+  it("omits qualifiers when neither option is set", () => {
+    expect(buildQueryTitle("useFlag", { includeArchived: false, excludeTemplates: false })).toBe(
+      '# Results for "useFlag"',
+    );
+  });
+});
+
 describe("buildMarkdownOutput", () => {
   it("includes selected repo and file link", () => {
     const groups = [makeGroup("myorg/repoA", ["src/foo.ts"])];
     const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set());
     expect(out).toContain("myorg/repoA");
     expect(out).toContain("[src/foo.ts](https://github.com/myorg/repoA/blob/main/src/foo.ts)");
+  });
+
+  it("starts with # Results for query H1 heading", () => {
+    const groups = [makeGroup("myorg/repoA", ["src/foo.ts"])];
+    const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set());
+    expect(out.split("\n")[0]).toBe(`# Results for "${QUERY}"`);
   });
 
   it("renders repo as bold bullet", () => {
@@ -388,12 +429,24 @@ describe("buildMarkdownOutput", () => {
     expect(out).toBe("");
   });
 
+  it("repo-only mode prepends H1 query title before repo list", () => {
+    const groups = [makeGroup("myorg/repoA", ["src/a.ts"])];
+    const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set(), "repo-only");
+    expect(out).toContain(`# Results for "${QUERY}"`);
+    const lines = out.split("\n");
+    expect(lines[0]).toBe(`# Results for "${QUERY}"`);
+    expect(out.indexOf(`# Results for "${QUERY}"`)).toBeLessThan(out.indexOf("myorg/repoA"));
+  });
+
   it("prepends selection summary line in repo-and-matches mode", () => {
     const groups = [makeGroup("myorg/repoA", ["src/foo.ts"])];
     const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set());
     expect(out).toContain("selected");
-    const firstLine = out.split("\n")[0];
-    expect(firstLine).toContain("selected");
+    const lines = out.split("\n");
+    // first line is the H1 query title
+    expect(lines[0]).toMatch(/^# Results for /);
+    // third line (index 2) is the selection summary
+    expect(lines[2]).toContain("selected");
   });
 
   it("does not prepend selection summary in repo-only mode", () => {
@@ -502,6 +555,13 @@ describe("buildMarkdownOutput — line/col annotation", () => {
     expect(out).not.toMatch(/\[src\/foo\.ts:\d+:\d+\]/);
   });
 
+  it("appends matched token in backticks when location is available", () => {
+    const groups = [makeGroupWithMatches("myorg/repoA", [{ path: "src/foo.ts", line: 3, col: 5 }])];
+    const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set());
+    expect(out).toContain("`snippet`");
+    expect(out).toContain("#L3): `snippet`");
+  });
+
   it("does not add location suffix in repo-only mode", () => {
     const groups = [makeGroupWithMatches("myorg/repoA", [{ path: "src/foo.ts", line: 3, col: 5 }])];
     const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set(), "repo-only");
@@ -524,6 +584,18 @@ describe("buildJsonOutput — line/col fields", () => {
     const parsed = JSON.parse(buildJsonOutput(groups, QUERY, ORG, new Set(), new Set()));
     expect(parsed.results[0].matches[0].line).toBeUndefined();
     expect(parsed.results[0].matches[0].col).toBeUndefined();
+  });
+
+  it("includes matchedText in match when text match is present", () => {
+    const groups = [makeGroupWithMatches("myorg/repoA", [{ path: "src/foo.ts", line: 2, col: 8 }])];
+    const parsed = JSON.parse(buildJsonOutput(groups, QUERY, ORG, new Set(), new Set()));
+    expect(parsed.results[0].matches[0].matchedText).toBe("snippet");
+  });
+
+  it("omits matchedText when no text matches", () => {
+    const groups = [makeGroup("myorg/repoA", ["src/foo.ts"])];
+    const parsed = JSON.parse(buildJsonOutput(groups, QUERY, ORG, new Set(), new Set()));
+    expect(parsed.results[0].matches[0].matchedText).toBeUndefined();
   });
 });
 

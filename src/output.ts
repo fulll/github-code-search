@@ -1,4 +1,5 @@
 import { buildSelectionSummary } from "./render.ts";
+import { isRegexQuery } from "./regex.ts";
 import type { OutputFormat, OutputType, RepoGroup } from "./types.ts";
 
 // ─── Short-form helpers ───────────────────────────────────────────────────────
@@ -150,6 +151,26 @@ export function buildReplayDetails(
   ].join("\n");
 }
 
+// ─── Query title ─────────────────────────────────────────────────────────────
+
+/**
+ * Builds a first-level heading that identifies the query and any active
+ * qualifiers (e.g. `--include-archived`, `--exclude-template-repositories`).
+ *
+ * Examples:
+ *   # Results for "useFlag"
+ *   # Results for `useFlag/i`
+ *   # Results for "axios" · including archived · excluding templates
+ */
+export function buildQueryTitle(query: string, options: ReplayOptions = {}): string {
+  const queryDisplay = isRegexQuery(query) ? `\`${query}\`` : `"${query}"`;
+  const qualifiers: string[] = [];
+  if (options.includeArchived) qualifiers.push("including archived");
+  if (options.excludeTemplates) qualifiers.push("excluding templates");
+  const suffix = qualifiers.length > 0 ? ` · ${qualifiers.join(" · ")}` : "";
+  return `# Results for ${queryDisplay}${suffix}`;
+}
+
 // ─── Selected matches helper ─────────────────────────────────────────────────
 
 function selectedMatches(group: RepoGroup) {
@@ -174,6 +195,8 @@ export function buildMarkdownOutput(
       .map((g) => g.repoFullName);
     if (repos.length === 0) return "";
     return (
+      buildQueryTitle(query, options) +
+      "\n\n" +
       repos.join("\n") +
       "\n\n" +
       buildReplayDetails(groups, query, org, excludedRepos, excludedExtractRefs, options) +
@@ -183,6 +206,8 @@ export function buildMarkdownOutput(
 
   const lines: string[] = [];
 
+  lines.push(buildQueryTitle(query, options));
+  lines.push("");
   lines.push(buildSelectionSummary(groups));
   lines.push("");
 
@@ -193,6 +218,7 @@ export function buildMarkdownOutput(
 
     // Section header (emitted before the first repo in a new team section)
     if (group.sectionLabel !== undefined) {
+      lines.push("");
       lines.push(`## ${group.sectionLabel}`);
       lines.push("");
     }
@@ -206,7 +232,10 @@ export function buildMarkdownOutput(
       // absolute line numbers).
       const seg = m.textMatches[0]?.matches[0];
       if (seg) {
-        lines.push(`  - [ ] [${m.path}:${seg.line}:${seg.col}](${m.htmlUrl}#L${seg.line})`);
+        const matchedText = seg.text ? `: \`${seg.text}\`` : "";
+        lines.push(
+          `  - [ ] [${m.path}:${seg.line}:${seg.col}](${m.htmlUrl}#L${seg.line})${matchedText}`,
+        );
       } else {
         lines.push(`  - [ ] [${m.path}](${m.htmlUrl})`);
       }
@@ -240,7 +269,7 @@ export function buildJsonOutput(
         return {
           path: m.path,
           url: m.htmlUrl,
-          ...(seg !== undefined ? { line: seg.line, col: seg.col } : {}),
+          ...(seg !== undefined ? { line: seg.line, col: seg.col, matchedText: seg.text } : {}),
         };
       });
       return { ...base, matches };

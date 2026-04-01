@@ -11,15 +11,17 @@ github-code-search "useFeatureFlag" --org fulll --format markdown --no-interacti
 ```
 
 ```text
+# Results for "useFeatureFlag"
+
 3 repos · 4 files selected
 
 - **fulll/auth-service** (2 matches)
-  - [ ] [src/middlewares/featureFlags.ts:2:19](...)
-  - [ ] [tests/unit/featureFlags.test.ts:1:8](...)
+  - [ ] [src/middlewares/featureFlags.ts:2:19](...): `useFeatureFlag`
+  - [ ] [tests/unit/featureFlags.test.ts:1:8](...): `useFeatureFlag`
 - **fulll/billing-api** (1 match)
-  - [ ] [src/flags.ts:3:14](...)
+  - [ ] [src/flags.ts:3:14](...): `useFeatureFlag`
 - **fulll/frontend-app** (1 match)
-  - [ ] [src/hooks/useFeatureFlag.ts:1:1](...)
+  - [ ] [src/hooks/useFeatureFlag.ts:1:1](...): `useFeatureFlag`
 ```
 
 ::: details replay command
@@ -30,7 +32,21 @@ github-code-search "useFeatureFlag" --org fulll --no-interactive
 
 :::
 
-Each extract link points directly to the matching line on GitHub.
+Each extract link points directly to the matching line on GitHub. When the GitHub API returns the exact matched token, it is appended inline in backticks (e.g. `` : `useFeatureFlag` ``).
+
+## Query title
+
+Every output (both Markdown and repo-only) is prefixed with a `# Results for` heading that identifies the search query. When active qualifiers are present, they are appended after a `·` separator:
+
+```text
+# Results for "useFeatureFlag" · including archived · excluding templates
+```
+
+In [regex mode](/usage/search-syntax#regex-mode), the pattern is shown in backticks:
+
+```text
+# Results for `/useFeatureFlag/i`
+```
 
 ## `--format json`
 
@@ -53,7 +69,8 @@ github-code-search "useFeatureFlag" --org fulll --format json --no-interactive
           "path": "src/middlewares/featureFlags.ts",
           "url": "https://github.com/fulll/auth-service/blob/main/src/middlewares/featureFlags.ts#L2",
           "line": 2,
-          "col": 19
+          "col": 19,
+          "matchedText": "useFeatureFlag"
         }
       ]
     }
@@ -83,6 +100,8 @@ github-code-search "useFeatureFlag" --org fulll \
 ```
 
 ```text
+# Results for "useFeatureFlag"
+
 fulll/auth-service
 fulll/billing-api
 fulll/frontend-app

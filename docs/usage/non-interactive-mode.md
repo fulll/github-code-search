@@ -37,16 +37,18 @@ $ CI=true github-code-search "useFeatureFlag" --org fulll
 ```
 
 ```text
+# Results for "useFeatureFlag"
+
 3 repos · 5 files selected
 
 - **fulll/auth-service** (2 matches)
-  - [ ] [src/middlewares/featureFlags.ts:2:19](https://github.com/fulll/auth-service/blob/main/src/middlewares/featureFlags.ts#L2)
-  - [ ] [tests/unit/featureFlags.test.ts:1:8](https://github.com/fulll/auth-service/blob/main/tests/unit/featureFlags.test.ts#L1)
+  - [ ] [src/middlewares/featureFlags.ts:2:19](https://github.com/fulll/auth-service/blob/main/src/middlewares/featureFlags.ts#L2): `useFeatureFlag`
+  - [ ] [tests/unit/featureFlags.test.ts:1:8](https://github.com/fulll/auth-service/blob/main/tests/unit/featureFlags.test.ts#L1): `useFeatureFlag`
 - **fulll/billing-api** (2 matches)
-  - [ ] [src/flags.ts:3:14](https://github.com/fulll/billing-api/blob/main/src/flags.ts#L3)
-  - [ ] [src/routes/invoices.ts:1:1](https://github.com/fulll/billing-api/blob/main/src/routes/invoices.ts#L1)
+  - [ ] [src/flags.ts:3:14](https://github.com/fulll/billing-api/blob/main/src/flags.ts#L3): `useFeatureFlag`
+  - [ ] [src/routes/invoices.ts:1:1](https://github.com/fulll/billing-api/blob/main/src/routes/invoices.ts#L1): `useFeatureFlag`
 - **fulll/frontend-app** (1 match)
-  - [ ] [src/hooks/useFeatureFlag.ts:1:1](https://github.com/fulll/frontend-app/blob/main/src/hooks/useFeatureFlag.ts#L1)
+  - [ ] [src/hooks/useFeatureFlag.ts:1:1](https://github.com/fulll/frontend-app/blob/main/src/hooks/useFeatureFlag.ts#L1): `useFeatureFlag`
 ```
 
 <details>
