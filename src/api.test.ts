@@ -146,6 +146,28 @@ describe("fetchAllResults", () => {
     expect(results[0].textMatches[0].matches[0].col).toBe(1);
   });
 
+  it("derives segment text from fragment when GitHub omits match text", async () => {
+    const fakeItem = {
+      path: "package.json",
+      html_url: "https://github.com/org/repo/blob/main/package.json",
+      repository: { full_name: "org/repo", archived: false },
+      text_matches: [
+        {
+          fragment: '{"dependencies":{"react-dom":"18.3.1"}}',
+          matches: [{ indices: [18, 27] }],
+        },
+      ],
+    };
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ items: [fakeItem], total_count: 1 }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })) as typeof fetch;
+
+    const results = await fetchAllResults("react-dom filename:package.json", "org", "tok");
+    expect(results[0].textMatches[0].matches[0].text).toBe("react-dom");
+  });
+
   it("marks archived repos correctly", async () => {
     const fakeItem = {
       path: "lib/old.ts",

@@ -22,6 +22,18 @@ interface RawCodeItem {
   text_matches?: RawTextMatch[];
 }
 
+function deriveSegmentText(
+  fragment: string,
+  indices: [number, number],
+  providedText?: string,
+): string {
+  if (providedText !== undefined) return providedText;
+  const [rawStart, rawEnd] = indices;
+  const start = Math.max(0, Math.min(rawStart, fragment.length));
+  const end = Math.max(start, Math.min(rawEnd, fragment.length));
+  return fragment.slice(start, end);
+}
+
 interface SearchCodeResponse {
   items: RawCodeItem[];
   total_count: number;
@@ -287,7 +299,7 @@ export async function fetchAllResults(
             const indices = seg.indices;
             const { line: fragLine, col } = segmentLineCol(fragment, indices[0]);
             const line = fragmentStartLine + fragLine - 1;
-            return { text: seg.text ?? "", indices, line, col };
+            return { text: deriveSegmentText(fragment, indices, seg.text), indices, line, col };
           }),
         };
       }),

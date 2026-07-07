@@ -622,7 +622,7 @@ describe("buildJsonOutput — line/col fields", () => {
   });
 
   it("omits matchedText when seg.text is an empty string", () => {
-    // api.ts normalizes missing segment text to "" — matchedText must not be emitted
+    // Empty segment text should not emit matchedText in JSON output.
     const groups: RepoGroup[] = [
       {
         repoFullName: "myorg/repoA",
