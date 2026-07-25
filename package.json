@@ -65,7 +65,7 @@
     "oxfmt": "^0.42.0",
     "oxlint": "^1.57.0",
     "pa11y-ci": "^4.1.0",
-    "sharp": "^0.34.5",
+    "sharp": "^0.35.3",
     "vitepress": "^1.6.4",
     "vitepress-mermaid-renderer": "^1.1.20"
   },
