@@ -86,8 +86,11 @@ src/
                          #   returns RegExp for local client-side filtering — no I/O
   render.ts              # Façade re-exporting sub-modules + top-level
                          #   renderGroups() / renderHelpOverlay()
-  tui.ts                 # Interactive keyboard-driven UI (navigation, filter mode,
-                         #   help overlay, selection)
+  scroll-cooldown.ts     # Pure scroll-cooldown state machine (createScrollCooldownState,
+                         #   isScrollCooldownActive, updateScrollCooldown) — debounces
+                         #   clicks during trackpad momentum scrolling — no I/O
+  tui.ts                 # Interactive keyboard- and mouse-driven UI (navigation, filter
+                         #   mode, help overlay, selection, SGR mouse tracking)
   output.ts              # Text (markdown) and JSON output formatters
   upgrade.ts             # Auto-upgrade logic (fetch latest GitHub release, replace binary)
                          #   + refreshCompletions() — overwrites existing completion file
@@ -102,6 +105,11 @@ src/
     summary.ts           # buildSummary, buildSummaryFull, buildSelectionSummary
     selection.ts         # applySelectAll, applySelectNone
     team-pick.ts         # renderTeamPickHeader — pick-mode candidate bar (pure, no I/O)
+    layout-constants.ts  # Shared header-line counts, mouse button codes and
+                         #   MOUSE_SCROLL_STEP, hit-test column math — no I/O
+    mouse.ts             # Pure SGR mouse-escape-sequence parser: parseMouseEvent() — no I/O
+    mouse-hit.ts         # Pure hit-testing: hitTestClick() maps a click (x, y) + scrollOffset
+                         #   to a Row and the zone that was clicked — no I/O
 
   *.test.ts              # Unit tests co-located with source files
   test-setup.ts          # Global test setup (Bun preload)
@@ -111,7 +119,7 @@ src/
 
 - **Pure functions first.** All business logic lives in pure, side-effect-free functions (`aggregate.ts`, `group.ts`, `output.ts`, `render/` sub-modules). This makes them straightforward to unit-test.
 - **Side effects are isolated.** API calls (`api.ts`, `api-utils.ts`), TTY interaction (`tui.ts`) and CLI parsing (`github-code-search.ts`) are the only side-effectful surfaces. `api-utils.ts` hosts shared retry/pagination helpers that perform network I/O and must not be used outside `api.ts`. `cache.ts` hosts disk-cache helpers that perform filesystem I/O and must not be used outside `api.ts`.
-- **`render.ts` is a façade.** It re-exports everything from `render/` and adds two top-level rendering functions. Consumers import from `render.ts`, not directly from sub-modules.
+- **`render.ts` is a façade.** It re-exports everything from `render/` and adds two top-level rendering functions. Consumers import from `render.ts`, not directly from sub-modules. Exceptions: `render/team-pick.ts`, `render/mouse.ts` and `render/mouse-hit.ts` are pure modules imported **directly** by their sole consumer (`render.ts` for `team-pick.ts`, `tui.ts` for the mouse modules) and are not re-exported publicly (knip would flag unused re-exports otherwise).
 - **`render/terminal.ts` is the sole Bun API call site.** All calls to `Bun.stringWidth()`, `Bun.stripANSI()`, and `Bun.sliceAnsi()` must go through the `terminal.ts` wrapper functions (`visibleWidth()`, `stripAnsi()`, `clipToWidth()`, `hasAnsi()`). This centralizes terminal handling logic and makes it easy to verify correct Unicode handling (graphemes, emoji, CJK, ZWJ sequences).
 - **`types.ts` is the single source of truth** for all shared interfaces. Any new shared type must go there.
 - **No classes** — the codebase uses plain TypeScript interfaces and functions throughout.
@@ -263,3 +271,4 @@ For minor/major releases update `docs/blog/index.md` to add a row in the version
 - The `--pick-team` option is repeatable (Commander collect function); each assignment resolves one combined section label to a single team. A warning is emitted on stderr when a label is not found.
 - `src/render/team-pick.ts` is a pure module (no I/O) and must be consumed only via the `src/render.ts` façade — it is imported **directly** inside `render.ts` for internal use but is not re-exported publicly (knip would flag it).
 - `RepoGroup.pickedFrom` (optional field in `src/types.ts`) tracks the combined label a repo was moved from; future split-mode features will use this to offer re-assignment.
+- **Mouse support** uses the terminal's SGR mouse-reporting protocol (`\x1b[?1000h\x1b[?1006h`), enabled in `runInteractive()` (`tui.ts`) next to `process.stdin.setRawMode(true)` and disabled on **every** exit path (normal exit, `q`, Ctrl+C, unhandled error) so a crashed process never leaves the user's terminal stuck in mouse-reporting mode. Escape sequences are parsed by `parseMouseEvent()` (`src/render/mouse.ts`), clicks are mapped to a row/zone by `hitTestClick()` (`src/render/mouse-hit.ts`), and wheel scroll steps use `MOUSE_SCROLL_STEP` (`src/render/layout-constants.ts`). `src/scroll-cooldown.ts` debounces clicks for a short window after a wheel scroll to avoid accidental selection during trackpad momentum scrolling. Documented for users in `docs/reference/keyboard-shortcuts.md` § Mouse support and `docs/usage/interactive-mode.md`.
