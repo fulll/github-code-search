@@ -5,6 +5,7 @@ import { buildFilterStats, type FilterStats } from "./render/filter.ts";
 import { rowTerminalLines } from "./render/rows.ts";
 import { buildMatchCountLabel, buildSummaryFull } from "./render/summary.ts";
 import { renderTeamPickHeader } from "./render/team-pick.ts";
+import { visibleWidth, stripAnsi, clipToWidth } from "./render/terminal.ts";
 
 // ─── Re-exports ───────────────────────────────────────────────────────────────
 // Consumers (tui.ts, output.ts, tests) continue to import from render.ts.
@@ -52,8 +53,7 @@ export function renderHelpOverlay(): string {
 
   /** Pad a visible-width string to CONTENT chars. */
   const pad = (s: string) => {
-    // eslint-disable-next-line no-control-regex
-    const visible = s.replace(/\x1b\[[0-9;]*m/g, "").length;
+    const visible = visibleWidth(s);
     return s + " ".repeat(Math.max(0, CONTENT - visible));
   };
 
@@ -134,7 +134,7 @@ const HEADER_LINES = 4; // title + summaryFull + hints + blank
  * purple left-bar character (▌).
  *
  * The bar occupies 1 visible column, so the caller must ensure that
- * `stripAnsi(content).length === termWidth - 1` for the total visible row
+ * `visibleWidth(content) === termWidth - 1` for the total visible row
  * width to equal `termWidth`.
  */
 function renderActiveLine(content: string): string {
@@ -200,58 +200,6 @@ function mergeSegments(segs: TextMatchSegment[]): TextMatchSegment[] {
     }
   }
   return merged;
-}
-
-/** Strip ANSI escape sequences to measure the visible character width of a string. */
-function stripAnsi(str: string): string {
-  // eslint-disable-next-line no-control-regex
-  return str.replace(/\x1b\[[\d;]*[mGKHF]/g, "");
-}
-
-/**
- * Clip a string (which may contain ANSI escape sequences) to at most
- * `maxVisible` visible characters. Correctly skips over escape sequences
- * when counting, and iterates by Unicode code point (not UTF-16 code unit)
- * so clipping never splits a surrogate pair (e.g. emoji like 🔍).
- *
- * At the cut point a partial SGR reset (`\x1b[22;39m`) is appended to
- * clear bold and foreground colour while deliberately **leaving background
- * colour intact** (no `\x1b[49m`). A full `\x1b[0m` reset would undo any
- * background applied by the caller (e.g. renderActiveLine's dark-purple
- * highlight), causing the remainder of the active row to lose its colour
- * on narrow terminals — see issue #105.
- *
- * If the string already fits within `maxVisible` visible chars it is
- * returned unchanged.
- */
-function clipAnsi(str: string, maxVisible: number): string {
-  if (maxVisible <= 0) return "";
-  if (stripAnsi(str).length <= maxVisible) return str;
-
-  let visCount = 0;
-  let i = 0;
-  while (i < str.length) {
-    // ANSI escape sequence: \x1b[ … <letter>
-    if (str[i] === "\x1b" && i + 1 < str.length && str[i + 1] === "[") {
-      // Skip to the terminating letter (one of m G K H F)
-      let j = i + 2;
-      while (j < str.length && !/[mGKHF]/.test(str[j])) j++;
-      i = j + 1; // skip the terminating letter too
-      continue;
-    }
-    // Advance by code-point width (2 UTF-16 units for non-BMP chars like emoji)
-    // so we never split a surrogate pair at a cut boundary.
-    const cp = str.codePointAt(i)!;
-    const cpLen = cp > 0xffff ? 2 : 1;
-    visCount++;
-    if (visCount === maxVisible) {
-      // Cut after this visible char. Use a partial SGR reset (bold + fg only)
-      // so that the caller's background colour is preserved.
-      return str.slice(0, i + cpLen) + "\x1b[22;39m";
-    }
-    i += cpLen;
-  }
-  return str;
 }
 
 /**
@@ -358,12 +306,12 @@ export function renderGroups(
   const lines: string[] = [];
 
   lines.push(
-    clipAnsi(
+    clipToWidth(
       `${pc.bgMagenta(pc.black(pc.bold(" github-code-search ")))} ${pc.bold(pc.cyan(query))} ${pc.dim("in")} ${pc.bold(pc.yellow(org))}`,
       termWidth,
     ),
   );
-  lines.push(clipAnsi(buildSummaryFull(groups), termWidth));
+  lines.push(clipToWidth(buildSummaryFull(groups), termWidth));
 
   // Active filter text used for in-row highlighting (filterInput while typing, filterPath once confirmed)
   const activeFilter = filterMode ? filterInput : filterPath;
@@ -402,7 +350,7 @@ export function renderGroups(
           ...(m2 !== f ? [`${m2} match${m2 !== 1 ? "es" : ""}`] : []),
         ];
         statsStr = pc.dim(parts.join(" \u00b7 "));
-        statsVisLen = stripAnsi(statsStr).length;
+        statsVisLen = visibleWidth(statsStr);
       } else {
         statsStr = pc.dim("…");
         statsVisLen = 1;
@@ -412,7 +360,7 @@ export function renderGroups(
     const statsRightVisLen = statsVisLen > 0 ? 2 + statsVisLen : 0;
 
     // 🔍 is 2 cols wide in most terminals; targetBadge is pure ASCII
-    const prefixVisLen = 2 + stripAnsi(targetBadge).length;
+    const prefixVisLen = 2 + visibleWidth(targetBadge);
     const fieldWidth = Math.max(8, termWidth - prefixVisLen - statsRightVisLen);
     const padWidth = Math.max(0, fieldWidth - filterInput.length - 1);
     const pad = " ".repeat(padWidth);
@@ -451,7 +399,7 @@ export function renderGroups(
     );
     // Fix: clip so the filter status line never wraps — see issue #105.
     lines.push(
-      clipAnsi(
+      clipToWidth(
         `🔍${targetBadge}${pc.bold("filter:")} ${pc.yellow(filterPath)}  ${statsStr}`,
         termWidth,
       ),
@@ -459,7 +407,7 @@ export function renderGroups(
     filterBarLines = 1;
   } else if (filterTarget !== "path" || filterRegex) {
     // No active filter text, but non-default mode selected — remind the user.
-    lines.push(clipAnsi(`🔍${targetBadge}${pc.dim("f to filter")}`, termWidth));
+    lines.push(clipToWidth(`🔍${targetBadge}${pc.dim("f to filter")}`, termWidth));
     filterBarLines = 1;
   }
 
@@ -481,7 +429,7 @@ export function renderGroups(
     // Pad between bar content and suffix to keep suffix right-aligned.
     const padLen = Math.max(0, barWidth - barPlain.length);
     const line = pc.dim(REPICK_PREFIX) + bar + " ".repeat(padLen) + pc.dim(REPICK_SUFFIX);
-    lines.push(clipAnsi(line, termWidth) + "\n");
+    lines.push(clipToWidth(line, termWidth) + "\n");
   } else if (opts.teamPickMode?.active) {
     const PICK_HINTS = `Pick team: ← / → move focus  ↵ confirm  Esc cancel`;
     const clippedPick = PICK_HINTS.length > termWidth ? PICK_HINTS.slice(0, termWidth) : PICK_HINTS;
@@ -513,7 +461,7 @@ export function renderGroups(
       const g = groups[cursorRow.repoIndex];
       const checkbox = g.repoSelected ? pc.green("✓") : " ";
       // Fix: clip to termWidth so the sticky line never wraps — see issue #105.
-      stickyRepoLine = clipAnsi(
+      stickyRepoLine = clipToWidth(
         pc.dim(`▲ ${checkbox} ${pc.bold(g.repoFullName)} ${pc.dim(buildMatchCountLabel(g))}`),
         termWidth,
       );
@@ -633,7 +581,7 @@ export function renderGroups(
       // When active, subtract ACTIVE_BAR_WIDTH from padding so that
       // bar (1 char) + line content = termWidth total.
       const leftPartRaw = `${arrow} ${checkbox} ${repoName}${pickedBadge}`;
-      const countLen = stripAnsi(count).length;
+      const countLen = visibleWidth(count);
       const barAdjust = isCursor ? ACTIVE_BAR_WIDTH : 0;
       // Use Math.max(1, …) so that on very narrow terminals the floor of 1
       // never exceeds the available width (unlike Math.max(4, …) which can
@@ -641,10 +589,10 @@ export function renderGroups(
       // wrapping — see review on #106).
       const maxLeftVisible = Math.max(1, termWidth - countLen - barAdjust);
       const leftPart =
-        stripAnsi(leftPartRaw).length > maxLeftVisible
-          ? clipAnsi(leftPartRaw, maxLeftVisible)
+        visibleWidth(leftPartRaw) > maxLeftVisible
+          ? clipToWidth(leftPartRaw, maxLeftVisible)
           : leftPartRaw;
-      const leftLen = stripAnsi(leftPart).length;
+      const leftLen = visibleWidth(leftPart);
       const pad = Math.max(0, termWidth - leftLen - countLen - barAdjust);
       const lineContent = pad > 0 ? `${leftPart}${" ".repeat(pad)}${count}` : `${leftPart}${count}`;
       lines.push(isCursor ? renderActiveLine(lineContent) : lineContent);
@@ -676,8 +624,8 @@ export function renderGroups(
         ? `${highlightText(match.path, "path", (s) => pc.bold(pc.white(s)))}${styledLocSuffix}`
         : `${highlightText(match.path, "path", pc.cyan)}${styledLocSuffix}`;
       const filePath =
-        stripAnsi(rawPath).length > maxPathVisible + locSuffix.length
-          ? clipAnsi(rawPath, maxPathVisible + locSuffix.length)
+        visibleWidth(rawPath) > maxPathVisible + locSuffix.length
+          ? clipToWidth(rawPath, maxPathVisible + locSuffix.length)
           : rawPath;
       const extractLineContent = `${INDENT}${checkbox} ${filePath}`;
       lines.push(
