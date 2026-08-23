@@ -6,6 +6,7 @@ import {
   buildFileUrl,
   buildFilterStats,
   buildRows,
+  getSectionPath,
   isCursorVisible,
   normalizeScrollOffset,
   renderGroups,
@@ -14,10 +15,15 @@ import {
 import { buildOutput } from "./output.ts";
 import {
   applyTeamPick,
-  moveRepoToSection,
-  undoSectionPick,
+  applyTeamPickInTree,
+  flattenTeamHierarchy,
   flattenTeamSections,
+  moveRepoToSection,
+  moveRepoToSectionInTree,
+  rebuildTeamHierarchy,
   rebuildTeamSections,
+  undoSectionPick,
+  undoSectionPickInTree,
 } from "./group.ts";
 import { parseMouseEvent } from "./render/mouse.ts";
 import {
@@ -218,14 +224,20 @@ export async function runInteractive(
 
   // ─── Team pick mode state ───────────────────────────────────────────────────────
   // Feat: team pick mode — resolve multi-team section ownership — see issue #85
+  // Fix: track the full ancestor sectionPath (not just the bare label) so a
+  // pick on a groupByTeamHierarchy tree unambiguously targets the row the
+  // cursor was actually on — see issue #181.
   let teamPickMode = {
     active: false,
     sectionLabel: "",
+    sectionPath: [] as string[],
     candidates: [] as string[],
     focusedIndex: 0,
   };
-  /** Maps combined section label → chosen team; pre-seeded with CLI --pick-team flags
-   *  so they are included in the replay command even if no additional interactive picks are made. */
+  /** Maps combined section path (joined with " > ", or the bare label for a
+   *  flat top-level section) → chosen team; pre-seeded with CLI --pick-team
+   *  flags so they are included in the replay command even if no additional
+   *  interactive picks are made. */
   const confirmedPicks: Record<string, string> = { ...initialPickTeams };
 
   // ─── Team re-pick mode state ──────────────────────────────────────────────────
@@ -460,18 +472,42 @@ export async function runInteractive(
       } else if (key === KEY_ENTER_CR || key === KEY_ENTER_LF) {
         // Enter — confirm pick, reassign repos, exit pick mode
         const chosen = teamPickMode.candidates[teamPickMode.focusedIndex];
-        const sections = rebuildTeamSections(groups);
-        const updated = applyTeamPick(sections, teamPickMode.sectionLabel, chosen);
-        groups = flattenTeamSections(updated);
-        confirmedPicks[teamPickMode.sectionLabel] = chosen;
-        teamPickMode = { active: false, sectionLabel: "", candidates: [], focusedIndex: 0 };
+        // Fix: branch on sectionPath depth so a pick on a nested
+        // groupByTeamHierarchy section reassigns within the tree instead of
+        // (incorrectly) treating the tree as a flat groupByTeamPrefix list —
+        // see issue #181. A depth-1 path (top-level section) behaves exactly
+        // like the flat path, since a hierarchy tree's top level is the same
+        // shape as groupByTeamPrefix's flat sections.
+        if (teamPickMode.sectionPath.length > 1) {
+          const sections = rebuildTeamHierarchy(groups);
+          const updated = applyTeamPickInTree(sections, teamPickMode.sectionPath, chosen);
+          groups = flattenTeamHierarchy(updated);
+        } else {
+          const sections = rebuildTeamSections(groups);
+          const updated = applyTeamPick(sections, teamPickMode.sectionLabel, chosen);
+          groups = flattenTeamSections(updated);
+        }
+        confirmedPicks[teamPickMode.sectionPath.join(" > ") || teamPickMode.sectionLabel] = chosen;
+        teamPickMode = {
+          active: false,
+          sectionLabel: "",
+          sectionPath: [],
+          candidates: [],
+          focusedIndex: 0,
+        };
         // Clamp cursor after row count may have changed
         const newRows = buildRows(groups, filterPath, filterTarget, filterRegex);
         cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
         scrollOffset = Math.min(scrollOffset, cursor);
       } else if (key === "\x1b" && !key.startsWith("\x1b[") && !key.startsWith("\x1b\x1b")) {
         // Esc — cancel with no change
-        teamPickMode = { active: false, sectionLabel: "", candidates: [], focusedIndex: 0 };
+        teamPickMode = {
+          active: false,
+          sectionLabel: "",
+          sectionPath: [],
+          candidates: [],
+          focusedIndex: 0,
+        };
       }
       redraw();
       continue;
@@ -500,7 +536,18 @@ export async function runInteractive(
         // Enter — confirm re-pick, move repo to the focused candidate team
         const targetTeam = repickMode.candidates[repickMode.focusedIndex];
         const g = groups[repickMode.repoIndex];
-        groups = moveRepoToSection(groups, g.repoFullName, targetTeam);
+        const pickedFrom = g.pickedFrom ?? "";
+        // Fix: a hierarchical pickedFrom ("parent > combined") must move the
+        // repo within the tree, at the same parent depth it was picked from
+        // — see issue #181.
+        if (pickedFrom.includes(" > ")) {
+          const parentPath = pickedFrom.split(" > ").slice(0, -1);
+          const sections = rebuildTeamHierarchy(groups);
+          const updated = moveRepoToSectionInTree(sections, g.repoFullName, parentPath, targetTeam);
+          groups = flattenTeamHierarchy(updated);
+        } else {
+          groups = moveRepoToSection(groups, g.repoFullName, targetTeam);
+        }
         const newRows = buildRows(groups, filterPath, filterTarget, filterRegex);
         cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
         scrollOffset = Math.min(scrollOffset, cursor);
@@ -513,7 +560,13 @@ export async function runInteractive(
         const combinedLabel = groups[repickMode.repoIndex]?.pickedFrom;
         if (combinedLabel) {
           delete confirmedPicks[combinedLabel];
-          groups = undoSectionPick(groups, combinedLabel);
+          if (combinedLabel.includes(" > ")) {
+            const sections = rebuildTeamHierarchy(groups);
+            const updated = undoSectionPickInTree(sections, combinedLabel);
+            groups = flattenTeamHierarchy(updated);
+          } else {
+            groups = undoSectionPick(groups, combinedLabel);
+          }
         }
         const newRows = buildRows(groups, filterPath, filterTarget, filterRegex);
         cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
@@ -706,7 +759,17 @@ export async function runInteractive(
     // Feat: team pick mode — resolve multi-team section ownership — see issue #85
     if (key === "p" && row?.type === "section" && row.sectionLabel?.includes(" + ")) {
       const candidates = row.sectionLabel.split(" + ");
-      teamPickMode = { active: true, sectionLabel: row.sectionLabel, candidates, focusedIndex: 0 };
+      // Fix: capture the full ancestor path so the pick targets the exact
+      // tree node under the cursor, not just any row sharing the same
+      // label — see issue #181.
+      const sectionPath = getSectionPath(rows, cursor);
+      teamPickMode = {
+        active: true,
+        sectionLabel: row.sectionLabel,
+        sectionPath,
+        candidates,
+        focusedIndex: 0,
+      };
       redraw();
       continue;
     }
@@ -715,12 +778,13 @@ export async function runInteractive(
     // different team. Otherwise cycle the filter target: path → content → repo → path.
     // Feat: re-pick mode — see issue #87
     if (key === "t") {
-      const isPickedRepo =
-        groupByTeamPrefix && row?.type === "repo" && !!groups[row.repoIndex]?.pickedFrom;
+      const isPickedRepo = row?.type === "repo" && !!groups[row.repoIndex]?.pickedFrom;
       if (isPickedRepo) {
         // Enter re-pick mode — candidates come from the original combined label
+        // (its last path segment for a hierarchical pick — see issue #181).
         const pickedFrom = groups[row!.repoIndex].pickedFrom!;
-        const candidates = pickedFrom.split(" + ").map((c) => c.trim());
+        const combinedLabel = pickedFrom.split(" > ").at(-1)!;
+        const candidates = combinedLabel.split(" + ").map((c) => c.trim());
         repickMode = { active: true, repoIndex: row!.repoIndex, candidates, focusedIndex: 0 };
       } else {
         // Cycle filter target when not on a picked repo

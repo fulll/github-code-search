@@ -2109,6 +2109,82 @@ describe("renderGroups — hierarchical section headings (sectionLevel)", () => 
   });
 });
 
+// ─── renderGroups — team pick mode section bar ────────────────────────────────
+// Regression: getSectionPath must be a real local import (not just re-exported)
+// for this branch to even run — see the crash reported on issue #181.
+
+describe("renderGroups — team pick mode section bar", () => {
+  it("shows the pick bar on a flat (sectionLabel) combined section", () => {
+    const groups = [
+      { ...makeGroup("org/repoA", ["a.ts"], true), sectionLabel: "squad-a + squad-b" },
+    ];
+    const rows = buildRows(groups);
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", {
+      termWidth: 80,
+      teamPickMode: {
+        active: true,
+        sectionLabel: "squad-a + squad-b",
+        candidates: ["squad-a", "squad-b"],
+        focusedIndex: 0,
+      },
+    });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).toContain("[ squad-a ]");
+  });
+
+  it("shows the pick bar on the hierarchical section whose full path matches", () => {
+    const groups = [
+      {
+        ...makeGroup("org/repoA", ["a.ts"], true),
+        sectionPath: [
+          { label: "gamme-client", level: 0 },
+          { label: "squad-a + squad-b", level: 1 },
+        ],
+      },
+    ];
+    const rows = buildRows(groups);
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", {
+      termWidth: 80,
+      teamPickMode: {
+        active: true,
+        sectionLabel: "squad-a + squad-b",
+        sectionPath: ["gamme-client", "squad-a + squad-b"],
+        candidates: ["squad-a", "squad-b"],
+        focusedIndex: 0,
+      },
+    });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).toContain("[ squad-a ]");
+  });
+
+  it("does not show the pick bar on a same-label section at a different path", () => {
+    const groups = [
+      {
+        ...makeGroup("org/repoA", ["a.ts"], true),
+        sectionPath: [
+          { label: "gamme-other", level: 0 },
+          { label: "squad-a + squad-b", level: 1 },
+        ],
+      },
+    ];
+    const rows = buildRows(groups);
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", {
+      termWidth: 80,
+      teamPickMode: {
+        active: true,
+        sectionLabel: "squad-a + squad-b",
+        // Targets a DIFFERENT parent than the one actually rendered above.
+        sectionPath: ["gamme-client", "squad-a + squad-b"],
+        candidates: ["squad-a", "squad-b"],
+        focusedIndex: 0,
+      },
+    });
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).not.toContain("[ squad-a ]");
+    expect(stripped).toContain("squad-a + squad-b");
+  });
+});
+
 // ─── renderGroups — re-pick mode hints bar ────────────────────────────────────
 
 describe("renderGroups — re-pick mode hints bar", () => {
