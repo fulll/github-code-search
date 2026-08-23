@@ -43,7 +43,17 @@ export function hitTestClick(
   for (let i = scrollOffset; i < rows.length; i++) {
     const row = rows[i];
     const group = groups[row.repoIndex] ?? undefined;
-    const h = rowTerminalLines(group, row);
+
+    // Calculate row height, mirroring renderGroups logic for sections:
+    // - First row (lineOffset === 0 for sections): 1 line (label only, no blank separator)
+    // - Subsequent section rows: 2 lines (blank separator + label)
+    // - Repos and extracts: use rowTerminalLines
+    let h: number;
+    if (row.type === "section") {
+      h = lineOffset === 0 ? 1 : 2;
+    } else {
+      h = rowTerminalLines(group, row);
+    }
 
     if (lineOffset <= clickedLineOffset && clickedLineOffset < lineOffset + h) {
       // This row was clicked
