@@ -539,6 +539,44 @@ describe("buildMarkdownOutput", () => {
     expect(out).toContain("###### deep");
     expect(out).not.toContain("####### deep");
   });
+
+  it("does not lose the heading when the repo that carries sectionPath is deselected", () => {
+    const groups: RepoGroup[] = [
+      {
+        ...makeGroup("myorg/repoA", ["a.ts"], { repoSelected: false }),
+        sectionPath: [{ label: "gamme-client", level: 0 }],
+      },
+      makeGroup("myorg/repoB", ["b.ts"]), // same leaf, no sectionPath of its own
+    ];
+    const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set());
+    expect(out).toContain("## gamme-client");
+    expect(out).toContain("myorg/repoB");
+  });
+
+  it("does not lose the heading when the repo that carries sectionPath has no selected matches", () => {
+    const groups: RepoGroup[] = [
+      {
+        ...makeGroup("myorg/repoA", ["a.ts"], { extractSelected: [false] }),
+        sectionPath: [{ label: "gamme-client", level: 0 }],
+      },
+      makeGroup("myorg/repoB", ["b.ts"]),
+    ];
+    const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set());
+    expect(out).toContain("## gamme-client");
+  });
+
+  it("does not lose a flat sectionLabel heading when its bearing repo is deselected", () => {
+    const groups: RepoGroup[] = [
+      {
+        ...makeGroup("myorg/repoA", ["a.ts"], { repoSelected: false }),
+        sectionLabel: "squad-frontend",
+      },
+      makeGroup("myorg/repoB", ["b.ts"]),
+    ];
+    const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set());
+    expect(out).toContain("## squad-frontend");
+    expect((out.match(/^## /gm) ?? []).length).toBe(1);
+  });
 });
 
 describe("buildJsonOutput", () => {
@@ -830,5 +868,15 @@ describe("buildOutput", () => {
     });
     const parsed = JSON.parse(out);
     expect(parsed.replayCommand).toContain("--group-by-team-prefix 'squad-'");
+  });
+
+  it("threads consolidateTeamSections into the replay command", () => {
+    const groups = [makeGroup("myorg/repoA", ["src/foo.ts"])];
+    const out = buildOutput(groups, QUERY, ORG, new Set(), new Set(), "json", "repo-and-matches", {
+      groupByTeamPrefix: "gamme-/squad-",
+      consolidateTeamSections: true,
+    });
+    const parsed = JSON.parse(out);
+    expect(parsed.replayCommand).toContain("--group-by-team-prefix-consolidate");
   });
 });

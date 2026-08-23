@@ -399,16 +399,9 @@ export function flattenTeamHierarchy(sections: TeamSection[]): RepoGroup[] {
   const result: RepoGroup[] = [];
   let previousPath: PathEntry[] = [];
 
-  function visit(node: TeamSection, ancestors: PathEntry[]): void {
-    const path = [...ancestors, { label: node.label, level: node.level ?? 0 }];
-    if (node.children && node.children.length > 0) {
-      for (const child of node.children) visit(child, path);
-      return;
-    }
-    if (node.groups.length === 0) return;
-
-    for (let i = 0; i < node.groups.length; i++) {
-      const g = node.groups[i];
+  function emitLeafGroups(groups: RepoGroup[], path: PathEntry[]): void {
+    for (let i = 0; i < groups.length; i++) {
+      const g = groups[i];
       if (i === 0) {
         const divergeAt = firstDivergingIndex(previousPath, path);
         const newHeadings = path.slice(divergeAt);
@@ -420,6 +413,17 @@ export function flattenTeamHierarchy(sections: TeamSection[]): RepoGroup[] {
         void _removed;
         result.push(rest as RepoGroup);
       }
+    }
+  }
+
+  function visit(node: TeamSection, ancestors: PathEntry[]): void {
+    const path = [...ancestors, { label: node.label, level: node.level ?? 0 }];
+    // A node can own repos directly *and* have nested children at once (see
+    // `TeamSection`) — emit its own groups under its own heading first, then
+    // descend into children so none of its repos are dropped.
+    if (node.groups.length > 0) emitLeafGroups(node.groups, path);
+    if (node.children) {
+      for (const child of node.children) visit(child, path);
     }
   }
 

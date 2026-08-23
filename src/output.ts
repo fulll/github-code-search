@@ -237,26 +237,44 @@ export function buildMarkdownOutput(
   lines.push(buildSelectionSummary(groups));
   lines.push("");
 
+  // Track section markers across ALL groups (not just visible ones) so a
+  // heading is never lost when the repo that first carried it gets filtered
+  // out below (deselected, or with no selected matches) — see review on #187.
+  let pendingSectionLabel: string | undefined;
+  let pendingSectionPath: NonNullable<RepoGroup["sectionPath"]> = [];
+
   for (const group of groups) {
+    if (group.sectionLabel !== undefined) {
+      pendingSectionLabel = group.sectionLabel;
+    }
+    if (group.sectionPath !== undefined && group.sectionPath.length > 0) {
+      pendingSectionPath = [
+        ...pendingSectionPath.slice(0, group.sectionPath[0].level),
+        ...group.sectionPath,
+      ];
+    }
+
     if (!group.repoSelected) continue;
     const matches = selectedMatches(group);
     if (matches.length === 0) continue;
 
-    // Section header(s), emitted before the first repo of a new section.
-    // `sectionLabel` is the flat single-level marker (`groupByTeamPrefix`);
-    // `sectionPath` is the hierarchical marker (`groupByTeamHierarchy`) —
-    // only one of the two is ever set on a given repo.
-    if (group.sectionLabel !== undefined) {
+    // Section header(s), emitted before the first *visible* repo of a new
+    // section. `sectionLabel` is the flat single-level marker
+    // (`groupByTeamPrefix`); `sectionPath` is the hierarchical marker
+    // (`groupByTeamHierarchy`) — only one of the two is ever set at a time.
+    if (pendingSectionLabel !== undefined) {
       lines.push("");
-      lines.push(`## ${group.sectionLabel}`);
+      lines.push(`## ${pendingSectionLabel}`);
       lines.push("");
-    } else if (group.sectionPath !== undefined && group.sectionPath.length > 0) {
+      pendingSectionLabel = undefined;
+    } else if (pendingSectionPath.length > 0) {
       lines.push("");
       // Markdown has no heading deeper than H6 — cap depth there.
-      for (const heading of group.sectionPath) {
+      for (const heading of pendingSectionPath) {
         lines.push(`${"#".repeat(Math.min(2 + heading.level, 6))} ${heading.label}`);
       }
       lines.push("");
+      pendingSectionPath = [];
     }
 
     const matchCount = selectedMatches(group).length;
@@ -379,7 +397,12 @@ export function buildOutput(
   outputType: OutputType = "repo-and-matches",
   extraOptions: Pick<
     ReplayOptions,
-    "includeArchived" | "excludeTemplates" | "groupByTeamPrefix" | "regexHint" | "pickTeams"
+    | "includeArchived"
+    | "excludeTemplates"
+    | "groupByTeamPrefix"
+    | "consolidateTeamSections"
+    | "regexHint"
+    | "pickTeams"
   > = {},
 ): string {
   const options: ReplayOptions = { format, outputType, ...extraOptions };

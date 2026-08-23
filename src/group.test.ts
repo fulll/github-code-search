@@ -467,6 +467,20 @@ describe("flattenTeamHierarchy", () => {
     expect(flat[1].sectionPath).toEqual([{ label: "chapter-backend", level: 0 }]);
   });
 
+  it("includes a parent's own repos even when it also has nested overlap children", () => {
+    // "gamme-lead-client" owns org/a directly AND has an overlap-nested
+    // child "gamme-lead-client-p1" owning org/b — both must appear.
+    const groups = [
+      makeGroup("org/a", ["gamme-lead-client"]),
+      makeGroup("org/b", ["gamme-lead-client-p1"]),
+    ];
+    const sections = groupByTeamHierarchy(groups, [["gamme-"]]);
+    const flat = flattenTeamHierarchy(sections);
+    expect(flat.map((g) => g.repoFullName)).toEqual(["org/a", "org/b"]);
+    expect(flat[0].sectionPath).toEqual([{ label: "gamme-lead-client", level: 0 }]);
+    expect(flat[1].sectionPath).toEqual([{ label: "gamme-lead-client-p1", level: 1 }]);
+  });
+
   it("does not mutate the input tree", () => {
     const groups = [makeGroup("org/a", ["gamme-client", "squad-dashboard"])];
     const sections = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
