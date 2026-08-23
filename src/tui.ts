@@ -26,6 +26,7 @@ import {
   isScrollCooldownActive,
   updateScrollCooldown,
 } from "./scroll-cooldown.ts";
+import { getHeaderLines } from "./render.ts";
 import { hitTestClick } from "./render/mouse-hit.ts";
 import type { FilterTarget, OutputFormat, OutputType, RepoGroup, Row } from "./types.ts";
 
@@ -346,15 +347,11 @@ export async function runInteractive(
       }
 
       // Calculate header lines before the first row to adjust click coordinates.
-      // Base header lines: title (1) + summary (1) + hints (1) + blank (1) = 4.
-      // Additional lines: filter bar (0-2) + sticky repo header (0-1 when cursor is on
-      // an extract whose repo scrolled above viewport).
-      let headerLines = 4; // HEADER_LINES constant from render.ts
-      if (filterMode)
-        headerLines += 2; // filter input + hints in filter mode
-      else if (filterPath || filterTarget !== "path" || filterRegex) headerLines += 1; // filter status or mode badge line
-      // Note: stickyRepoLine (0-1) would add +1 but requires complex cursor state evaluation;
-      // omitting for now — this may cause clicks to be off by 1 row when sticky repo is shown
+      // Includes: title + summary + hints + blank (base 4) + filter bar if active.
+      const headerLines = getHeaderLines(
+        filterMode,
+        filterPath || filterTarget !== "path" || filterRegex,
+      );
 
       // Hit-test the click against visible rows (non-wheel buttons)
       const target = hitTestClick(

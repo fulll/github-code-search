@@ -3,6 +3,7 @@
 
 import type { RepoGroup, Row } from "../types.ts";
 import { rowTerminalLines } from "./rows.ts";
+import { isClickInFoldZone, isClickInCheckboxZone, isClickInNavZone } from "./layout-constants.ts";
 
 export interface ClickTarget {
   row: Row;
@@ -18,11 +19,9 @@ export interface ClickTarget {
  * headerLines: number of header lines before the first row (position indicator + filter bar).
  *
  * Actions:
- *   - "fold" on repo rows: click lands on the ▸/▾ emoji (occupies columns 1-2 visually)
- *   - "select" on any row: click lands on the ✓ checkbox (occupies columns 4-5 on repo rows, columns 4-5 on extract rows)
- *   - "navigate" on any row: click elsewhere (just move cursor to that row)
- *
- * Note: Emojis like ▸, ▾, ✓ occupy 2 visual columns each when rendered in terminals.
+ *   - "fold": click lands on the ▸/▾ emoji (repo rows only)
+ *   - "select": click lands on the ✓ checkbox (repo or extract rows)
+ *   - "navigate": click elsewhere (move cursor to that row)
  */
 export function hitTestClick(
   groups: RepoGroup[],
@@ -62,27 +61,18 @@ export function hitTestClick(
 
       if (row.type === "repo") {
         // Repo row layout: "▸ ✓ repo-name"
-        // Arrow emoji: columns 1-2 (occupies 2 visual columns)
-        // Space: column 3
-        // Checkbox emoji: columns 4-5 (occupies 2 visual columns)
-        // Space: column 6
-        // Repo name: columns 7+
-        if (x >= 1 && x <= 2) {
+        if (isClickInFoldZone(x)) {
           action = "fold";
-        } else if (x >= 4 && x <= 5) {
+        } else if (isClickInCheckboxZone(x)) {
           action = "select";
         }
       } else if (row.type === "extract") {
         // Extract row layout: "  ✓ path:line:col" (top line) or fragments
-        // Indent: columns 1-2
-        // Checkbox emoji: columns 4-5 (occupies 2 visual columns) on extract header line only
-        // Entire row width (except fold zone cols 1-2) is clickable for selection in double-click mode
-        if (clickedLineOffset === lineOffset && x >= 4 && x <= 5) {
-          // Only the first line of an extract has a clickable checkbox
+        // Checkbox only on extract header line (first line of extract)
+        if (clickedLineOffset === lineOffset && isClickInCheckboxZone(x)) {
           action = "select";
-        } else if (clickedLineOffset === lineOffset && x >= 6) {
-          // Double-click anywhere on extract header line (except fold/indent zone) can toggle
-          // For now, mark as selectable so double-click can work on full width
+        } else if (clickedLineOffset === lineOffset && isClickInNavZone(x)) {
+          // Double-click anywhere on extract header line (nav zone) can toggle
           action = "select";
         }
       }
