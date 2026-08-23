@@ -24,6 +24,7 @@ export {
   buildSelectionSummary,
 } from "./render/summary.ts";
 export { applySelectAll, applySelectNone } from "./render/selection.ts";
+export { visibleWidth, stripAnsi, clipToWidth, hasAnsi } from "./render/terminal.ts";
 
 // ─── buildFileUrl ─────────────────────────────────────────────────────────────
 
