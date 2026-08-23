@@ -597,6 +597,59 @@ describe("applyTeamPickInTree", () => {
     expect(result).toEqual(tree);
   });
 
+  it("preserves the picked section's own children (does not drop the subtree)", () => {
+    // Regression: a top-level combined section ("gamme-a + gamme-a-security-p1")
+    // that was already subdivided by the next chain level (squad-) must keep
+    // its nested children when picked — only its own (now empty) `groups`
+    // were carried over before the fix, silently dropping every repo nested
+    // underneath.
+    const groups = [
+      makeGroup("org/tools-mobile", [
+        "gamme-lead-mobile",
+        "gamme-lead-mobile-security-p1",
+        "squad-core",
+        "squad-mobile",
+      ]),
+      makeGroup("org/wizard-mobile", ["gamme-lead-mobile", "gamme-lead-mobile-security-p1"]),
+    ];
+    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const combined = tree.find((s) => s.label.includes(" + "))!;
+    expect(combined.label).toBe("gamme-lead-mobile + gamme-lead-mobile-security-p1");
+    expect(combined.groups).toEqual([]); // fully subdivided by squad- before the pick
+    expect(combined.children).toHaveLength(2); // "squad-core + squad-mobile" and "other"
+
+    const updated = applyTeamPickInTree(tree, [combined.label], "gamme-lead-mobile");
+
+    expect(updated.map((s) => s.label)).not.toContain(combined.label);
+    const picked = updated.find((s) => s.label === "gamme-lead-mobile")!;
+    expect(picked).toBeDefined();
+    expect(picked.children).toHaveLength(2);
+    const squadChild = picked.children!.find((c) => c.label === "squad-core + squad-mobile")!;
+    expect(squadChild.groups.map((g) => g.repoFullName)).toEqual(["org/tools-mobile"]);
+    const otherChild = picked.children!.find((c) => c.label === "other")!;
+    expect(otherChild.groups.map((g) => g.repoFullName)).toEqual(["org/wizard-mobile"]);
+    // Every repo in the moved subtree is tagged, not just the top node's own groups.
+    expect(squadChild.groups[0].pickedFrom).toBe(combined.label);
+    expect(otherChild.groups[0].pickedFrom).toBe(combined.label);
+  });
+
+  it("merges the picked subtree's children into an existing target section's children", () => {
+    const groups = [
+      makeGroup("org/existing", ["gamme-lead-mobile", "squad-existing"]),
+      makeGroup("org/tools-mobile", [
+        "gamme-lead-mobile",
+        "gamme-lead-mobile-security-p1",
+        "squad-core",
+      ]),
+    ];
+    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const combined = tree.find((s) => s.label.includes(" + "))!;
+    const updated = applyTeamPickInTree(tree, [combined.label], "gamme-lead-mobile");
+    const picked = updated.find((s) => s.label === "gamme-lead-mobile")!;
+    const childLabels = picked.children!.map((c) => c.label).toSorted();
+    expect(childLabels).toEqual(["squad-core", "squad-existing"]);
+  });
+
   it("returns sections unchanged for an empty combinedPath", () => {
     const groups = [makeGroup("org/a")];
     const tree = groupByTeamHierarchy(groups, [["squad-"]]);

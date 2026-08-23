@@ -587,12 +587,15 @@ function stripPickedFrom(g: RepoGroup): RepoGroup {
 }
 
 /**
- * Tree-aware equivalent of `applyTeamPick`: reassigns every repo of the
- * combined section identified by `combinedPath` (e.g.
- * `["gamme-client", "squad-a + squad-b"]`) to a sibling section named
- * `chosenTeam` at that same depth (appended to it if it already exists,
- * otherwise created in its place). Moved repos are tagged with
- * `pickedFrom = combinedPath.join(" > ")`.
+ * Tree-aware equivalent of `applyTeamPick`: reassigns the ENTIRE subtree of
+ * the combined section identified by `combinedPath` (e.g.
+ * `["gamme-client", "squad-a + squad-b"]`) — its own `groups` *and* any
+ * nested `children` (e.g. it was already subdivided by a further chain
+ * level) — to a sibling section named `chosenTeam` at that same depth
+ * (merged into it if it already exists, otherwise created in its place).
+ * Every repo in the moved subtree (own groups and every descendant) is
+ * tagged with `pickedFrom = combinedPath.join(" > ")` so
+ * `undoSectionPickInTree` can find all of them later.
  *
  * No-op (returns `sections` unchanged) if any segment of `combinedPath` does
  * not resolve to an existing node. Pure — does not mutate `sections`.
@@ -611,25 +614,47 @@ export function applyTeamPickInTree(
     const idx = siblings.findIndex((s) => s.label === combinedLabel);
     if (idx === -1) return siblings;
 
-    const reposToMove = siblings[idx].groups.map((g) => ({ ...g, pickedFrom: pathKey }));
+    const picked = tagPickedFrom(siblings[idx], pathKey);
     const remaining = siblings.filter((_, i) => i !== idx);
 
     const targetIdx = remaining.findIndex((s) => s.label === chosenTeam);
     if (targetIdx !== -1) {
       return remaining.map((s, i) =>
-        i === targetIdx ? { ...s, groups: [...s.groups, ...reposToMove] } : s,
+        i === targetIdx
+          ? {
+              ...s,
+              groups: [...s.groups, ...picked.groups],
+              ...(picked.children && picked.children.length > 0
+                ? { children: [...(s.children ?? []), ...picked.children] }
+                : {}),
+            }
+          : s,
       );
     }
 
     const newSection: TeamSection = {
       label: chosenTeam,
-      groups: reposToMove,
+      groups: picked.groups,
       level: siblings[idx].level,
+      ...(picked.children && picked.children.length > 0 ? { children: picked.children } : {}),
     };
     const result = [...remaining];
     result.splice(idx, 0, newSection);
     return result;
   });
+}
+
+/**
+ * Recursively tags every repo in `node` (its own `groups` and every
+ * descendant's, through `children`) with `pickedFrom`, preserving the
+ * subtree's shape. Pure — returns a new tree, does not mutate `node`.
+ */
+function tagPickedFrom(node: TeamSection, pathKey: string): TeamSection {
+  return {
+    ...node,
+    groups: node.groups.map((g) => ({ ...g, pickedFrom: pathKey })),
+    ...(node.children ? { children: node.children.map((c) => tagPickedFrom(c, pathKey)) } : {}),
+  };
 }
 
 /**
