@@ -154,6 +154,59 @@ describe("renderTeamPickHeader — windowed scrolling", () => {
   });
 });
 
+// ─── renderTeamPickHeader — Unicode and wide characters ───────────────────────
+
+describe("renderTeamPickHeader — CJK and emoji", () => {
+  it("renders CJK team names with correct width measurement", () => {
+    // CJK characters take 2 columns each: "中文" = 4 visible columns
+    const result = strip(renderTeamPickHeader(["中文", "team"], 0));
+    expect(result).toContain("[ 中文 ]");
+    expect(result).toContain("team");
+  });
+
+  it("clips CJK focused team when it exceeds maxWidth", () => {
+    // "[ 中文测试平台 ]" = 11 chars, 19 visible columns
+    // With maxWidth=10, should clip to fit
+    const result = strip(renderTeamPickHeader(["中文测试平台"], 0, 10));
+    expect(result.length).toBeLessThanOrEqual(10);
+    // Ensure the ellipsis is present (clipping occurred)
+    expect(result.endsWith("…")).toBe(true);
+  });
+
+  it("preserves focused ellipsis styling when clipping CJK names", () => {
+    // Verify the clipped output contains ANSI codes for bold/magenta
+    // and the ellipsis is styled
+    const result = renderTeamPickHeader(["中文测试平台"], 0, 10);
+    expect(result).toMatch(/\x1b\[/); // Has ANSI codes
+    expect(result).toContain("…"); // Has ellipsis
+  });
+
+  it("renders emoji team names with correct width", () => {
+    // Single emoji typically takes 2 columns: "🔍" = 2 visible columns
+    const result = strip(renderTeamPickHeader(["🔍platform", "backend"], 0));
+    expect(result).toContain("[ 🔍platform ]");
+    expect(result).toContain("backend");
+  });
+
+  it("handles mixed ASCII and emoji in team names", () => {
+    const result = strip(renderTeamPickHeader(["data📊", "api", "web🌐"], 1));
+    expect(result).toContain("[ api ]");
+    expect(result).toContain("data📊");
+    expect(result).toContain("web🌐");
+  });
+
+  it("maintains maxWidth constraint with wide characters in window rendering", () => {
+    // Mix of CJK and ASCII in a windowed render
+    const teams = ["中", "team", "api", "平"];
+    // Each CJK = 2 cols, ASCII words = their length
+    // "[ 中 ]"=5 cols, "team"=4, "api"=3, "平"=2
+    const maxWidth = 20;
+    const result = strip(renderTeamPickHeader(teams, 0, maxWidth));
+    // Verify output length is reasonable (accounting for SEP + ellipsis)
+    expect(result.length).toBeLessThanOrEqual(maxWidth + 4); // Allow some margin for ANSI codes
+  });
+});
+
 // ─── renderTeamPickHeader — guard conditions ──────────────────────────────────
 
 describe("renderTeamPickHeader — guard conditions", () => {

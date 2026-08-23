@@ -62,8 +62,10 @@ export function renderTeamPickHeader(
 
   // If the focused item alone is wider than maxWidth, clip it.
   if (widths[safeIndex] > maxWidth) {
-    const clipped = clipToWidth(texts[safeIndex], maxWidth - 1) + "…";
-    return pc.bold(pc.magenta(clipped));
+    const styledText = pc.bold(pc.magenta(texts[safeIndex]));
+    const clipped = clipToWidth(styledText, maxWidth - 1);
+    const styledEllipsis = pc.bold(pc.magenta("…"));
+    return clipped + styledEllipsis;
   }
 
   // ── Windowed rendering ────────────────────────────────────────────────────
