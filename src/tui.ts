@@ -20,6 +20,7 @@ import {
   rebuildTeamSections,
 } from "./group.ts";
 import { parseMouseEvent } from "./render/mouse.ts";
+import { hitTestClick } from "./render/mouse-hit.ts";
 import type { FilterTarget, OutputFormat, OutputType, RepoGroup, Row } from "./types.ts";
 
 // ─── Key binding constants ────────────────────────────────────────────────────
@@ -291,7 +292,36 @@ export async function runInteractive(
     // Try parsing as a mouse event; if it's not a mouse event, treat as keyboard input
     const mouseEvent = parseMouseEvent(key);
     if (mouseEvent !== null) {
-      // Mouse events are silently ignored for now; this hook is here for future #170 / #168
+      // Hit-test the click against visible rows
+      const target = hitTestClick(groups, rows, scrollOffset, mouseEvent.x, mouseEvent.y);
+      if (target !== null) {
+        const row = target.row;
+        if (target.action === "fold" && row.type === "repo") {
+          // Toggle fold for this repo
+          const group = groups[row.repoIndex];
+          group.folded = !group.folded;
+          redraw();
+        } else if (target.action === "select") {
+          if (row.type === "repo") {
+            // Toggle repo selection
+            const group = groups[row.repoIndex];
+            group.repoSelected = !group.repoSelected;
+          } else if (row.type === "extract" && row.extractIndex !== undefined) {
+            // Toggle extract selection
+            const group = groups[row.repoIndex];
+            group.extractSelected[row.extractIndex] = !group.extractSelected[row.extractIndex];
+          }
+          redraw();
+        } else if (target.action === "navigate") {
+          // Move cursor to this row
+          const rowIndex = rows.findIndex((r) => r === row);
+          if (rowIndex >= 0) {
+            cursor = rowIndex;
+            scrollOffset = Math.min(scrollOffset, cursor);
+            redraw();
+          }
+        }
+      }
       continue;
     }
 
