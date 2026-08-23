@@ -553,7 +553,7 @@ export async function runInteractive(
     }
 
     // ── Normal mode ───────────────────────────────────────────────────────────────
-    const rows = buildRows(groups, filterPath, filterTarget, filterRegex);
+    rows = buildRows(groups, filterPath, filterTarget, filterRegex);
     const row = rows[cursor];
 
     if (key === KEY_CTRL_C || key === "q") {
