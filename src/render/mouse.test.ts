@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { parseMouseEvent, type MouseEvent } from "./mouse.ts";
+import { parseMouseEvent } from "./mouse.ts";
 
 describe("parseMouseEvent", () => {
   it("parses a valid left click (button 0) press", () => {

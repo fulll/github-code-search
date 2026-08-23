@@ -20,8 +20,11 @@ export interface MouseEvent {
  *   64 = wheel up
  *   65 = wheel down
  */
+const SGR_MOUSE_PREFIX = "\x1b[<";
+
 export function parseMouseEvent(sequence: string): MouseEvent | null {
-  const match = sequence.match(/^\x1b\[<(\d+);(\d+);(\d+)([Mm])$/);
+  if (!sequence.startsWith(SGR_MOUSE_PREFIX)) return null;
+  const match = sequence.slice(SGR_MOUSE_PREFIX.length).match(/^(\d+);(\d+);(\d+)([Mm])$/);
   if (!match) return null;
 
   const button = parseInt(match[1], 10);
