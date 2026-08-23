@@ -2,9 +2,8 @@ import pc from "picocolors";
 import type { FilterTarget, RepoGroup, Row, TextMatchSegment } from "./types.ts";
 import { highlightFragment } from "./render/highlight.ts";
 import { buildFilterStats, type FilterStats } from "./render/filter.ts";
-import { rowTerminalLines, buildRows, isCursorVisible } from "./render/rows.ts";
+import { rowTerminalLines } from "./render/rows.ts";
 import { buildMatchCountLabel, buildSummaryFull } from "./render/summary.ts";
-import { applySelectAll, applySelectNone } from "./render/selection.ts";
 import { renderTeamPickHeader } from "./render/team-pick.ts";
 
 // ─── Re-exports ───────────────────────────────────────────────────────────────

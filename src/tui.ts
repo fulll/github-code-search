@@ -139,16 +139,16 @@ export async function runInteractive(
   // O(n) per call. The map is rebuilt lazily whenever the `rows` reference changes — which
   // happens at most once per keypress (in redraw) — keeping the amortised cost O(n) total
   // rather than O(n²) when scrolling through large result sets. See review on #106.
-  let _cachedRowsForMap: Row[] | null = null;
-  let _repoRowIndexMap: Map<number, number> = new Map();
+  let cachedRowsForMap: Row[] | null = null;
+  let repoRowIndexMap: Map<number, number> = new Map();
   const getRepoRowIndexMap = (rows: Row[]): Map<number, number> => {
-    if (rows !== _cachedRowsForMap) {
-      _cachedRowsForMap = rows;
-      _repoRowIndexMap = new Map(
+    if (rows !== cachedRowsForMap) {
+      cachedRowsForMap = rows;
+      repoRowIndexMap = new Map(
         rows.flatMap((r, i) => (r.type === "repo" ? [[r.repoIndex, i] as [number, number]] : [])),
       );
     }
-    return _repoRowIndexMap;
+    return repoRowIndexMap;
   };
 
   const getViewportHeight = (rows: Row[]) => {
