@@ -214,6 +214,22 @@ describe("buildReplayCommand", () => {
     expect(cmd).not.toContain("--regex-hint");
   });
 
+  it("includes --group-by-team-prefix-consolidate when consolidateTeamSections is true", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const opts: ReplayOptions = {
+      groupByTeamPrefix: "gamme-/squad-",
+      consolidateTeamSections: true,
+    };
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
+    expect(cmd).toContain("--group-by-team-prefix-consolidate");
+  });
+
+  it("does not include --group-by-team-prefix-consolidate when consolidateTeamSections is false (default)", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set());
+    expect(cmd).not.toContain("--group-by-team-prefix-consolidate");
+  });
+
   it("emits --pick-team for each entry in pickTeams", () => {
     const groups = [makeGroup("myorg/repoA", ["a.ts"])];
     const opts: ReplayOptions = {
@@ -477,6 +493,52 @@ describe("buildMarkdownOutput", () => {
     const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set(), "repo-only");
     expect(out).not.toContain("selected");
   });
+
+  it("renders each sectionPath entry as a heading at 2 + level (## / ###)", () => {
+    const groups: RepoGroup[] = [
+      {
+        ...makeGroup("myorg/repoA", ["a.ts"]),
+        sectionPath: [
+          { label: "gamme-client", level: 0 },
+          { label: "squad-dashboard", level: 1 },
+        ],
+      },
+    ];
+    const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set());
+    expect(out).toContain("## gamme-client");
+    expect(out).toContain("### squad-dashboard");
+  });
+
+  it("does not repeat an unchanged ancestor heading for a sibling leaf", () => {
+    const groups: RepoGroup[] = [
+      {
+        ...makeGroup("myorg/repoA", ["a.ts"]),
+        sectionPath: [
+          { label: "gamme-client", level: 0 },
+          { label: "squad-billing", level: 1 },
+        ],
+      },
+      {
+        ...makeGroup("myorg/repoB", ["b.ts"]),
+        sectionPath: [{ label: "squad-dashboard", level: 1 }],
+      },
+    ];
+    const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set());
+    expect((out.match(/^## /gm) ?? []).length).toBe(1);
+    expect((out.match(/^### /gm) ?? []).length).toBe(2);
+  });
+
+  it("caps heading depth at H6 for very deep chains", () => {
+    const groups: RepoGroup[] = [
+      {
+        ...makeGroup("myorg/repoA", ["a.ts"]),
+        sectionPath: [{ label: "deep", level: 10 }],
+      },
+    ];
+    const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set());
+    expect(out).toContain("###### deep");
+    expect(out).not.toContain("####### deep");
+  });
 });
 
 describe("buildJsonOutput", () => {
@@ -533,6 +595,45 @@ describe("buildJsonOutput", () => {
     );
     expect(parsed.results[0].repo).toBe("myorg/repoA");
     expect(parsed.results[0].matches).toBeUndefined();
+  });
+
+  it("includes the full section path on a repo tagged with sectionPath", () => {
+    const groups: RepoGroup[] = [
+      {
+        ...makeGroup("myorg/repoA", ["a.ts"]),
+        sectionPath: [
+          { label: "gamme-client", level: 0 },
+          { label: "squad-dashboard", level: 1 },
+        ],
+      },
+    ];
+    const parsed = JSON.parse(buildJsonOutput(groups, QUERY, ORG, new Set(), new Set()));
+    expect(parsed.results[0].section).toEqual(["gamme-client", "squad-dashboard"]);
+  });
+
+  it("carries the reconstructed path forward to a sibling repo missing the shared ancestor", () => {
+    const groups: RepoGroup[] = [
+      {
+        ...makeGroup("myorg/repoA", ["a.ts"]),
+        sectionPath: [
+          { label: "gamme-client", level: 0 },
+          { label: "squad-billing", level: 1 },
+        ],
+      },
+      {
+        ...makeGroup("myorg/repoB", ["b.ts"]),
+        sectionPath: [{ label: "squad-dashboard", level: 1 }],
+      },
+    ];
+    const parsed = JSON.parse(buildJsonOutput(groups, QUERY, ORG, new Set(), new Set()));
+    expect(parsed.results[0].section).toEqual(["gamme-client", "squad-billing"]);
+    expect(parsed.results[1].section).toEqual(["gamme-client", "squad-dashboard"]);
+  });
+
+  it("omits the section field when no sectionPath/sectionLabel is present", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const parsed = JSON.parse(buildJsonOutput(groups, QUERY, ORG, new Set(), new Set()));
+    expect(parsed.results[0].section).toBeUndefined();
   });
 });
 

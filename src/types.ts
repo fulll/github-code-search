@@ -42,6 +42,15 @@ export interface RepoGroup {
   /** When set, this repo is the first entry of a new team section with this
    *  label. Consumed by `buildRows` to emit a preceding section-header row. */
   sectionLabel?: string;
+  /** When set (by `flattenTeamHierarchy`), this repo is the first entry of
+   *  one or more new nested section headings — one entry per heading, each
+   *  with its own nesting `level`. Only the headings that changed since the
+   *  previous leaf are listed (siblings under an unchanged ancestor don't
+   *  repeat that ancestor's heading). Consumers that need the *full* current
+   *  path (e.g. JSON output) should maintain a running cursor: replace
+   *  `cursor.slice(0, sectionPath[0].level)` with `sectionPath` whenever it
+   *  is set. */
+  sectionPath?: { label: string; level: number }[];
   /** When set, this repo was moved from a combined section via --pick-team or
    *  interactive pick. Stores the original combined label (e.g. "squad-a + squad-b")
    *  so future split mode can identify it and offer to re-assign. */
