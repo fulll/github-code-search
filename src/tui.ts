@@ -315,10 +315,16 @@ export async function runInteractive(
         continue;
       }
 
-      // Calculate header lines (position indicator + filter bar) to adjust click coordinates
-      let headerLines = 2; // HEADER_LINES (4) - 2, positioned at top
-      if (filterMode) headerLines += 2;
-      else if (filterPath || filterTarget !== "path" || filterRegex) headerLines += 1;
+      // Calculate header lines before the first row to adjust click coordinates.
+      // Base header lines: title (1) + summary (1) + hints (1) + blank (1) = 4.
+      // Additional lines: filter bar (0-2) + sticky repo header (0-1 when cursor is on
+      // an extract whose repo scrolled above viewport).
+      let headerLines = 4; // HEADER_LINES constant from render.ts
+      if (filterMode)
+        headerLines += 2; // filter input + hints in filter mode
+      else if (filterPath || filterTarget !== "path" || filterRegex) headerLines += 1; // filter status or mode badge line
+      // Note: stickyRepoLine (0-1) would add +1 but requires complex cursor state evaluation;
+      // omitting for now — this may cause clicks to be off by 1 row when sticky repo is shown
 
       // Hit-test the click against visible rows (non-wheel buttons)
       const target = hitTestClick(
