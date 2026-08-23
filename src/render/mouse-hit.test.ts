@@ -108,36 +108,51 @@ describe("hitTestClick", () => {
       });
     });
 
-    it("does not detect select action outside checkbox zone", () => {
+    it("detects select action beyond checkbox column (double-click full width)", () => {
       const groups = [createTestGroup("org/repo")];
       const rows: Row[] = [{ type: "repo", repoIndex: 0 }];
+      // Double-click works on entire row width from CHECKBOX_COLUMN_START onwards
       const result = hitTestClick(groups, rows, 0, CHECKBOX_COLUMN_END + 1, 1);
-      expect(result?.action).not.toBe("select");
+      expect(result?.action).toBe("select");
+    });
+
+    it("detects navigate action only before checkbox zone", () => {
+      const groups = [createTestGroup("org/repo")];
+      const rows: Row[] = [{ type: "repo", repoIndex: 0 }];
+      // Column 3 is between fold (1-2) and checkbox (4+), should be navigate
+      const result = hitTestClick(groups, rows, 0, 3, 1);
+      expect(result?.action).toBe("navigate");
     });
   });
 
   // ─── Navigation Zone Tests ──────────────────────────────────────────────────
   describe("navigation zone", () => {
-    it("detects navigate action at nav zone start column", () => {
+    it("detects navigate action at separator column (column 3)", () => {
       const groups = [createTestGroup("org/repo")];
       const rows: Row[] = [{ type: "repo", repoIndex: 0 }];
-      const result = hitTestClick(groups, rows, 0, NAV_COLUMN_START, 1);
+      // Column 3 is between fold (1-2) and checkbox (4+), should be navigate
+      const result = hitTestClick(groups, rows, 0, 3, 1);
       expect(result).toEqual({
         row: rows[0],
-        column: NAV_COLUMN_START,
+        column: 3,
         action: "navigate",
       });
     });
 
-    it("detects navigate action at far right column", () => {
+    it("detects select action at nav column start (column 6) for repos", () => {
       const groups = [createTestGroup("org/repo")];
       const rows: Row[] = [{ type: "repo", repoIndex: 0 }];
+      // Column 6 and beyond is now part of checkbox zone (full-width select)
+      const result = hitTestClick(groups, rows, 0, NAV_COLUMN_START, 1);
+      expect(result?.action).toBe("select");
+    });
+
+    it("detects select action at far right column for repos", () => {
+      const groups = [createTestGroup("org/repo")];
+      const rows: Row[] = [{ type: "repo", repoIndex: 0 }];
+      // Full-width double-click from checkbox start onwards
       const result = hitTestClick(groups, rows, 0, 100, 1);
-      expect(result).toEqual({
-        row: rows[0],
-        column: 100,
-        action: "navigate",
-      });
+      expect(result?.action).toBe("select");
     });
   });
 
@@ -154,19 +169,20 @@ describe("hitTestClick", () => {
       });
     });
 
-    it("detects select action on extract row header nav zone (for double-click)", () => {
+    it("detects select action on extract row header anywhere from checkbox column onwards", () => {
       const groups = [createTestGroup("org/repo")];
       const rows: Row[] = [{ type: "extract", repoIndex: 0, extractIndex: 0 }];
-      // Click in nav zone on the first line of extract (header line)
+      // Double-click on extract works on entire header line from checkbox column onwards
       const result = hitTestClick(groups, rows, 0, NAV_COLUMN_START, 1);
       expect(result?.action).toBe("select");
     });
 
-    it("does not detect fold action on extract rows", () => {
+    it("detects select action on extract row header at far right column", () => {
       const groups = [createTestGroup("org/repo")];
       const rows: Row[] = [{ type: "extract", repoIndex: 0, extractIndex: 0 }];
-      const result = hitTestClick(groups, rows, 0, FOLD_COLUMN_START, 1);
-      expect(result?.action).not.toBe("fold");
+      // Double-click works anywhere from checkbox start
+      const result = hitTestClick(groups, rows, 0, 100, 1);
+      expect(result?.action).toBe("select");
     });
 
     it("detects navigate on non-header line of extract (continuation line)", () => {

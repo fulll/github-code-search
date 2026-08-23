@@ -57,9 +57,14 @@ describe("render/layout-constants", () => {
       expect(isClickInCheckboxZone(5)).toBe(true);
     });
 
-    it("should not detect checkbox zone outside columns 4-5", () => {
+    it("should detect checkbox zone beyond column 5 (full-width double-click)", () => {
+      // Checkbox zone now extends from column 4 to infinity (full width from checkbox start)
+      expect(isClickInCheckboxZone(6)).toBe(true);
+      expect(isClickInCheckboxZone(100)).toBe(true);
+    });
+
+    it("should not detect checkbox zone before column 4", () => {
       expect(isClickInCheckboxZone(3)).toBe(false);
-      expect(isClickInCheckboxZone(6)).toBe(false);
     });
   });
 

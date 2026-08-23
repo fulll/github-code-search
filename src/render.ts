@@ -10,7 +10,7 @@ import { visibleWidth, stripAnsi, clipToWidth } from "./render/terminal.ts";
 // ─── Re-exports ───────────────────────────────────────────────────────────────
 // Consumers (tui.ts, output.ts, tests) continue to import from render.ts.
 
-export { getHeaderLines } from "./render/layout-constants.ts";
+export { getHeaderLines, MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN } from "./render/layout-constants.ts";
 export { highlightFragment } from "./render/highlight.ts";
 export { buildFilterStats, type FilterStats } from "./render/filter.ts";
 export {

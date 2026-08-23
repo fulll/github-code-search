@@ -68,11 +68,8 @@ export function hitTestClick(
         }
       } else if (row.type === "extract") {
         // Extract row layout: "  ✓ path:line:col" (top line) or fragments
-        // Checkbox only on extract header line (first line of extract)
+        // On the extract header line, double-click from checkbox onwards is select
         if (clickedLineOffset === lineOffset && isClickInCheckboxZone(x)) {
-          action = "select";
-        } else if (clickedLineOffset === lineOffset && isClickInNavZone(x)) {
-          // Double-click anywhere on extract header line (nav zone) can toggle
           action = "select";
         }
       }

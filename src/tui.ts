@@ -26,7 +26,7 @@ import {
   isScrollCooldownActive,
   updateScrollCooldown,
 } from "./scroll-cooldown.ts";
-import { getHeaderLines } from "./render.ts";
+import { getHeaderLines, MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN } from "./render.ts";
 import { hitTestClick } from "./render/mouse-hit.ts";
 import type { FilterTarget, OutputFormat, OutputType, RepoGroup, Row } from "./types.ts";
 
@@ -48,6 +48,13 @@ const KEY_CTRL_A = "\x01";
 const KEY_CTRL_E = "\x05";
 const KEY_CTRL_W = "\x17";
 const KEY_ALT_BACKSPACE = "\x1b\x7f";
+const MOUSE_SCROLL_STEP = 3; // rows per wheel scroll
+
+// ─── Terminal mouse reporting (SGR protocol) ──────────────────────────────────
+// https://en.wikipedia.org/wiki/X11_mouse_protocol#SGR_1006_Protocol
+// Enable/disable both basic mouse support (?1000) and SGR encoding (?1006)
+const ANSI_ENABLE_MOUSE_REPORTING = "\x1b[?1000h\x1b[?1006h";
+const ANSI_DISABLE_MOUSE_REPORTING = "\x1b[?1000l\x1b[?1006l";
 const KEY_CTRL_ARROW_LEFT = "\x1b[1;5D";
 const KEY_CTRL_ARROW_RIGHT = "\x1b[1;5C";
 const KEY_ALT_ARROW_LEFT = "\x1b[1;3D"; // Alt/Option+← (xterm, iTerm2 with Use Option as Meta key)
@@ -142,7 +149,7 @@ export async function runInteractive(
   process.stdin.setRawMode(true);
   readline.emitKeypressEvents(process.stdin);
   // Enable SGR mouse reporting on the terminal
-  process.stdout.write("\x1b[?1000h\x1b[?1006h");
+  process.stdout.write(ANSI_ENABLE_MOUSE_REPORTING);
 
   let cursor = 0;
   let scrollOffset = 0;
@@ -288,7 +295,7 @@ export async function runInteractive(
   // ─── Exit handler for cleanup ────────────────────────────────────────────
   const exit = () => {
     // Disable SGR mouse reporting and clear terminal
-    process.stdout.write("\x1b[?1000l\x1b[?1006l");
+    process.stdout.write(ANSI_DISABLE_MOUSE_REPORTING);
     process.stdout.write(ANSI_CLEAR);
     if (statsDebounceTimer !== null) clearTimeout(statsDebounceTimer);
     process.stdin.setRawMode(false);
@@ -321,16 +328,16 @@ export async function runInteractive(
       }
 
       // Handle wheel scroll
-      if (mouseEvent.button === 64) {
-        // Wheel up — scroll up by a small step (3 rows)
-        scrollOffset = Math.max(0, scrollOffset - 3);
+      if (mouseEvent.button === MOUSE_BUTTON_WHEEL_UP) {
+        // Wheel up — scroll up by a small step
+        scrollOffset = Math.max(0, scrollOffset - MOUSE_SCROLL_STEP);
         scrollOffset = normalizeScrollOffset(scrollOffset, rows, groups, getViewportHeight(rows));
         scrollCooldownState = recordScroll(scrollCooldownState);
         redraw();
         continue;
-      } else if (mouseEvent.button === 65) {
-        // Wheel down — scroll down by a small step (3 rows)
-        scrollOffset = Math.min(Math.max(0, rows.length - 1), scrollOffset + 3);
+      } else if (mouseEvent.button === MOUSE_BUTTON_WHEEL_DOWN) {
+        // Wheel down — scroll down by a small step
+        scrollOffset = Math.min(Math.max(0, rows.length - 1), scrollOffset + MOUSE_SCROLL_STEP);
         scrollOffset = normalizeScrollOffset(scrollOffset, rows, groups, getViewportHeight(rows));
         scrollCooldownState = recordScroll(scrollCooldownState);
         redraw();

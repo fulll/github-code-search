@@ -25,6 +25,12 @@ export function getHeaderLines(filterMode: boolean, hasActiveFilter: boolean): n
   return total;
 }
 
+// ─── Mouse Button Codes (SGR mouse protocol) ─────────────────────────────────
+// https://en.wikipedia.org/wiki/X11_mouse_protocol#SGR_1006_Protocol
+export const MOUSE_BUTTON_WHEEL_UP = 64;
+export const MOUSE_BUTTON_WHEEL_DOWN = 65;
+const MOUSE_SCROLL_STEP = 3; // rows per wheel scroll
+
 // ─── Mouse Hit-Testing: Column Layout ──────────────────────────────────────────
 // Terminal row columns (1-indexed per SGR protocol):
 // Repo row:  "▸ ✓ repo-name"
@@ -52,11 +58,11 @@ export function isClickInFoldZone(x: number): boolean {
 }
 
 /**
- * Determine if a click at column `x` is in the checkbox zone.
- * Both repo and extract rows have checkbox at columns 4-5.
+ * Determine if a click at column `x` is in the checkbox/select zone.
+ * Checkbox emoji starts at column 4; double-click works on entire row from there.
  */
 export function isClickInCheckboxZone(x: number): boolean {
-  return x >= CHECKBOX_COLUMN_START && x <= CHECKBOX_COLUMN_END;
+  return x >= CHECKBOX_COLUMN_START;
 }
 
 /**
