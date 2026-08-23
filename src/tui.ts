@@ -295,6 +295,11 @@ export async function runInteractive(
     // Try parsing as a mouse event; if it's not a mouse event, treat as keyboard input
     const mouseEvent = parseMouseEvent(key);
     if (mouseEvent !== null) {
+      // Ignore mouse release events; only act on press (M)
+      if (mouseEvent.isRelease) {
+        continue;
+      }
+
       // Handle wheel scroll
       if (mouseEvent.button === 64) {
         // Wheel up — scroll up by a small step (3 rows)
@@ -310,8 +315,20 @@ export async function runInteractive(
         continue;
       }
 
+      // Calculate header lines (position indicator + filter bar) to adjust click coordinates
+      let headerLines = 2; // HEADER_LINES (4) - 2, positioned at top
+      if (filterMode) headerLines += 2;
+      else if (filterPath || filterTarget !== "path" || filterRegex) headerLines += 1;
+
       // Hit-test the click against visible rows (non-wheel buttons)
-      const target = hitTestClick(groups, rows, scrollOffset, mouseEvent.x, mouseEvent.y);
+      const target = hitTestClick(
+        groups,
+        rows,
+        scrollOffset,
+        mouseEvent.x,
+        mouseEvent.y,
+        headerLines,
+      );
       if (target !== null) {
         const row = target.row;
         if (target.action === "fold" && row.type === "repo") {

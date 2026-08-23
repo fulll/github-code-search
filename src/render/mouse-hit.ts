@@ -15,6 +15,7 @@ export interface ClickTarget {
  *
  * Returns a ClickTarget if the click lands on a valid row; null if out of bounds.
  * Coordinates (x, y) are 1-indexed (terminal convention).
+ * headerLines: number of header lines before the first row (position indicator + filter bar).
  *
  * Actions:
  *   - "fold" on repo rows: click lands on the ▸/▾ column (column 0)
@@ -27,9 +28,11 @@ export function hitTestClick(
   scrollOffset: number,
   x: number,
   y: number,
+  headerLines: number = 0,
 ): ClickTarget | null {
-  // Convert 1-indexed terminal coordinates to 0-indexed row list
-  const clickedRowIndex = y - 1;
+  // Convert 1-indexed terminal coordinates to 0-indexed row list,
+  // accounting for header lines (filter bar, position indicator)
+  const clickedRowIndex = y - 1 - headerLines;
   if (clickedRowIndex < 0 || clickedRowIndex >= rows.length) return null;
 
   // Calculate cumulative line heights to find which row was clicked
