@@ -240,6 +240,9 @@ export async function runInteractive(
   // Persistent rows reference — updated on every redraw so it's available in the event loop
   let rows: Row[] = [];
 
+  // Flag to signal when to exit the event loop
+  let shouldExit = false;
+
   // Mouse double-click detection state
   const DOUBLE_CLICK_DELAY = 300; // milliseconds
   let lastClickTime = 0;
@@ -298,13 +301,16 @@ export async function runInteractive(
 
   // ─── Exit handler for cleanup ────────────────────────────────────────────
   const exit = () => {
-    // Disable SGR mouse reporting and clear terminal
+    // Disable SGR mouse reporting and clear terminal.
+    // This ensures the terminal returns to normal mode before process exits.
     process.stdout.write(ANSI_DISABLE_MOUSE_REPORTING);
     process.stdout.write(ANSI_CLEAR);
     if (statsDebounceTimer !== null) clearTimeout(statsDebounceTimer);
     process.stdin.setRawMode(false);
     process.off("SIGWINCH", onResize);
-    process.exit(0);
+    // Set flag to break out of the event loop and allow stdout buffer to flush
+    // before process termination. process.exit() may terminate too early.
+    shouldExit = true;
   };
 
   // ─── Live terminal resize handler ────────────────────────────────────────
@@ -647,9 +653,13 @@ export async function runInteractive(
         redraw();
         continue;
       }
+      // Disable SGR mouse reporting and cleanup before printing output.
+      // This must happen BEFORE console.log to ensure the terminal is in normal mode.
+      process.stdout.write(ANSI_DISABLE_MOUSE_REPORTING);
       process.stdout.write(ANSI_CLEAR);
       process.stdin.setRawMode(false);
       process.off("SIGWINCH", onResize);
+      if (statsDebounceTimer !== null) clearTimeout(statsDebounceTimer);
       console.log(
         buildOutput(groups, query, org, excludedRepos, excludedExtractRefs, format, outputType, {
           includeArchived,
@@ -659,7 +669,9 @@ export async function runInteractive(
           pickTeams: Object.keys(confirmedPicks).length > 0 ? confirmedPicks : undefined,
         }),
       );
-      process.exit(0);
+      // Break out of the event loop to allow stdout buffer to flush before exit
+      shouldExit = true;
+      break;
     }
 
     // `h` / `?` / Esc — toggle help overlay (Esc closes only, h/? toggle)
@@ -900,5 +912,10 @@ export async function runInteractive(
     }
 
     redraw();
+
+    // Break out of the event loop if exit was requested
+    if (shouldExit) {
+      break;
+    }
   }
 }
