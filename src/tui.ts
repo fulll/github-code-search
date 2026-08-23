@@ -19,6 +19,7 @@ import {
   flattenTeamSections,
   rebuildTeamSections,
 } from "./group.ts";
+import { parseMouseEvent } from "./render/mouse.ts";
 import type { FilterTarget, OutputFormat, OutputType, RepoGroup, Row } from "./types.ts";
 
 // ─── Key binding constants ────────────────────────────────────────────────────
@@ -127,6 +128,8 @@ export async function runInteractive(
 
   process.stdin.setRawMode(true);
   readline.emitKeypressEvents(process.stdin);
+  // Enable SGR mouse reporting on the terminal
+  process.stdout.write("\x1b[?1000h\x1b[?1006h");
 
   let cursor = 0;
   let scrollOffset = 0;
@@ -261,6 +264,8 @@ export async function runInteractive(
 
   // ─── Exit handler for cleanup ────────────────────────────────────────────
   const exit = () => {
+    // Disable SGR mouse reporting and clear terminal
+    process.stdout.write("\x1b[?1000l\x1b[?1006l");
     process.stdout.write(ANSI_CLEAR);
     process.stdin.setRawMode(false);
     process.off("SIGWINCH", onResize);
@@ -282,6 +287,13 @@ export async function runInteractive(
 
   for await (const chunk of process.stdin) {
     const key = chunk.toString();
+
+    // Try parsing as a mouse event; if it's not a mouse event, treat as keyboard input
+    const mouseEvent = parseMouseEvent(key);
+    if (mouseEvent !== null) {
+      // Mouse events are silently ignored for now; this hook is here for future #170 / #168
+      continue;
+    }
 
     // Reset the gg pending state on every key that isn't a sequence of one
     // or more plain "g" characters. This allows terminals that batch key
