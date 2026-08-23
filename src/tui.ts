@@ -108,6 +108,11 @@ function openInBrowser(url: string): void {
 
 // ─── Interactive TUI ─────────────────────────────────────────────────────────
 
+/** Compute a unique key for a row to detect double-clicks. */
+function getRowKey(row: Row): string {
+  return `${row.type}:${row.repoIndex}:${row.extractIndex ?? -1}`;
+}
+
 export async function runInteractive(
   groups: RepoGroup[],
   query: string,
@@ -217,7 +222,11 @@ export async function runInteractive(
   // Persistent rows reference — updated on every redraw so it's available in the event loop
   let rows: Row[] = [];
 
-  /** Schedule a debounced stats recompute (while typing in filter bar). */
+  // Mouse double-click detection state
+  const DOUBLE_CLICK_DELAY = 300; // milliseconds
+  let lastClickTime = 0;
+  let lastClickRowKey: string | null = null;
+
   const scheduleStatsUpdate = () => {
     if (statsDebounceTimer !== null) clearTimeout(statsDebounceTimer);
     filterLiveStats = null; // show "…" while typing fast
@@ -337,24 +346,34 @@ export async function runInteractive(
       );
       if (target !== null) {
         const row = target.row;
-        if (target.action === "fold" && row.type === "repo") {
-          // Toggle fold for this repo
-          const group = groups[row.repoIndex];
-          group.folded = !group.folded;
-          redraw();
-        } else if (target.action === "select") {
-          if (row.type === "repo") {
-            // Toggle repo selection
+        const rowKey = getRowKey(row);
+        const now = Date.now();
+        const isDoubleClick =
+          lastClickRowKey === rowKey && now - lastClickTime < DOUBLE_CLICK_DELAY;
+
+        // Update last click state for next click detection
+        lastClickTime = now;
+        lastClickRowKey = rowKey;
+
+        if (isDoubleClick) {
+          // Double-click: apply the action (fold or select)
+          if (target.action === "fold" && row.type === "repo") {
             const group = groups[row.repoIndex];
-            group.repoSelected = !group.repoSelected;
-          } else if (row.type === "extract" && row.extractIndex !== undefined) {
-            // Toggle extract selection
-            const group = groups[row.repoIndex];
-            group.extractSelected[row.extractIndex] = !group.extractSelected[row.extractIndex];
+            group.folded = !group.folded;
+            redraw();
+          } else if (target.action === "select") {
+            if (row.type === "repo") {
+              const group = groups[row.repoIndex];
+              group.repoSelected = !group.repoSelected;
+            } else if (row.type === "extract" && row.extractIndex !== undefined) {
+              const group = groups[row.repoIndex];
+              group.extractSelected[row.extractIndex] = !group.extractSelected[row.extractIndex];
+            }
+            redraw();
           }
-          redraw();
-        } else if (target.action === "navigate") {
-          // Move cursor to this row
+          // If action is "navigate", double-click does nothing (navigate already happened on single click)
+        } else {
+          // Simple-click: always navigate to this row
           const rowIndex = rows.findIndex((r) => r === row);
           if (rowIndex >= 0) {
             cursor = rowIndex;

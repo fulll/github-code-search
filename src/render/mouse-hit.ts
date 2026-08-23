@@ -30,24 +30,22 @@ export function hitTestClick(
   y: number,
   headerLines: number = 0,
 ): ClickTarget | null {
-  // Convert 1-indexed terminal coordinates to 0-indexed row list,
+  // Convert 1-indexed terminal coordinates to 0-indexed offset within visible rows,
   // accounting for header lines (filter bar, position indicator)
-  const clickedRowIndex = y - 1 - headerLines;
-  if (clickedRowIndex < 0 || clickedRowIndex >= rows.length) return null;
+  const clickedLineOffset = y - 1 - headerLines;
+  if (clickedLineOffset < 0) return null;
 
   // Calculate cumulative line heights to find which row was clicked
+  // Iterate only through visible rows (starting from scrollOffset)
   let lineOffset = 0;
-  for (let i = 0; i < rows.length; i++) {
+  for (let i = scrollOffset; i < rows.length; i++) {
     const row = rows[i];
     const group = groups[row.repoIndex] ?? undefined;
     const h = rowTerminalLines(group, row);
 
-    if (lineOffset <= clickedRowIndex && clickedRowIndex < lineOffset + h) {
+    if (lineOffset <= clickedLineOffset && clickedLineOffset < lineOffset + h) {
       // This row was clicked
-      // Column 0 is the fold arrow (for repo rows)
-      // Column ~2 is the checkbox (after "▸ " or "  ")
-      // For extract rows, the checkbox offset is slightly different based on line type
-
+      // Determine action based on column position and row type
       let action: "fold" | "select" | "navigate" = "navigate";
 
       if (row.type === "repo") {
@@ -59,9 +57,10 @@ export function hitTestClick(
           action = "select";
         }
       } else if (row.type === "extract") {
-        // Extract row layout: "  ✓ path:line:col"
-        // Checkbox at column 2 (after "  ")
-        if (x === 2) {
+        // Extract row layout: "  ✓ path:line:col" (top line) or fragments
+        // Checkbox at column 2 (after "  ") on the extract header line only
+        if (clickedLineOffset === lineOffset && x === 2) {
+          // Only the first line of an extract has a clickable checkbox
           action = "select";
         }
       }
