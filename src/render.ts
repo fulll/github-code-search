@@ -474,9 +474,9 @@ export function renderGroups(
       const checkbox = g.repoSelected ? style.green("✓") : style.dim("✓");
       // Fix: clip to termWidth so the sticky line never wraps — see issue #105.
       stickyRepoLine = clipToWidth(
-        style.dim(
-          `▲ ${checkbox} ${style.bold(g.repoFullName)} ${style.dim(buildMatchCountLabel(g))}`,
-        ),
+        `${style.dim(`▲ ${checkbox} `)}${style.style(["dim", "bold"], `${g.repoFullName} `)}${style.dim(
+          buildMatchCountLabel(g),
+        )}`,
         termWidth,
       );
       lines.push(stickyRepoLine);
