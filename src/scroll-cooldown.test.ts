@@ -15,16 +15,16 @@ describe("scroll-cooldown", () => {
 
   it("should mark cooldown active after recording a scroll", () => {
     const state = createScrollCooldownState();
-    const now = Date.now();
-    const updated = recordScroll(state);
+    const now = 1000;
+    const updated = recordScroll(state, now);
     expect(updated.isActive).toBe(true);
     expect(updated.lastScrollTime).toBe(now);
   });
 
   it("should report cooldown active immediately after scroll", () => {
     const state = createScrollCooldownState();
-    const now = Date.now();
-    const updated = recordScroll(state);
+    const now = 1000;
+    const updated = recordScroll(state, now);
     expect(isScrollCooldownActive(updated, now)).toBe(true);
   });
 

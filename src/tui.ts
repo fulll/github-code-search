@@ -384,6 +384,11 @@ export async function runInteractive(
         lastClickTime = now;
         lastClickRowKey = rowKey;
 
+        // Mouse click semantics (see docs/usage/interactive-mode.md § Mouse support):
+        // - Single-click: always navigate (move cursor) to the clicked row.
+        // - Double-click: apply the zone-specific action (fold or select).
+        //   This is a UX feature that complements keyboard shortcuts (arrow keys for
+        //   navigation, spacebar for selection, arrow keys for fold/unfold).
         if (isDoubleClick) {
           // Double-click: apply the action (fold or select)
           if (target.action === "fold" && row.type === "repo") {
@@ -406,7 +411,7 @@ export async function runInteractive(
           }
           // If action is "navigate", double-click does nothing (navigate already happened on single click)
         } else {
-          // Simple-click: always navigate to this row
+          // Single-click: always navigate to this row
           const rowIndex = rows.findIndex((r) => r === row);
           if (rowIndex >= 0) {
             cursor = rowIndex;

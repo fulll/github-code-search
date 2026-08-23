@@ -17,10 +17,13 @@ export function createScrollCooldownState(): ScrollCooldownState {
   };
 }
 
-export function recordScroll(state: ScrollCooldownState): ScrollCooldownState {
+export function recordScroll(
+  state: ScrollCooldownState,
+  now: number = Date.now(),
+): ScrollCooldownState {
   return {
     ...state,
-    lastScrollTime: Date.now(),
+    lastScrollTime: now,
     isActive: true,
   };
 }
