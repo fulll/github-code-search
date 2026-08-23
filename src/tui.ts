@@ -1,4 +1,4 @@
-import pc from "picocolors";
+import * as style from "./style.ts";
 import * as readline from "readline";
 import {
   applySelectAll,
@@ -146,7 +146,7 @@ export async function runInteractive(
   initialPickTeams: Record<string, string> = {},
 ): Promise<void> {
   if (groups.length === 0) {
-    console.log(pc.yellow("No results found."));
+    console.log(style.yellow("No results found."));
     return;
   }
 

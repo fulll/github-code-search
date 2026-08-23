@@ -29,7 +29,7 @@ Custom components live in `docs/.vitepress/theme/`:
 1. Locate the `.vue` file above.
 2. Follow the existing scoped `<style>` conventions (no global selectors inside `<style scoped>`).
 3. Add responsive styles inside the component's `<style>` or in `custom.css` if the rule is global.
-4. Never import additional NPM packages for styling — only `picocolors` (CLI) and VitePress built-ins.
+4. Never import additional NPM packages for styling — only `src/style.ts` (CLI, wraps `node:util`'s `styleText`) and VitePress built-ins.
 
 ---
 

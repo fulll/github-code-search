@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { visibleWidth, stripAnsi, clipToWidth, hasAnsi } from "./terminal";
-import pc from "picocolors";
+import * as style from "../style.ts";
 
 describe("render/terminal", () => {
   describe("visibleWidth", () => {
@@ -11,7 +11,7 @@ describe("render/terminal", () => {
 
     it("ignores ANSI escape codes in measurement", () => {
       expect(visibleWidth("\u001b[31mhello\u001b[0m")).toBe(5);
-      expect(visibleWidth(pc.red("world"))).toBe(5);
+      expect(visibleWidth(style.red("world"))).toBe(5);
     });
 
     it("handles single-width emoji", () => {
@@ -44,7 +44,7 @@ describe("render/terminal", () => {
     });
 
     it("handles mixed content: colored text, wide chars, and CJK", () => {
-      const mixed = pc.bold("\u001b[35mhello\u{1F50D}\u{524D}\u{7AEF}");
+      const mixed = style.bold("\u001b[35mhello\u{1F50D}\u{524D}\u{7AEF}");
       // 5 (hello) + 2 (emoji) + 4 (CJK) = 11, ANSI codes ignored
       expect(visibleWidth(mixed)).toBe(11);
     });
@@ -53,7 +53,7 @@ describe("render/terminal", () => {
   describe("stripAnsi", () => {
     it("removes SGR color codes", () => {
       expect(stripAnsi("\u001b[31mred\u001b[0m")).toBe("red");
-      expect(stripAnsi(pc.red("text"))).toBe("text");
+      expect(stripAnsi(style.red("text"))).toBe("text");
     });
 
     it("removes bold codes", () => {
@@ -103,7 +103,7 @@ describe("render/terminal", () => {
     });
 
     it("preserves ANSI codes and closes them correctly", () => {
-      const colored = pc.red("hello world");
+      const colored = style.red("hello world");
       const result = clipToWidth(colored, 5);
       const plain = stripAnsi(result);
       expect(plain).toBe("hello");
@@ -152,7 +152,7 @@ describe("render/terminal", () => {
 
   describe("hasAnsi", () => {
     it("returns true for colored text", () => {
-      expect(hasAnsi(pc.red("text"))).toBe(true);
+      expect(hasAnsi(style.red("text"))).toBe(true);
       expect(hasAnsi("\u001b[31mred\u001b[0m")).toBe(true);
     });
 
@@ -162,7 +162,7 @@ describe("render/terminal", () => {
     });
 
     it("returns true for styled text", () => {
-      expect(hasAnsi(pc.bold("bold"))).toBe(true);
+      expect(hasAnsi(style.bold("bold"))).toBe(true);
       expect(hasAnsi("\u001b[1mbold\u001b[22m")).toBe(true);
     });
 
@@ -172,7 +172,7 @@ describe("render/terminal", () => {
     });
 
     it("handles mixed emoji and ANSI", () => {
-      expect(hasAnsi(pc.red("\u{1F50D}"))).toBe(true);
+      expect(hasAnsi(style.red("\u{1F50D}"))).toBe(true);
     });
   });
 });
