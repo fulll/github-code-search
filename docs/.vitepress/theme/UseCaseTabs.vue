@@ -55,7 +55,7 @@ const USE_CASES: UseCase[] = [
     label: "Semver / version audit",
     headline: "Which repos are pinned to a vulnerable minor version?",
     description:
-      "Use regex syntax to target a precise version range — something a plain keyword search cannot do. Find every repo still locked to axios 1.x, react 17.x, or any other outdated pin, then export the list to a migration issue.",
+      "Use regex syntax to target a precise version range, something a plain keyword search cannot do. Find every repo still locked to axios 1.x, react 17.x, or any other outdated pin, then export the list to a migration issue. The CLI automatically escapes the double quotes in the pattern so the search stays precise instead of matching every unrelated mention of axios or react.",
     command: `github-code-search query '/"axios": "1\\./' --org my-org`,
   },
 ];
