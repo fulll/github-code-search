@@ -27,23 +27,32 @@ function isEscapedQuote(s: string, index: number): boolean {
 }
 
 /**
- * Validates that a plain-text (non-regex) query has a balanced number of
- * unescaped `"` characters, as required by GitHub's query syntax — an odd
- * count is rejected by the API with an opaque
- * `ERROR_TYPE_QUERY_PARSING_FATAL` 422 error.
+ * Validates that a plain-text query has a balanced number of unescaped `"`
+ * characters, as required by GitHub's query syntax — an odd count is
+ * rejected by the API with an opaque `ERROR_TYPE_QUERY_PARSING_FATAL` 422
+ * error.
  *
- * Returns `null` when the query is valid (including regex queries, whose
- * `/pattern/` token is validated separately by `buildApiQuery`). Returns a
- * human-readable error message — including a corrected example using
- * GitHub's documented double-escaping syntax — when the query would be
- * rejected by the API. See issue #149.
+ * Quotes inside a `/pattern/` regex token are excluded from this check: they
+ * are handled separately by `buildApiQuery`/`extractApiTerm`, which escapes
+ * them for the API term. Only the token itself is excluded, not the rest of
+ * the query — a mixed query like `filename:package.json /regex/ "oops` must
+ * still be caught, since the stray quote outside the token would otherwise
+ * reach the GitHub API unbalanced. See issue #149.
+ *
+ * Returns `null` when the query is valid. Returns a human-readable error
+ * message — including a corrected example using GitHub's documented
+ * double-escaping syntax — when the query would be rejected by the API.
  */
 export function validateQuoteBalance(query: string): string | null {
-  if (isRegexQuery(query)) return null;
+  const token = extractRegexToken(query);
+  const outsideToken =
+    token === null
+      ? query
+      : query.slice(0, token.index) + query.slice(token.index + token.raw.length);
 
   let unescapedCount = 0;
-  for (let i = 0; i < query.length; i++) {
-    if (query[i] === '"' && !isEscapedQuote(query, i)) unescapedCount++;
+  for (let i = 0; i < outsideToken.length; i++) {
+    if (outsideToken[i] === '"' && !isEscapedQuote(outsideToken, i)) unescapedCount++;
   }
   if (unescapedCount % 2 === 0) return null;
 
