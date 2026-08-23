@@ -334,3 +334,80 @@ describe("aggregate — regexFilter", () => {
     expect(groups[0].matches[0].textMatches[0].fragment).toBe("import axios from 'axios'");
   });
 });
+
+// ─── aggregate — fileContent fallback (issue #148) ────────────────────────────
+
+describe("aggregate — regexFilter fallback to full fileContent", () => {
+  it("keeps a match whose API fragment does not contain the full regex match but whose fileContent does", () => {
+    // The API fragment only shows a narrower context (e.g. "react-dom" noise);
+    // the regex needs "react": "18 which only the full file content has.
+    const fileContent =
+      'deps:\n  "prettier": "latest",\n  "react": "18.2.0",\n  "react-dom": "18.2.0"\n';
+    const matches: CodeMatch[] = [
+      {
+        path: "package.json",
+        repoFullName: "myorg/repoA",
+        htmlUrl: "https://github.com/myorg/repoA/blob/main/package.json",
+        archived: false,
+        fileContent,
+        textMatches: [{ fragment: '"react-dom": "18.2.0"', matches: [] }],
+      },
+    ];
+
+    const groups = aggregate(matches, new Set(), new Set(), false, /"react": "18/);
+    expect(groups).toHaveLength(1);
+    const tm = groups[0].matches[0].textMatches[0];
+    expect(tm.fragment).toContain('"react": "18');
+    expect(tm.matches[0].text).toBe('"react": "18');
+  });
+
+  it("drops the match when neither the fragment nor fileContent contain a match", () => {
+    const matches: CodeMatch[] = [
+      {
+        path: "package.json",
+        repoFullName: "myorg/repoA",
+        htmlUrl: "",
+        archived: false,
+        fileContent: 'deps:\n  "vue": "3.0.0"\n',
+        textMatches: [{ fragment: '"vue": "3.0.0"', matches: [] }],
+      },
+    ];
+
+    const groups = aggregate(matches, new Set(), new Set(), false, /"react": "18/);
+    expect(groups).toHaveLength(0);
+  });
+
+  it("does not use fileContent when the API fragment already matches (no behaviour change)", () => {
+    const fileContent = 'deps:\n  "react": "18.2.0"\n';
+    const matches: CodeMatch[] = [
+      {
+        path: "package.json",
+        repoFullName: "myorg/repoA",
+        htmlUrl: "",
+        archived: false,
+        fileContent,
+        textMatches: [{ fragment: '"react": "18.2.0"', matches: [] }],
+      },
+    ];
+
+    const groups = aggregate(matches, new Set(), new Set(), false, /"react": "18/);
+    expect(groups[0].matches[0].textMatches[0].fragment).toBe('"react": "18.2.0"');
+  });
+
+  it("falls back to fragment-only behaviour (drops the match) when fileContent is absent", () => {
+    // Backward compatibility: no fileContent field at all (e.g. raw content
+    // fetch failed) behaves exactly as before this issue's fix.
+    const matches: CodeMatch[] = [
+      {
+        path: "package.json",
+        repoFullName: "myorg/repoA",
+        htmlUrl: "",
+        archived: false,
+        textMatches: [{ fragment: '"react-dom": "18.2.0"', matches: [] }],
+      },
+    ];
+
+    const groups = aggregate(matches, new Set(), new Set(), false, /"react": "18/);
+    expect(groups).toHaveLength(0);
+  });
+});

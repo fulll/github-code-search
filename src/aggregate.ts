@@ -79,6 +79,43 @@ function recomputeSegments(
 
 // ─── Aggregation ─────────────────────────────────────────────────────────────
 
+/**
+ * Extracts a small multi-line window of `content` around the 1-based line
+ * `matchLine`, mirroring the size of context GitHub's own fragment field
+ * typically provides. Used to build a display-friendly fallback `TextMatch`
+ * when the API-provided fragment does not contain a match but the full
+ * downloaded file content does — see issue #148.
+ */
+function sliceContextWindow(
+  content: string,
+  matchLine: number,
+  contextLines = 2,
+): { fragment: string; fragmentStartLine: number } {
+  const lines = content.split("\n");
+  const startLine = Math.max(1, matchLine - contextLines);
+  const endLine = Math.min(lines.length, matchLine + contextLines);
+  return {
+    fragment: lines.slice(startLine - 1, endLine).join("\n"),
+    fragmentStartLine: startLine,
+  };
+}
+
+/**
+ * Finds the 1-based line numbers where `re` matches within `content`.
+ * `re` must be a global RegExp; its `lastIndex` is reset before use.
+ */
+function findMatchLines(content: string, re: RegExp): Set<number> {
+  re.lastIndex = 0;
+  const lines = new Set<number>();
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(content)) !== null) {
+    const before = content.slice(0, m.index);
+    lines.add((before.match(/\n/g)?.length ?? 0) + 1);
+    if (m[0].length === 0) re.lastIndex++;
+  }
+  return lines;
+}
+
 export function aggregate(
   matches: CodeMatch[],
   excludedRepos: Set<string>,
@@ -107,7 +144,7 @@ export function aggregate(
       // Preserve the caller's lastIndex: aggregate() must not have observable
       // side-effects on the passed-in RegExp instance.
       const savedLastIndex = regexFilter!.lastIndex;
-      const updatedTextMatches: TextMatch[] = m.textMatches
+      let updatedTextMatches: TextMatch[] = m.textMatches
         .map((tm) => {
           // Derive the absolute start line of this fragment from the first API
           // segment. If no API segment is available, fall back to 1 so that
@@ -124,6 +161,20 @@ export function aggregate(
           return segs.length > 0 ? { fragment: tm.fragment, matches: segs } : null;
         })
         .filter((tm): tm is TextMatch => tm !== null);
+      // Fix: fall back to the full downloaded file content when none of the
+      // API-provided fragments contain a match — the API fragment can be too
+      // narrow to include the whole regex match even though the file does
+      // contain it, silently dropping otherwise-valid results — see issue #148.
+      if (updatedTextMatches.length === 0 && m.fileContent) {
+        const fileContent = m.fileContent;
+        updatedTextMatches = [...findMatchLines(fileContent, globalRe)]
+          .map((matchLine) => {
+            const { fragment, fragmentStartLine } = sliceContextWindow(fileContent, matchLine);
+            const segs = recomputeSegments(fragment, globalRe, fragmentStartLine);
+            return segs.length > 0 ? { fragment, matches: segs } : null;
+          })
+          .filter((tm): tm is TextMatch => tm !== null);
+      }
       // Restore the caller's original lastIndex (rather than hard-coding 0),
       // so aggregate() doesn't have observable side effects on its inputs.
       regexFilter!.lastIndex = savedLastIndex;

@@ -278,6 +278,10 @@ export async function fetchAllResults(
       htmlUrl: item.html_url,
       archived: item.repository.archived === true,
       isTemplate: item.repository.is_template === true,
+      // Propagate the already-downloaded content for local regex filtering
+      // fallback — see issue #148. No extra network calls: reuses the content
+      // fetched above for line-number resolution.
+      fileContent,
       textMatches: (item.text_matches ?? []).map((m) => {
         const fragment: string = m.fragment ?? "";
         const fragmentStartLine = fileContent ? computeFragmentStartLine(fileContent, fragment) : 1;

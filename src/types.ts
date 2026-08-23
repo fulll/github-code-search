@@ -22,6 +22,11 @@ export interface CodeMatch {
   textMatches: TextMatch[];
   archived: boolean;
   isTemplate?: boolean;
+  /** Full raw file content, when already downloaded by `fetchAllResults()` for
+   *  line-number resolution. Used as a fallback for local regex filtering
+   *  when the API-provided fragment does not contain the full match — see
+   *  issue #148. Absent when the raw content could not be fetched. */
+  fileContent?: string;
 }
 
 export interface RepoGroup {
