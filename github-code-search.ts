@@ -465,15 +465,22 @@ async function searchAction(
     // Race against a 2 s timeout so slow networks never delay the exit.
     // Fix: use AbortController so the in-flight fetch is actually cancelled on timeout.
     const updateAbortController = new AbortController();
+    // Fix: the losing Promise.race branch's timer is never cleared, and by default
+    // keeps the process alive until it fires — causing a ~2 s exit delay on every
+    // non-interactive run even when checkForUpdate resolves instantly. unref() lets
+    // the process exit as soon as the real work is done; clearTimeout on the winning
+    // path avoids a stray abort() firing after we've already moved on.
+    let updateCheckTimer!: ReturnType<typeof setTimeout>;
     const latestTag = await Promise.race([
       checkForUpdate(VERSION, GITHUB_TOKEN, updateAbortController.signal),
-      new Promise<null>((res) =>
-        setTimeout(() => {
+      new Promise<null>((res) => {
+        updateCheckTimer = setTimeout(() => {
           updateAbortController.abort();
           res(null);
-        }, 2000),
-      ),
+        }, 2000).unref();
+      }),
     ]).catch(() => null);
+    clearTimeout(updateCheckTimer);
     if (latestTag) {
       const w = 55;
       // Fix: compute all widths from totalWidth so corners always align.
