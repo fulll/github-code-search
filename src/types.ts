@@ -64,6 +64,10 @@ export interface Row {
   extractIndex?: number;
   /** Populated only for `type === "section"` rows. */
   sectionLabel?: string;
+  /** Nesting depth for `type === "section"` rows produced from a
+   *  `groupByTeamHierarchy` tree (0, 1, 2, …). Rows from the flat
+   *  `groupByTeamPrefix` path are always level 0. Defaults to 0 when unset. */
+  sectionLevel?: number;
 }
 
 /**

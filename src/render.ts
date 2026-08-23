@@ -508,9 +508,15 @@ export function renderGroups(
       // is the very first row rendered — see issue #105.
       const sectionCost = usedLines === 0 ? 1 : 2;
       if (sectionCost + usedLines > viewportHeight && usedLines > 0) break;
+      // Nested hierarchy headings (from groupByTeamHierarchy) are indented
+      // 2 spaces per level; flat groupByTeamPrefix sections are always
+      // level 0 (no indent) — see issue #180.
+      const level = row.sectionLevel ?? 0;
+      const indent = "  ".repeat(level);
       // Fix: clip section label to termWidth so the label line never wraps.
-      // "── " prefix is 3 visible chars + 1 trailing space = 4 chars total.
-      const SECTION_FIXED = 4; // "── " (3) + trailing " " (1)
+      // "── " prefix is 3 visible chars + 1 trailing space = 4 chars total,
+      // plus the per-level indent consumed before it.
+      const SECTION_FIXED = 4 + indent.length; // "── " (3) + trailing " " (1) + indent
       const maxLabelChars = Math.max(0, termWidth - SECTION_FIXED);
       if (maxLabelChars === 0) {
         if (usedLines > 0) lines.push(""); // blank separator when not first
@@ -529,8 +535,12 @@ export function renderGroups(
       const pickMode = opts.teamPickMode;
       if (pickMode?.active && pickMode.sectionLabel === row.sectionLabel) {
         // Fix: clip pick bar to (termWidth - 3) so "── " + bar never wraps — see issue #121.
-        const bar = renderTeamPickHeader(pickMode.candidates, pickMode.focusedIndex, termWidth - 3);
-        lines.push(`${style.style(["magenta", "bold"], "── ")}${bar}`);
+        const bar = renderTeamPickHeader(
+          pickMode.candidates,
+          pickMode.focusedIndex,
+          termWidth - 3 - indent.length,
+        );
+        lines.push(`${indent}${style.style(["magenta", "bold"], "── ")}${bar}`);
       } else if (isActiveSectionCursor) {
         const isMultiTeam = (row.sectionLabel ?? "").includes(" + ");
         if (isMultiTeam) {
@@ -556,13 +566,13 @@ export function renderGroups(
             }
           }
           lines.push(
-            `${style.style(["bgMagenta", "bold"], `── ${activeLabel} `)}${hint ? style.dim(hint) : ""}`,
+            `${indent}${style.style(["bgMagenta", "bold"], `── ${activeLabel} `)}${hint ? style.dim(hint) : ""}`,
           );
         } else {
-          lines.push(style.style(["bgMagenta", "bold"], `── ${label} `));
+          lines.push(`${indent}${style.style(["bgMagenta", "bold"], `── ${label} `)}`);
         }
       } else {
-        lines.push(style.style(["magenta", "bold"], `── ${label} `));
+        lines.push(`${indent}${style.style(["magenta", "bold"], `── ${label} `)}`);
       }
       usedLines += sectionCost;
       if (usedLines >= viewportHeight) break;
