@@ -292,7 +292,36 @@ export async function runInteractive(
     // Try parsing as a mouse event; if it's not a mouse event, treat as keyboard input
     const mouseEvent = parseMouseEvent(key);
     if (mouseEvent !== null) {
-      // Hit-test the click against visible rows
+      // Handle wheel scroll
+      if (mouseEvent.button === 64) {
+        // Wheel up — scroll up by a small step (3 rows)
+        scrollOffset = Math.max(0, scrollOffset - 3);
+        scrollOffset = normalizeScrollOffset(
+          groups,
+          rows,
+          scrollOffset,
+          termHeight,
+          filterBarLines,
+          stickyRepoLine !== null ? 1 : 0,
+        );
+        redraw();
+        continue;
+      } else if (mouseEvent.button === 65) {
+        // Wheel down — scroll down by a small step (3 rows)
+        scrollOffset = Math.min(Math.max(0, rows.length - 1), scrollOffset + 3);
+        scrollOffset = normalizeScrollOffset(
+          groups,
+          rows,
+          scrollOffset,
+          termHeight,
+          filterBarLines,
+          stickyRepoLine !== null ? 1 : 0,
+        );
+        redraw();
+        continue;
+      }
+
+      // Hit-test the click against visible rows (non-wheel buttons)
       const target = hitTestClick(groups, rows, scrollOffset, mouseEvent.x, mouseEvent.y);
       if (target !== null) {
         const row = target.row;
