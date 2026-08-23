@@ -1,4 +1,5 @@
 import pc from "picocolors";
+import { visibleWidth, clipToWidth } from "./terminal.ts";
 
 const SEP = "  ";
 
@@ -45,7 +46,7 @@ export function renderTeamPickHeader(
 
   // Pre-compute visible text for each candidate (focused gets [ ] brackets).
   const texts = candidateTeams.map((t, i) => (i === safeIndex ? `[ ${t} ]` : t));
-  const widths = texts.map((t) => t.length);
+  const widths = texts.map((t) => visibleWidth(t));
 
   if (maxWidth === undefined) {
     // No width constraint — render all candidates.
@@ -61,8 +62,10 @@ export function renderTeamPickHeader(
 
   // If the focused item alone is wider than maxWidth, clip it.
   if (widths[safeIndex] > maxWidth) {
-    const clipped = texts[safeIndex].slice(0, maxWidth - 1) + "…";
-    return pc.bold(pc.magenta(clipped));
+    const styledText = pc.bold(pc.magenta(texts[safeIndex]));
+    const clipped = clipToWidth(styledText, maxWidth - 1);
+    const styledEllipsis = pc.bold(pc.magenta("…"));
+    return clipped + styledEllipsis;
   }
 
   // ── Windowed rendering ────────────────────────────────────────────────────

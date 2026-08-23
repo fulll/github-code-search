@@ -428,7 +428,8 @@ export function renderGroups(
     const bar = renderTeamPickHeader(dm.candidates, dm.focusedIndex, barWidth);
     const barPlain = stripAnsi(bar);
     // Pad between bar content and suffix to keep suffix right-aligned.
-    const padLen = Math.max(0, barWidth - barPlain.length);
+    // Use visibleWidth to account for CJK and multi-code-point graphemes.
+    const padLen = Math.max(0, barWidth - visibleWidth(barPlain));
     const line = pc.dim(REPICK_PREFIX) + bar + " ".repeat(padLen) + pc.dim(REPICK_SUFFIX);
     lines.push(clipToWidth(line, termWidth) + "\n");
   } else if (opts.teamPickMode?.active) {
