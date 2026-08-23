@@ -1413,6 +1413,27 @@ describe("resolvePickTeamAssignment", () => {
     expect(result).toEqual({ path: ["gamme-client", "squad-a + squad-b"], chosen: "squad-b" });
   });
 
+  it("rejects an explicit path whose parent segment doesn't exist in the tree", () => {
+    const groups = [makeGroup("org/a", ["gamme-client", "squad-a", "squad-b"])];
+    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const result = resolvePickTeamAssignment(tree, "wrong-parent > squad-a + squad-b=squad-a");
+    expect("error" in result).toBe(true);
+    expect((result as { error: string }).error).toContain("no combined section found");
+    expect((result as { error: string }).error).toContain("gamme-client > squad-a + squad-b");
+  });
+
+  it("rejects an explicit path pointing at a section that no longer exists after an earlier pick", () => {
+    const groups = [makeGroup("org/a", ["gamme-client", "squad-a", "squad-b"])];
+    let tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    // First pick resolves (and removes) the only combined section.
+    const first = resolvePickTeamAssignment(tree, "gamme-client > squad-a + squad-b=squad-a");
+    if ("error" in first) throw new Error("unexpected error in test setup");
+    tree = applyTeamPickInTree(tree, first.path, first.chosen);
+    // Re-using the same (now stale) explicit path must be rejected, not silently no-op.
+    const second = resolvePickTeamAssignment(tree, "gamme-client > squad-a + squad-b=squad-a");
+    expect("error" in second).toBe(true);
+  });
+
   it("errors when the = separator is missing", () => {
     const tree = groupByTeamHierarchy([makeGroup("org/a", ["squad-a"])], [["squad-"]]);
     const result = resolvePickTeamAssignment(tree, "squad-a + squad-b");

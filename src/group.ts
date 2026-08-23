@@ -752,6 +752,18 @@ export function findCombinedSectionPaths(sections: TeamSection[]): string[][] {
   return paths;
 }
 
+/** Returns whether `path` (root-first ancestor labels) resolves to an actual node in the tree. */
+function pathExistsInTree(sections: TeamSection[], path: string[]): boolean {
+  let level = sections;
+  for (let i = 0; i < path.length; i++) {
+    const node = level.find((s) => s.label === path[i]);
+    if (!node) return false;
+    if (i === path.length - 1) return true;
+    level = node.children ?? [];
+  }
+  return path.length === 0;
+}
+
 // ─── CLI option parsing (pure) ─────────────────────────────────────────────────
 
 /**
@@ -833,6 +845,24 @@ export function resolvePickTeamAssignment(
   let path: string[];
   if (combinedInput.includes(PATH_SEPARATOR)) {
     path = combinedInput.split(PATH_SEPARATOR).map((s) => s.trim());
+    // Fix: validate the explicit path actually resolves to a node in the
+    // current tree — otherwise applyTeamPickInTree silently no-ops while the
+    // caller still records a bogus assignment for replay — see review on #190.
+    // (Checked generally, not just against combined sections, so a valid path
+    // to a non-combined section still falls through to the clearer
+    // "not a multi-team section" error below instead of this one.)
+    if (!pathExistsInTree(sections, path)) {
+      const available = findCombinedSectionPaths(sections)
+        .map((p) => `  "${p.join(PATH_SEPARATOR)}"`)
+        .join("\n");
+      return {
+        error:
+          `--pick-team: no combined section found at path "${combinedInput}"\n` +
+          (available
+            ? `  Available combined sections:\n${available}`
+            : "  (no combined sections remain)"),
+      };
+    }
   } else {
     const matches = findCombinedSectionPaths(sections).filter(
       (p) => p[p.length - 1] === combinedInput,

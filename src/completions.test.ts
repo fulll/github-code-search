@@ -31,6 +31,10 @@ describe("generateCompletion", () => {
       expect(script).toContain("--regex-hint");
     });
 
+    it("contains --group-by-team-prefix-consolidate", () => {
+      expect(generateCompletion("bash")).toContain("--group-by-team-prefix-consolidate");
+    });
+
     it("contains format values (markdown, json)", () => {
       const script = generateCompletion("bash");
       expect(script).toContain("markdown");
@@ -75,6 +79,10 @@ describe("generateCompletion", () => {
       expect(script).toContain("--regex-hint");
     });
 
+    it("contains --group-by-team-prefix-consolidate", () => {
+      expect(generateCompletion("zsh")).toContain("--group-by-team-prefix-consolidate");
+    });
+
     it("contains a 'compdef' directive (zsh-style)", () => {
       const script = generateCompletion("zsh");
       expect(script).toContain("compdef ");
@@ -105,6 +113,10 @@ describe("generateCompletion", () => {
       expect(script).toContain("format");
       expect(script).toContain("output-type");
       expect(script).toContain("regex-hint");
+    });
+
+    it("contains group-by-team-prefix-consolidate", () => {
+      expect(generateCompletion("fish")).toContain("group-by-team-prefix-consolidate");
     });
 
     it("uses fish 'complete -c' syntax", () => {

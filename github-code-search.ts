@@ -366,7 +366,10 @@ async function searchAction(
   );
 
   // ─── Team-prefix grouping ─────────────────────────────────────────────────
-  const pickTeams: Record<string, string> = {};
+  const pickTeams: Record<string, string> = {}; // Whether consolidation was actually applied (requested AND not --format
+  // json, which always needs the full, uncollapsed hierarchy) — forwarded to
+  // the replay command and the TUI so they stay consistent with `groups`.
+  let consolidateApplied = false;
   if (!opts.groupByTeamPrefix && opts.pickTeam && opts.pickTeam.length > 0) {
     for (const assignment of opts.pickTeam) {
       process.stderr.write(
@@ -393,11 +396,10 @@ async function searchAction(
       }
 
       let sections = groupByTeamHierarchy(groups, chains);
-      if (opts.groupByTeamPrefixConsolidate) {
-        sections = consolidateTeamHierarchy(sections);
-      }
 
-      // Apply --pick-team assignments before flattening.
+      // Apply --pick-team assignments BEFORE consolidation: consolidating
+      // first would change (or erase) the identity of the combined sections
+      // --pick-team addresses, silently breaking resolution — see review on #190.
       for (const assignment of opts.pickTeam) {
         const resolution = resolvePickTeamAssignment(sections, assignment);
         if ("error" in resolution) {
@@ -419,6 +421,22 @@ async function searchAction(
             "\n",
         );
       }
+
+      // Consolidation is a display-only concern: JSON output is a data
+      // contract and must reflect the real, uncollapsed hierarchy (its
+      // `section` path per result), so skip it entirely for --format json —
+      // see review on #190.
+      consolidateApplied = Boolean(opts.groupByTeamPrefixConsolidate) && format !== "json";
+      if (opts.groupByTeamPrefixConsolidate && !consolidateApplied) {
+        process.stderr.write(
+          "warning: --group-by-team-prefix-consolidate is ignored with --format json " +
+            "(JSON output always reflects the full, uncollapsed hierarchy)\n",
+        );
+      }
+      if (consolidateApplied) {
+        sections = consolidateTeamHierarchy(sections);
+      }
+
       groups = flattenTeamHierarchy(sections);
     }
   }
@@ -429,7 +447,7 @@ async function searchAction(
         includeArchived,
         excludeTemplates,
         groupByTeamPrefix: opts.groupByTeamPrefix,
-        consolidateTeamSections: opts.groupByTeamPrefixConsolidate,
+        consolidateTeamSections: consolidateApplied,
         regexHint: opts.regexHint,
         pickTeams: Object.keys(pickTeams).length > 0 ? pickTeams : undefined,
       }),
@@ -490,7 +508,7 @@ async function searchAction(
       includeArchived,
       excludeTemplates,
       opts.groupByTeamPrefix,
-      Boolean(opts.groupByTeamPrefixConsolidate),
+      consolidateApplied,
       opts.regexHint ?? "",
       Object.keys(pickTeams).length > 0 ? pickTeams : {},
     );
