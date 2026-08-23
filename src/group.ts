@@ -26,42 +26,7 @@ export function groupByTeamPrefix(groups: RepoGroup[], prefixes: string[]): Team
   const remaining = new Set(groups);
 
   for (const prefix of prefixes) {
-    // Repos that have at least one team starting with this prefix
-    const matchingGroups = [...remaining].filter((g) =>
-      (g.teams ?? []).some((t) => t.startsWith(prefix)),
-    );
-    if (matchingGroups.length === 0) continue;
-
-    // Bucket by number of teams matching this prefix
-    const byCount = new Map<number, RepoGroup[]>();
-    for (const g of matchingGroups) {
-      const matchingTeams = (g.teams ?? []).filter((t) => t.startsWith(prefix));
-      const count = matchingTeams.length;
-      if (!byCount.has(count)) byCount.set(count, []);
-      byCount.get(count)!.push(g);
-      remaining.delete(g);
-    }
-
-    // Process buckets in ascending count order (1 team, then 2, then 3 …)
-    for (const count of [...byCount.keys()].toSorted((a, b) => a - b)) {
-      const groupsInBucket = byCount.get(count)!;
-
-      // Within each count-bucket, group by the sorted team combination
-      const byCombo = new Map<string, RepoGroup[]>();
-      for (const g of groupsInBucket) {
-        const matchingTeams = (g.teams ?? [])
-          .filter((t) => t.startsWith(prefix))
-          .toSorted()
-          .join(" + ");
-        if (!byCombo.has(matchingTeams)) byCombo.set(matchingTeams, []);
-        byCombo.get(matchingTeams)!.push(g);
-      }
-
-      // Stable ordering: emit combo sections in alphabetical order of the label
-      for (const label of [...byCombo.keys()].toSorted()) {
-        sections.push({ label, groups: byCombo.get(label)! });
-      }
-    }
+    sections.push(...bucketSingleLevel(remaining, prefix));
   }
 
   // Repos not matched by any prefix
@@ -70,6 +35,179 @@ export function groupByTeamPrefix(groups: RepoGroup[], prefixes: string[]): Team
   }
 
   return sections;
+}
+
+/**
+ * Buckets the repos in `remaining` that have at least one team starting with
+ * `prefix` into one `TeamSection` per matching-team combination, removing
+ * matched repos from `remaining` (mutated in place). Repos are first bucketed
+ * by the *number* of matching teams (1, then 2, then 3 …), then within each
+ * count-bucket by the sorted combination of matching team names.
+ *
+ * Shared by `groupByTeamPrefix` (flat, single level) and
+ * `groupByTeamHierarchy` (tree, applied at every depth of a prefix chain).
+ * Returns an empty array when nothing in `remaining` matches `prefix`.
+ */
+function bucketSingleLevel(remaining: Set<RepoGroup>, prefix: string): TeamSection[] {
+  const sections: TeamSection[] = [];
+  const matchingGroups = [...remaining].filter((g) =>
+    (g.teams ?? []).some((t) => t.startsWith(prefix)),
+  );
+  if (matchingGroups.length === 0) return sections;
+
+  const byCount = new Map<number, RepoGroup[]>();
+  for (const g of matchingGroups) {
+    const matchingTeams = (g.teams ?? []).filter((t) => t.startsWith(prefix));
+    const count = matchingTeams.length;
+    if (!byCount.has(count)) byCount.set(count, []);
+    byCount.get(count)!.push(g);
+    remaining.delete(g);
+  }
+
+  for (const count of [...byCount.keys()].toSorted((a, b) => a - b)) {
+    const groupsInBucket = byCount.get(count)!;
+
+    const byCombo = new Map<string, RepoGroup[]>();
+    for (const g of groupsInBucket) {
+      const matchingTeams = (g.teams ?? [])
+        .filter((t) => t.startsWith(prefix))
+        .toSorted()
+        .join(" + ");
+      if (!byCombo.has(matchingTeams)) byCombo.set(matchingTeams, []);
+      byCombo.get(matchingTeams)!.push(g);
+    }
+
+    for (const label of [...byCombo.keys()].toSorted()) {
+      sections.push({ label, groups: byCombo.get(label)! });
+    }
+  }
+
+  return sections;
+}
+
+// ─── Hierarchical (nested) team-prefix grouping ───────────────────────────────
+
+/**
+ * Groups `RepoGroup[]` into a *tree* of `TeamSection`s from one or more
+ * independent prefix chains. Each chain is an ordered list of prefixes, one
+ * per nesting depth: `["gamme-", "squad-"]` groups repos by teams matching
+ * `gamme-` first, then sub-groups each resulting section by teams matching
+ * `squad-`. Multiple chains are processed independently and sequentially
+ * (like `groupByTeamPrefix`'s multi-prefix list), each drawing from the pool
+ * of repos not yet claimed by an earlier chain.
+ *
+ * On top of the explicit chain depth, this also auto-nests sections whose
+ * single-team label is a prefix of another single-team label at the same
+ * depth (e.g. `gamme-lead-client` becomes the parent of
+ * `gamme-lead-client-p1`) instead of listing them as unrelated siblings.
+ * Combined-label sections (`"a + b"`) and `"other"` sections are never
+ * auto-nested.
+ *
+ * Repos matching no prefix at a given depth are collected into an `"other"`
+ * child at that depth; repos matching no chain at all are collected into a
+ * single top-level `"other"` section, mirroring `groupByTeamPrefix`.
+ *
+ * Pure function — no mutation of `groups` or its elements.
+ */
+export function groupByTeamHierarchy(groups: RepoGroup[], chains: string[][]): TeamSection[] {
+  const sections: TeamSection[] = [];
+  const remaining = new Set(groups);
+
+  for (const chain of chains) {
+    if (chain.length === 0) continue;
+
+    const siblings = bucketSingleLevel(remaining, chain[0]).map((s) => ({ ...s, level: 0 }));
+    if (siblings.length === 0) continue;
+
+    const nested = nestOverlappingLabels(siblings, 0);
+    sections.push(...nested.map((s) => applyChainDepth(s, chain, 1)));
+  }
+
+  if (remaining.size > 0) {
+    sections.push({ label: "other", groups: [...remaining], level: 0, children: [] });
+  }
+
+  return sections;
+}
+
+/**
+ * Recursively subdivides `node` by the next prefix in `chain` (at `depth`),
+ * descending first through any auto-nested overlap children (same `depth`,
+ * since auto-nesting does not consume an explicit chain level) before
+ * splitting an actual leaf's `groups`. No-op once `depth` exceeds the chain
+ * or the node has no repos left to split.
+ */
+function applyChainDepth(node: TeamSection, chain: string[], depth: number): TeamSection {
+  if (node.children && node.children.length > 0) {
+    return { ...node, children: node.children.map((c) => applyChainDepth(c, chain, depth)) };
+  }
+  if (depth >= chain.length) return node;
+
+  const level = (node.level ?? 0) + 1;
+  const localRemaining = new Set(node.groups);
+  const siblings = bucketSingleLevel(localRemaining, chain[depth]).map((s) => ({ ...s, level }));
+  if (localRemaining.size > 0) {
+    siblings.push({ label: "other", groups: [...localRemaining], level, children: [] });
+  }
+  if (siblings.length === 0) return node;
+
+  const nested = nestOverlappingLabels(siblings, level);
+  const children = nested.map((c) => applyChainDepth(c, chain, depth + 1));
+  return { ...node, groups: [], children };
+}
+
+/**
+ * Nests sections whose single-team `label` is a proper prefix of another
+ * single-team label at the same `level` (e.g. `gamme-lead-client` becomes the
+ * parent of `gamme-lead-client-p1`), instead of leaving them as siblings.
+ * Combined-label (`"a + b"`) and `"other"` sections are left untouched at
+ * `level` and passed through unnested. When a chain of overlaps exists
+ * (A prefix of B prefix of C), nesting cascades and `level` is incremented
+ * once per hop from the shallowest ancestor.
+ */
+function nestOverlappingLabels(sections: TeamSection[], level: number): TeamSection[] {
+  const nestable = sections.filter((s) => s.label !== "other" && !s.label.includes(" + "));
+  const rest = sections
+    .filter((s) => s.label === "other" || s.label.includes(" + "))
+    .map((s) => ({ ...s, level, children: [] }));
+
+  const nodeByLabel = new Map<string, TeamSection>(
+    nestable.map((s) => [s.label, { ...s, level, children: [] }]),
+  );
+
+  const parentOf = new Map<string, string>();
+  for (const s of nestable) {
+    let bestParent: string | undefined;
+    for (const other of nestable) {
+      if (other.label === s.label) continue;
+      if (
+        s.label.startsWith(other.label) &&
+        (bestParent === undefined || other.label.length > bestParent.length)
+      ) {
+        bestParent = other.label;
+      }
+    }
+    if (bestParent !== undefined) parentOf.set(s.label, bestParent);
+  }
+
+  for (const [child, parent] of parentOf) {
+    nodeByLabel.get(parent)!.children!.push(nodeByLabel.get(child)!);
+  }
+
+  const roots = nestable
+    .filter((s) => !parentOf.has(s.label))
+    .map((s) => assignLevels(nodeByLabel.get(s.label)!, level));
+
+  return [...roots, ...rest];
+}
+
+/** Sets `level` on `node` (and cascades +1 per depth into its children), mutating in place. */
+function assignLevels(node: TeamSection, lvl: number): TeamSection {
+  node.level = lvl;
+  if (node.children && node.children.length > 0) {
+    node.children = node.children.map((c) => assignLevels(c, lvl + 1));
+  }
+  return node;
 }
 
 /**

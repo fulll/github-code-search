@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   applyTeamPick,
   flattenTeamSections,
+  groupByTeamHierarchy,
   groupByTeamPrefix,
   moveRepoToSection,
   rebuildTeamSections,
@@ -142,6 +143,142 @@ describe("groupByTeamPrefix — multiple prefixes", () => {
     const sections = groupByTeamPrefix(groups, ["squad-"]);
     const labels = sections.map((s) => s.label);
     expect(labels).toEqual(["squad-a", "squad-z"]);
+  });
+});
+
+// ─── groupByTeamHierarchy ─────────────────────────────────────────────────────
+
+/** Flattens a tree's labels (with indent per level) into a single array for
+ *  easy assertions, depth-first, in the order sections are emitted. */
+function collectLabels(sections: TeamSection[]): string[] {
+  const out: string[] = [];
+  for (const s of sections) {
+    out.push(`${"  ".repeat(s.level ?? 0)}${s.label}`);
+    if (s.children) out.push(...collectLabels(s.children));
+  }
+  return out;
+}
+
+describe("groupByTeamHierarchy — single-level chain (parity with groupByTeamPrefix)", () => {
+  it("behaves like groupByTeamPrefix for a single 1-level chain", () => {
+    const groups = [makeGroup("org/a", ["squad-frontend"]), makeGroup("org/b", ["squad-mobile"])];
+    const sections = groupByTeamHierarchy(groups, [["squad-"]]);
+    const labels = sections.map((s) => s.label);
+    expect(labels).toContain("squad-frontend");
+    expect(labels).toContain("squad-mobile");
+    expect(sections.every((s) => (s.level ?? 0) === 0)).toBe(true);
+  });
+
+  it("returns empty array for no groups and no chains", () => {
+    expect(groupByTeamHierarchy([], [])).toEqual([]);
+  });
+
+  it("repos matching no chain at all go to a top-level 'other'", () => {
+    const groups = [makeGroup("org/a", ["squad-frontend"]), makeGroup("org/b", ["chapter-x"])];
+    const sections = groupByTeamHierarchy(groups, [["squad-"]]);
+    const other = sections.find((s) => s.label === "other");
+    expect(other).toBeDefined();
+    expect(other!.level).toBe(0);
+    expect(other!.groups[0].repoFullName).toBe("org/b");
+  });
+});
+
+describe("groupByTeamHierarchy — 2-level chain", () => {
+  it("groups by the first prefix, then sub-groups each section by the second", () => {
+    const groups = [
+      makeGroup("org/a", ["gamme-client", "squad-dashboard"]),
+      makeGroup("org/b", ["gamme-client", "squad-billing"]),
+    ];
+    const sections = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    expect(sections).toHaveLength(1);
+    expect(sections[0].label).toBe("gamme-client");
+    expect(sections[0].level).toBe(0);
+    expect(sections[0].groups).toEqual([]); // subdivided, not a leaf
+    const childLabels = (sections[0].children ?? []).map((c) => c.label).toSorted();
+    expect(childLabels).toEqual(["squad-billing", "squad-dashboard"]);
+    for (const child of sections[0].children ?? []) {
+      expect(child.level).toBe(1);
+    }
+  });
+
+  it("repos with no match at the second level fall into a nested 'other'", () => {
+    const groups = [makeGroup("org/a", ["gamme-client"])]; // no squad- team
+    const sections = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const child = sections[0].children ?? [];
+    expect(child.map((c) => c.label)).toEqual(["other"]);
+    expect(child[0].level).toBe(1);
+    expect(child[0].groups[0].repoFullName).toBe("org/a");
+  });
+
+  it("supports a 3-level chain recursively", () => {
+    const groups = [makeGroup("org/a", ["gamme-client", "squad-dashboard", "chapter-fe"])];
+    const sections = groupByTeamHierarchy(groups, [["gamme-", "squad-", "chapter-"]]);
+    const l1 = sections[0];
+    const l2 = l1.children![0];
+    const l3 = l2.children![0];
+    expect(l1.label).toBe("gamme-client");
+    expect(l2.label).toBe("squad-dashboard");
+    expect(l3.label).toBe("chapter-fe");
+    expect([l1.level, l2.level, l3.level]).toEqual([0, 1, 2]);
+    expect(l3.groups.map((g) => g.repoFullName)).toEqual(["org/a"]);
+  });
+});
+
+describe("groupByTeamHierarchy — multiple independent chains", () => {
+  it("processes each chain sequentially against the remaining pool", () => {
+    const groups = [
+      makeGroup("org/a", ["gamme-client", "squad-dashboard"]),
+      makeGroup("org/b", ["chapter-backend"]),
+      makeGroup("org/c", []),
+    ];
+    const sections = groupByTeamHierarchy(groups, [["gamme-", "squad-"], ["chapter-"]]);
+    const labels = sections.map((s) => s.label);
+    expect(labels).toEqual(["gamme-client", "chapter-backend", "other"]);
+    expect(sections[2].groups[0].repoFullName).toBe("org/c");
+  });
+});
+
+describe("groupByTeamHierarchy — auto-nesting of overlapping team names", () => {
+  it("nests a longer team name under a shorter one that is its prefix", () => {
+    const groups = [
+      makeGroup("org/a", ["gamme-lead-client"]),
+      makeGroup("org/b", ["gamme-lead-client-p1"]),
+    ];
+    const sections = groupByTeamHierarchy(groups, [["gamme-"]]);
+    expect(sections).toHaveLength(1);
+    expect(sections[0].label).toBe("gamme-lead-client");
+    expect(sections[0].level).toBe(0);
+    expect(sections[0].children).toHaveLength(1);
+    expect(sections[0].children![0].label).toBe("gamme-lead-client-p1");
+    expect(sections[0].children![0].level).toBe(1);
+  });
+
+  it("cascades nesting across 3 overlapping names", () => {
+    const groups = [
+      makeGroup("org/a", ["gamme-lead-client"]),
+      makeGroup("org/b", ["gamme-lead-client-p1"]),
+      makeGroup("org/c", ["gamme-lead-client-p1-x"]),
+    ];
+    const sections = groupByTeamHierarchy(groups, [["gamme-"]]);
+    expect(collectLabels(sections)).toEqual([
+      "gamme-lead-client",
+      "  gamme-lead-client-p1",
+      "    gamme-lead-client-p1-x",
+    ]);
+  });
+
+  it("does not nest unrelated single-team labels as siblings", () => {
+    const groups = [makeGroup("org/a", ["squad-front"]), makeGroup("org/b", ["squad-back"])];
+    const sections = groupByTeamHierarchy(groups, [["squad-"]]);
+    expect(sections.every((s) => !s.children || s.children.length === 0)).toBe(true);
+  });
+
+  it("does not nest combined ('a + b') or 'other' sections", () => {
+    const groups = [makeGroup("org/a", ["squad-front", "squad-back"]), makeGroup("org/b", [])];
+    const sections = groupByTeamHierarchy(groups, [["squad-"]]);
+    const combined = sections.find((s) => s.label.includes(" + "));
+    expect(combined).toBeDefined();
+    expect(combined!.children ?? []).toHaveLength(0);
   });
 });
 

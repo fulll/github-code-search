@@ -57,10 +57,25 @@ export interface Row {
   sectionLabel?: string;
 }
 
-/** One labelled group of repos produced by `groupByTeamPrefix`. */
+/**
+ * One labelled group of repos produced by `groupByTeamPrefix` or
+ * `groupByTeamHierarchy`. A node either owns repos directly (`groups`, a
+ * leaf) or is subdivided into `children` — the two are not expected to be
+ * populated at the same time for hierarchy-aware consumers, though flat
+ * consumers (`groupByTeamPrefix`) only ever set `groups`.
+ */
 export interface TeamSection {
   label: string;
   groups: RepoGroup[];
+  /** Nesting depth: 0 for a top-level section, 1 for a section nested one
+   *  level down (via a chained `--group-by-team-prefix` level or an
+   *  auto-detected overlapping team name), etc. Only set by
+   *  `groupByTeamHierarchy`. */
+  level?: number;
+  /** Present (non-empty) when this section was subdivided further, either by
+   *  the next prefix in the chain or by an auto-detected overlapping
+   *  team-name relationship. Only set by `groupByTeamHierarchy`. */
+  children?: TeamSection[];
 }
 
 export type OutputFormat = "markdown" | "json";
