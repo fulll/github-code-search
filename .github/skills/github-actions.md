@@ -146,7 +146,7 @@ should post a **single sticky comment** per PR, updated on every push:
 
 - name: Post / update comment
   if: github.event_name == 'pull_request'
-  uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2.9.4
+  uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
   with:
     header: <unique-workflow-id> # e.g. "lighthouse-ci", "coverage", "pa11y"
     message: ${{ steps.report.outputs.result }}
