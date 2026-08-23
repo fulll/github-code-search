@@ -631,6 +631,8 @@ describe("renderGroups", () => {
   it("shows dimmed ✓ for deselected repo", () => {
     const groups = [makeGroup("org/repoA", ["src/a.ts"], true)];
     groups[0].repoSelected = false;
+    // When repo is deselected, all extracts should be deselected too
+    groups[0].extractSelected = groups[0].extractSelected.map(() => false);
     const rows = buildRows(groups);
     const out = renderGroups(groups, 0, rows, 40, 0, "q", "org");
     // Verify the output contains the ✓ character

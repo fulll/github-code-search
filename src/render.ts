@@ -564,8 +564,11 @@ export function renderGroups(
 
     if (row.type === "repo") {
       const arrow = group.folded ? pc.magenta("▸") : pc.magenta("▾");
-      // Green ✓ for selected; dimmed ✓ for deselected — provides a clickable target in both states.
-      const checkbox = group.repoSelected ? pc.green("✓") : pc.dim("✓");
+      // Determine checkbox state: green if any extract is selected, dimmed if none are selected.
+      // Note: group.repoSelected may not reflect actual selection state if extracts were toggled
+      // individually, so we compute it from extractSelected.
+      const hasSelectedExtract = group.extractSelected.some(Boolean);
+      const checkbox = hasSelectedExtract ? pc.green("✓") : pc.dim("✓");
       // On cursor rows, use bold+white for the repo name (dark bg applied
       // to the whole line via renderActiveLine; no inline bgMagenta needed).
       // On inactive rows, use bright purple (same as the bar) in bold.

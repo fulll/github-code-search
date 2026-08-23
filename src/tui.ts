@@ -364,10 +364,14 @@ export async function runInteractive(
           } else if (target.action === "select") {
             if (row.type === "repo") {
               const group = groups[row.repoIndex];
+              // Toggle repo selection and cascade to all extracts (same as spacebar)
               group.repoSelected = !group.repoSelected;
+              group.extractSelected = group.extractSelected.map(() => group.repoSelected);
             } else if (row.type === "extract" && row.extractIndex !== undefined) {
               const group = groups[row.repoIndex];
               group.extractSelected[row.extractIndex] = !group.extractSelected[row.extractIndex];
+              // Update repo selection to match if any extract is selected
+              group.repoSelected = group.extractSelected.some(Boolean);
             }
             redraw();
           }
