@@ -29,7 +29,7 @@ export function getHeaderLines(filterMode: boolean, hasActiveFilter: boolean): n
 // https://en.wikipedia.org/wiki/X11_mouse_protocol#SGR_1006_Protocol
 export const MOUSE_BUTTON_WHEEL_UP = 64;
 export const MOUSE_BUTTON_WHEEL_DOWN = 65;
-const MOUSE_SCROLL_STEP = 3; // rows per wheel scroll
+export const MOUSE_SCROLL_STEP = 3; // rows per wheel scroll
 
 // ─── Mouse Hit-Testing: Column Layout ──────────────────────────────────────────
 // Terminal row columns (1-indexed per SGR protocol):

@@ -26,7 +26,12 @@ import {
   isScrollCooldownActive,
   updateScrollCooldown,
 } from "./scroll-cooldown.ts";
-import { getHeaderLines, MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN } from "./render.ts";
+import {
+  getHeaderLines,
+  MOUSE_BUTTON_WHEEL_UP,
+  MOUSE_BUTTON_WHEEL_DOWN,
+  MOUSE_SCROLL_STEP,
+} from "./render.ts";
 import { hitTestClick } from "./render/mouse-hit.ts";
 import type { FilterTarget, OutputFormat, OutputType, RepoGroup, Row } from "./types.ts";
 
@@ -48,7 +53,6 @@ const KEY_CTRL_A = "\x01";
 const KEY_CTRL_E = "\x05";
 const KEY_CTRL_W = "\x17";
 const KEY_ALT_BACKSPACE = "\x1b\x7f";
-const MOUSE_SCROLL_STEP = 3; // rows per wheel scroll
 
 // ─── Terminal mouse reporting (SGR protocol) ──────────────────────────────────
 // https://en.wikipedia.org/wiki/X11_mouse_protocol#SGR_1006_Protocol

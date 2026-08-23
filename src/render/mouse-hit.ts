@@ -3,7 +3,7 @@
 
 import type { RepoGroup, Row } from "../types.ts";
 import { rowTerminalLines } from "./rows.ts";
-import { isClickInFoldZone, isClickInCheckboxZone, isClickInNavZone } from "./layout-constants.ts";
+import { isClickInFoldZone, isClickInCheckboxZone } from "./layout-constants.ts";
 
 export interface ClickTarget {
   row: Row;
