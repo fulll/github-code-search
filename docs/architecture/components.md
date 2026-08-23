@@ -60,6 +60,7 @@ C4Component
   Container(tui, "TUI", "src/tui.ts", "Calls render functions<br/>on every redraw;<br/>formats output on Enter")
 
   Container_Boundary(render, "src/render/ — pure functions") {
+    Component(terminal, "Terminal API wrapper", "src/render/terminal.ts", "visibleWidth()<br/>stripAnsi()<br/>clipToWidth()<br/>hasAnsi()")
     Component(rows, "Row builder", "src/render/rows.ts", "buildRows()<br/>rowTerminalLines()<br/>isCursorVisible()")
     Component(summary, "Summary builder", "src/render/summary.ts", "buildSummary()<br/>buildSummaryFull()<br/>buildSelectionSummary()")
     Component(filter, "Filter stats", "src/render/filter.ts", "buildFilterStats()<br/>FilterStats — visible/hidden counts")
@@ -116,6 +117,7 @@ C4Component
 | **Selection helpers**    | `src/render/selection.ts`    | `applySelectAll()` — marks all visible rows as selected (respects filter target); `applySelectNone()` — deselects all visible rows.                                                                                                                                                                                                                      |
 | **Syntax highlighter**   | `src/render/highlight.ts`    | `highlightFragment()` — maps file extension to a language token ruleset and applies ANSI escape sequences. Falls back to plain text for unknown extensions.                                                                                                                                                                                              |
 | **Team pick bar**        | `src/render/team-pick.ts`    | `renderTeamPickHeader()` — renders the ANSI pick-mode candidate bar shown when the user presses `p` on a multi-team section header. Focused candidate is highlighted in bold magenta; others are dimmed.                                                                                                                                                 |
+| **Terminal API wrapper** | `src/render/terminal.ts`     | `visibleWidth()` — measures terminal columns (Bun.stringWidth); `stripAnsi()` — removes escape codes (Bun.stripANSI); `clipToWidth()` — truncates to N columns preserving partial reset (Bun.sliceAnsi); `hasAnsi()` — detects presence of codes. Sole authorized call site for Bun 1.4+ ANSI APIs.                                                      |
 | **Output formatter**     | `src/output.ts`              | `buildOutput()` — entry point for both `--format markdown` and `--format json` serialisation of the confirmed selection.                                                                                                                                                                                                                                 |
 
 ## Design principles

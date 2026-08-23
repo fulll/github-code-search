@@ -12,6 +12,11 @@ keyboard-driven TUI, fine-grained extract selection, markdown/JSON output.
 
 ![Demo](demo/demo.gif)
 
+## Requirements
+
+- **Bun** ≥ 1.4 (runtime and package manager)
+- **GitHub Token** with `repo` and `read:org` scopes
+
 ## Quick start
 
 **macOS / Linux**
