@@ -214,6 +214,54 @@ function assignLevels(node: TeamSection, lvl: number): TeamSection {
   return node;
 }
 
+// ─── Advanced consolidated rendering ──────────────────────────────────────────
+
+/**
+ * Collapses chains of single-child nesting in a `groupByTeamHierarchy` tree
+ * into one node, so a run of unambiguous nesting (a parent with exactly one
+ * child, that child with exactly one child, …) renders as a single heading
+ * with an "(including …)" suffix listing the collapsed labels, instead of
+ * one heading per level. A node whose next level has 0 or 2+ children is
+ * left as-is at that point (only unambiguous single-branch chains collapse).
+ *
+ * The `"other"` label reads as `"unset"` inside the suffix (e.g. `"gamme-
+ * lead-client (including p1, unset)"`), matching how an unassigned bucket
+ * reads in prose, without changing the underlying section's `label`.
+ *
+ * Pure function — no mutation of the input tree; `level` is recomputed on
+ * the resulting (shallower) tree.
+ */
+export function consolidateTeamHierarchy(sections: TeamSection[]): TeamSection[] {
+  return sections.map((s) => assignLevels(consolidateNode(s), s.level ?? 0));
+}
+
+function consolidateNode(node: TeamSection): TeamSection {
+  const collapsedLabels: string[] = [];
+  let current = node;
+  while (current.children && current.children.length === 1) {
+    const only = current.children[0];
+    collapsedLabels.push(only.label === "other" ? "unset" : only.label);
+    current = only;
+  }
+
+  const label =
+    collapsedLabels.length > 0
+      ? `${node.label} (including ${collapsedLabels.join(", ")})`
+      : node.label;
+
+  const children =
+    current.children && current.children.length > 0
+      ? current.children.map((c) => consolidateNode(c))
+      : undefined;
+
+  return {
+    label,
+    groups: current.groups,
+    level: node.level,
+    ...(children ? { children } : {}),
+  };
+}
+
 /**
  * Recursively drops an empty `children` array so the field is only present
  * when a section actually has nested sub-sections, matching `TeamSection`'s
