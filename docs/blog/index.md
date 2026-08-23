@@ -11,6 +11,7 @@ Full release notes and changelogs are always available on
 
 | Release                      | Highlights                                                                                                 |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| [v1.12.0](./release-v1-12-0) | Mouse-driven TUI, team re-pick/undo, query-title heading and matched token in output, regex quoting fixes  |
 | [v1.11.0](./release-v1-11-0) | Team pick mode, `--exclude-template-repositories`, security hardening and Windows installer fixes          |
 | [v1.10.0](./release-v1-10-0) | Native regex syntax `/pattern/flags` — automatic term extraction, top-level alternation and `--regex-hint` |
 | [v1.9.0](./release-v1-9-0)   | Windows support — native x64, x64-modern, x64-baseline and ARM64 binaries with one-line PowerShell install |
