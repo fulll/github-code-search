@@ -222,7 +222,14 @@ function assignLevels(node: TeamSection, lvl: number): TeamSection {
  * child, that child with exactly one child, …) renders as a single heading
  * with an "(including …)" suffix listing the collapsed labels, instead of
  * one heading per level. A node whose next level has 0 or 2+ children is
- * left as-is at that point (only unambiguous single-branch chains collapse).
+ * left as-is at that point (only unambiguous single-branch chains collapse);
+ * a child that itself forks into 2+ children stops the collapse *before* it
+ * so the fork point remains its own heading rather than disappearing into
+ * the suffix.
+ *
+ * `groups` from every node absorbed into the collapsed heading (the root and
+ * each merged intermediate) are accumulated — overlap-nested parents can own
+ * repos directly (see `TeamSection`), and those must not be dropped.
  *
  * The `"other"` label reads as `"unset"` inside the suffix (e.g. `"gamme-
  * lead-client (including p1, unset)"`), matching how an unassigned bucket
@@ -238,9 +245,13 @@ export function consolidateTeamHierarchy(sections: TeamSection[]): TeamSection[]
 function consolidateNode(node: TeamSection): TeamSection {
   const collapsedLabels: string[] = [];
   let current = node;
+  let groups = node.groups;
   while (current.children && current.children.length === 1) {
     const only = current.children[0];
+    // A forking grandchild must remain its own heading — stop before it.
+    if (only.children && only.children.length > 1) break;
     collapsedLabels.push(only.label === "other" ? "unset" : only.label);
+    groups = [...groups, ...only.groups];
     current = only;
   }
 
@@ -256,7 +267,7 @@ function consolidateNode(node: TeamSection): TeamSection {
 
   return {
     label,
-    groups: current.groups,
+    groups,
     level: node.level,
     ...(children ? { children } : {}),
   };

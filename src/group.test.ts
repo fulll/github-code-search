@@ -374,6 +374,45 @@ describe("consolidateTeamHierarchy", () => {
     expect(consolidated[0].level).toBe(0);
   });
 
+  it("stops collapsing before a child that itself forks into 2+ children", () => {
+    const groups = [
+      makeGroup("org/a", ["gamme-x"]),
+      makeGroup("org/b", ["gamme-x-y"]),
+      makeGroup("org/c", ["gamme-x-y-c1"]),
+      makeGroup("org/d", ["gamme-x-y-c2"]),
+    ];
+    const sections = groupByTeamHierarchy(groups, [["gamme-"]]);
+    const consolidated = consolidateTeamHierarchy(sections);
+    expect(consolidated).toHaveLength(1);
+    // "gamme-x-y" is the fork point (2 children) — it must remain its own
+    // heading rather than being absorbed into "gamme-x"'s suffix.
+    expect(consolidated[0].label).toBe("gamme-x");
+    expect(consolidated[0].groups.map((g) => g.repoFullName)).toEqual(["org/a"]);
+    expect(consolidated[0].children).toHaveLength(1);
+    const fork = consolidated[0].children![0];
+    expect(fork.label).toBe("gamme-x-y");
+    expect(fork.groups.map((g) => g.repoFullName)).toEqual(["org/b"]);
+    const forkChildLabels = (fork.children ?? []).map((c) => c.label).toSorted();
+    expect(forkChildLabels).toEqual(["gamme-x-y-c1", "gamme-x-y-c2"]);
+  });
+
+  it("accumulates groups from every merged node, not just the deepest one", () => {
+    const groups = [
+      makeGroup("org/a", ["gamme-x"]),
+      makeGroup("org/b", ["gamme-x-y"]),
+      makeGroup("org/c", ["gamme-x-y-z"]),
+    ];
+    const sections = groupByTeamHierarchy(groups, [["gamme-"]]);
+    const consolidated = consolidateTeamHierarchy(sections);
+    expect(consolidated[0].label).toBe("gamme-x (including gamme-x-y, gamme-x-y-z)");
+    expect(consolidated[0].groups.map((g) => g.repoFullName).toSorted()).toEqual([
+      "org/a",
+      "org/b",
+      "org/c",
+    ]);
+    expect(consolidated[0].children ?? []).toHaveLength(0);
+  });
+
   it("is a pure function — does not mutate the input tree", () => {
     const groups = [makeGroup("org/a", ["gamme-client", "squad-dashboard"])];
     const sections = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
