@@ -17,7 +17,7 @@ Set FontSize 15
 Set Width 1200
 Set Height 600
 Set Padding 24
-Set TypingSpeed 60ms
+Set TypingSpeed 70ms
 
 # ── Show the prompt ────────────────────────────────────────────────────────────
 Hide
@@ -25,11 +25,11 @@ Type "export GITHUB_TOKEN=$GITHUB_TOKEN"
 Enter
 Show
 
-Sleep 500ms
+Sleep 700ms
 
 # ── Type the command ──────────────────────────────────────────────────────────
 Type 'github-code-search query "@actions/cache" --org actions'
-Sleep 800ms
+Sleep 1s
 Enter
 
 # Wait for results to load (API call + TUI render)
@@ -37,41 +37,42 @@ Sleep 4s
 
 # ── Fold all repos — Z gives a compact bird's-eye view ────────────────────────
 Type "Z"
-Sleep 800ms
+Sleep 1s
 
 # ── Unfold all repos — Z again expands everything ─────────────────────────────
 Type "Z"
-Sleep 800ms
+Sleep 1s
 
 # ── Filter by file path to focus on YAML files ────────────────────────────────
 Type "f"
-Sleep 300ms
+Sleep 400ms
 Type ".yml"
-Sleep 600ms
+Sleep 800ms
 Enter
-Sleep 500ms
+Sleep 700ms
 
 # ── Jump to top with gg ───────────────────────────────────────────────────────
 Type "g"
-Sleep 150ms
+Sleep 200ms
 Type "g"
-Sleep 500ms
+Sleep 700ms
 
 # ── Select all visible (filtered) results ─────────────────────────────────────
 Type "a"
-Sleep 500ms
+Sleep 700ms
 
 # ── Jump to bottom with G to inspect the last match ───────────────────────────
 Type "G"
-Sleep 600ms
+Sleep 800ms
 
 # ── Open the focused file directly in the browser ─────────────────────────────
 Type "o"
-Sleep 600ms
+Sleep 800ms
 
 # ── Reset filter and confirm selection ────────────────────────────────────────
 Type "r"
-Sleep 600ms
+Sleep 800ms
 Enter
 
-Sleep 2s
+# Hold on the final markdown output — query title heading + matched token per extract
+Sleep 4s
