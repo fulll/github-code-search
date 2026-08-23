@@ -117,3 +117,17 @@ C4Container
 4. **TUI** receives `RepoGroup[]`, renders the browser, and waits for user input.
 5. On `Enter`, **TUI** returns the selection → **CLI parser** calls **Output renderer**.
 6. **Output renderer** prints markdown or JSON to stdout.
+
+## Terminal resizing and SIGWINCH
+
+**The TUI responds to live terminal resize events.** When the user resizes their terminal window during an interactive session:
+
+1. The operating system sends the `SIGWINCH` signal to the process.
+2. The **TUI** installs a `SIGWINCH` handler before entering the keyboard event loop.
+3. The handler reads the new `process.stdout.rows` and `process.stdout.columns` values.
+4. If dimensions have changed, the handler calls `redraw()` to re-render with the new layout.
+5. The user sees an immediate, flicker-free refresh without needing to press any key.
+
+When the **TUI** exits (via Ctrl+C, `q`, `Enter`, or `Esc`), the handler is unregistered via `process.off("SIGWINCH", onResize)` to ensure clean cleanup. The **Terminal API wrapper** (`src/render/terminal.ts`) uses `Bun.stringWidth()`, `Bun.stripANSI()`, and `Bun.sliceAnsi()` to measure and truncate text accurately, accounting for emoji, CJK characters, and multi-code-point grapheme clusters.
+
+**Note on `Bun.Terminal`:** This project uses Bun's low-level ANSI/stringWidth APIs, not the high-level `Bun.Terminal` class (which is designed for PTY subprocess management, not TUI rendering).

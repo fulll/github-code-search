@@ -10,7 +10,7 @@ This file provides context for AI coding agents (GitHub Copilot, Claude, Gemini,
 
 | Tool           | Version                                                  |
 | -------------- | -------------------------------------------------------- |
-| **Bun**        | ≥ 1.0 (runtime, bundler, test runner, package manager)   |
+| **Bun**        | ≥ 1.4 (runtime, bundler, test runner, package manager)   |
 | **TypeScript** | via Bun (no separate `tsc` invocation needed at runtime) |
 | **oxlint**     | linter (`bun run lint`)                                  |
 | **oxfmt**      | formatter (`bun run format`)                             |
@@ -93,6 +93,8 @@ src/
                          #   + refreshCompletions() — overwrites existing completion file
 
   render/
+    terminal.ts          # Bun 1.4+ native API wrappers (stringWidth, stripANSI, sliceAnsi)
+                         #   sole authorized call site for these APIs
     highlight.ts         # Syntax highlighting (language detection + token rules)
     filter.ts            # FilterStats + buildFilterStats
     filter-match.ts      # Pure pattern matchers — makeExtractMatcher, makeRepoMatcher
@@ -110,6 +112,7 @@ src/
 - **Pure functions first.** All business logic lives in pure, side-effect-free functions (`aggregate.ts`, `group.ts`, `output.ts`, `render/` sub-modules). This makes them straightforward to unit-test.
 - **Side effects are isolated.** API calls (`api.ts`, `api-utils.ts`), TTY interaction (`tui.ts`) and CLI parsing (`github-code-search.ts`) are the only side-effectful surfaces. `api-utils.ts` hosts shared retry/pagination helpers that perform network I/O and must not be used outside `api.ts`. `cache.ts` hosts disk-cache helpers that perform filesystem I/O and must not be used outside `api.ts`.
 - **`render.ts` is a façade.** It re-exports everything from `render/` and adds two top-level rendering functions. Consumers import from `render.ts`, not directly from sub-modules.
+- **`render/terminal.ts` is the sole Bun API call site.** All calls to `Bun.stringWidth()`, `Bun.stripANSI()`, and `Bun.sliceAnsi()` must go through the `terminal.ts` wrapper functions (`visibleWidth()`, `stripAnsi()`, `clipToWidth()`, `hasAnsi()`). This centralizes terminal handling logic and makes it easy to verify correct Unicode handling (graphemes, emoji, CJK, ZWJ sequences).
 - **`types.ts` is the single source of truth** for all shared interfaces. Any new shared type must go there.
 - **No classes** — the codebase uses plain TypeScript interfaces and functions throughout.
 
