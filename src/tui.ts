@@ -228,7 +228,8 @@ export async function runInteractive(
   let lastClickRowKey: string | null = null;
 
   // Scroll cooldown to avoid accidental selection during/after scroll
-  const SCROLL_COOLDOWN = 300; // milliseconds
+  // Trackpad momentum scrolling can last 400-500ms, so use 500ms minimum
+  const SCROLL_COOLDOWN = 500; // milliseconds
   let lastScrollTime = 0;
 
   const scheduleStatsUpdate = () => {
