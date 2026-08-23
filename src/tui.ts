@@ -336,6 +336,15 @@ export async function runInteractive(
         continue;
       }
 
+      // Check scroll cooldown BEFORE hit-testing any clicks.
+      // During momentum scrolling, clicks can fire at scroll end positions; ignore them completely.
+      const now = Date.now();
+      scrollCooldownState = updateScrollCooldown(scrollCooldownState, now);
+      if (isScrollCooldownActive(scrollCooldownState, now)) {
+        // Completely ignore all clicks during scroll cooldown
+        continue;
+      }
+
       // Calculate header lines before the first row to adjust click coordinates.
       // Base header lines: title (1) + summary (1) + hints (1) + blank (1) = 4.
       // Additional lines: filter bar (0-2) + sticky repo header (0-1 when cursor is on
@@ -359,18 +368,6 @@ export async function runInteractive(
       if (target !== null) {
         const row = target.row;
         const rowKey = getRowKey(row);
-        const now = Date.now();
-
-        // Update scroll cooldown state (clears isActive flag if timeout expired)
-        scrollCooldownState = updateScrollCooldown(scrollCooldownState, now);
-
-        // Ignore selection/fold actions during scroll cooldown to avoid accidental toggles
-        if (isScrollCooldownActive(scrollCooldownState, now) && target.action !== "navigate") {
-          // Only allow navigation during scroll cooldown
-          cursor = rows.indexOf(row);
-          redraw();
-          continue;
-        }
 
         const isDoubleClick =
           lastClickRowKey === rowKey && now - lastClickTime < DOUBLE_CLICK_DELAY;
