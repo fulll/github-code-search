@@ -12,6 +12,12 @@
       "rules": {
         "no-control-regex": "off"
       }
+    },
+    {
+      "files": ["**/*.vue"],
+      "rules": {
+        "no-underscore-dangle": "off"
+      }
     }
   ],
   "settings": {
