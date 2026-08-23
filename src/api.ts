@@ -123,6 +123,18 @@ export function segmentLineCol(fragment: string, offset: number): { line: number
   };
 }
 
+/**
+ * Derive a text-match segment's matched text from `fragment` and `indices`
+ * when GitHub omits the `text` field on the segment. Restores PR #133 —
+ * see issue #151.
+ */
+export function deriveSegmentText(fragment: string, seg: RawSearchSegment): string {
+  if (seg.text !== undefined) return seg.text;
+  const [start, end] = seg.indices;
+  if (start < 0 || end < start || end > fragment.length) return "";
+  return fragment.slice(start, end);
+}
+
 export async function searchCode(
   q: string,
   org: string,
@@ -296,7 +308,7 @@ export async function fetchAllResults(
             const indices = seg.indices;
             const { line: fragLine, col } = segmentLineCol(fragment, indices[0]);
             const line = fragmentStartLine + fragLine - 1;
-            return { text: seg.text ?? "", indices, line, col };
+            return { text: deriveSegmentText(fragment, seg), indices, line, col };
           }),
         };
       }),

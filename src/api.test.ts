@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import {
   buildFetchProgress,
   buildLineResolutionProgress,
+  deriveSegmentText,
   fetchAllResults,
   fetchRepoTeams,
   searchCode,
@@ -25,6 +26,26 @@ describe("segmentLineCol (api)", () => {
 
   it("handles column within a line", () => {
     expect(segmentLineCol("abcdef", 3)).toEqual({ line: 1, col: 4 });
+  });
+});
+
+// ─── deriveSegmentText (issue #151, restores PR #133) ─────────────────────────────────────
+
+describe("deriveSegmentText", () => {
+  it("returns seg.text unchanged when GitHub provides it", () => {
+    expect(deriveSegmentText("hello world", { text: "hello", indices: [0, 5] })).toBe("hello");
+  });
+
+  it("derives the text from fragment + indices when seg.text is omitted", () => {
+    expect(deriveSegmentText("hello world", { indices: [6, 11] })).toBe("world");
+  });
+
+  it("returns an empty string for out-of-range indices", () => {
+    expect(deriveSegmentText("hello", { indices: [10, 20] })).toBe("");
+  });
+
+  it("returns an empty string when end is before start", () => {
+    expect(deriveSegmentText("hello", { indices: [4, 1] })).toBe("");
   });
 });
 
@@ -144,6 +165,28 @@ describe("fetchAllResults", () => {
     expect(results[0].textMatches[0].fragment).toBe("hello world");
     expect(results[0].textMatches[0].matches[0].line).toBe(1);
     expect(results[0].textMatches[0].matches[0].col).toBe(1);
+  });
+
+  it("derives matchedText from fragment + indices when GitHub omits the segment's text field (issue #151)", async () => {
+    const fakeItem = {
+      path: "src/foo.ts",
+      html_url: "https://github.com/org/repo/blob/main/src/foo.ts",
+      repository: { full_name: "org/repo", archived: false },
+      text_matches: [
+        {
+          fragment: "hello world",
+          matches: [{ indices: [6, 11] }],
+        },
+      ],
+    };
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ items: [fakeItem], total_count: 1 }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })) as typeof fetch;
+
+    const results = await fetchAllResults("world", "org", "tok");
+    expect(results[0].textMatches[0].matches[0].text).toBe("world");
   });
 
   it("marks archived repos correctly", async () => {
