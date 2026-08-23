@@ -281,7 +281,7 @@ describe("escapeApiTerm — backslash escaping (CodeQL: incomplete string escapi
     expect(escapeApiTerm("foo\\bar")).toBe("foo\\bar");
   });
 
-  it('escapes a lone quote: "react" → \\"react\\"', () => {
+  it('escapes a lone quote and wraps the term: "react" → "\\"react\\""', () => {
     expect(escapeApiTerm('"react"')).toBe('"\\"react\\""');
   });
 
