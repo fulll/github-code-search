@@ -143,7 +143,7 @@ query with qualifiers (`language:`, `path:`, `filename:`) to keep the result set
 GitHub's query syntax treats `"` as a phrase delimiter, not a literal character. To search for an actual quote character (for example to precisely match a `package.json` dependency line like `"react": "18.2.0"`), escape it for **both** your shell and GitHub:
 
 ```bash
-github-code-search '"\"react\": \""' --org fulll
+github-code-search '"\"react\": \""' --org myorg
 ```
 
 - The outer single quotes protect the whole argument from your shell.
