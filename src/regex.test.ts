@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { buildApiQuery, escapeApiTerm, isRegexQuery } from "./regex.ts";
+import { buildApiQuery, escapeApiTerm, isRegexQuery, validateQuoteBalance } from "./regex.ts";
 
 // ─── isRegexQuery ─────────────────────────────────────────────────────────────
 
@@ -315,5 +315,65 @@ describe("buildApiQuery — warn cases", () => {
     expect(r.warn).toBeDefined();
     // The raw token should appear in warn for easy identification.
     expect(r.warn).toContain("/[/");
+  });
+});
+
+describe("validateQuoteBalance (issue #149)", () => {
+  it("returns null for a query with no quotes", () => {
+    expect(validateQuoteBalance("useFeatureFlag")).toBeNull();
+  });
+
+  it("returns null for a balanced two-quote phrase", () => {
+    expect(validateQuoteBalance('"feature flag"')).toBeNull();
+  });
+
+  it("returns an error for '\"react\": ' style queries with an odd number of unescaped quotes", () => {
+    // Regression: github-code-search '"react": "' --org fulll returned a raw
+    // GitHub 422 ERROR_TYPE_QUERY_PARSING_FATAL — this must now be caught locally.
+    const err = validateQuoteBalance('"react": "');
+    expect(err).not.toBeNull();
+    expect(err).toContain("Unbalanced double quotes");
+  });
+
+  it("error message includes a corrected example using double escaping", () => {
+    const err = validateQuoteBalance('"react": "');
+    expect(err).toContain('\\"react\\"');
+  });
+
+  it("returns null when escaped quotes make the query GitHub-valid", () => {
+    // The shell must deliver the literal backslash-quote sequence for this to work
+    // (single-quoted at the shell level): github-code-search '"\"react\": \""' --org myorg
+    expect(validateQuoteBalance('"\\"react\\": \\""')).toBeNull();
+  });
+
+  it("only excludes the /pattern/ token itself, not the rest of a mixed query (issue #149 review)", () => {
+    // The /pattern/ token itself may contain an odd count of literal quote
+    // characters (e.g. "react":\s*" has 3) without being invalid GitHub syntax —
+    // extractApiTerm already escapes it correctly, so this check does not apply
+    // to a query made up of only a regex token.
+    expect(validateQuoteBalance('/"react":\\s*"[~^]?[0-9]/')).toBeNull();
+  });
+
+  it("still catches an unbalanced stray quote outside the regex token in a mixed query", () => {
+    // Regression: validateQuoteBalance previously bailed out entirely for any
+    // query containing a /pattern/ token (via isRegexQuery), so a stray
+    // unescaped quote in the surrounding qualifiers/text (outside the token)
+    // was never caught and could still reach the GitHub API unbalanced.
+    const err = validateQuoteBalance('filename:package.json /"react":\\s*"[~^]?[0-9]/ "oops');
+    expect(err).not.toBeNull();
+    expect(err).toContain("Unbalanced double quotes");
+  });
+
+  it("does not flag a mixed query with balanced quotes outside the regex token", () => {
+    const err = validateQuoteBalance('"feature flag" /TODO|FIXME|HACK/');
+    expect(err).toBeNull();
+  });
+
+  it("returns an error for three unescaped quotes in a row", () => {
+    expect(validateQuoteBalance('"""')).not.toBeNull();
+  });
+
+  it("returns null for four unescaped quotes (two balanced phrases)", () => {
+    expect(validateQuoteBalance('"foo" "bar"')).toBeNull();
   });
 });

@@ -13,6 +13,58 @@ export function isRegexQuery(q: string): boolean {
 }
 
 /**
+ * Returns true when the `"` at `index` in `s` is escaped, i.e. preceded by an
+ * odd number of consecutive backslashes (GitHub's `\"` escape sequence).
+ */
+function isEscapedQuote(s: string, index: number): boolean {
+  let backslashes = 0;
+  let i = index - 1;
+  while (i >= 0 && s[i] === "\\") {
+    backslashes++;
+    i--;
+  }
+  return backslashes % 2 === 1;
+}
+
+/**
+ * Validates that a plain-text query has a balanced number of unescaped `"`
+ * characters, as required by GitHub's query syntax — an odd count is
+ * rejected by the API with an opaque `ERROR_TYPE_QUERY_PARSING_FATAL` 422
+ * error.
+ *
+ * Quotes inside a `/pattern/` regex token are excluded from this check: they
+ * are handled separately by `buildApiQuery`/`extractApiTerm`, which escapes
+ * them for the API term. Only the token itself is excluded, not the rest of
+ * the query — a mixed query like `filename:package.json /regex/ "oops` must
+ * still be caught, since the stray quote outside the token would otherwise
+ * reach the GitHub API unbalanced. See issue #149.
+ *
+ * Returns `null` when the query is valid. Returns a human-readable error
+ * message — including a corrected example using GitHub's documented
+ * double-escaping syntax — when the query would be rejected by the API.
+ */
+export function validateQuoteBalance(query: string): string | null {
+  const token = extractRegexToken(query);
+  const outsideToken =
+    token === null
+      ? query
+      : query.slice(0, token.index) + query.slice(token.index + token.raw.length);
+
+  let unescapedCount = 0;
+  for (let i = 0; i < outsideToken.length; i++) {
+    if (outsideToken[i] === '"' && !isEscapedQuote(outsideToken, i)) unescapedCount++;
+  }
+  if (unescapedCount % 2 === 0) return null;
+
+  return (
+    `Unbalanced double quotes in query: ${JSON.stringify(query)}. ` +
+    "GitHub rejects this with a query parsing error. " +
+    "To search for a literal quote character, escape it for both your shell and GitHub, " +
+    'e.g.: github-code-search \'"\\"react\\": \\""\' --org myorg'
+  );
+}
+
+/**
  * Given a raw query string (possibly mixing GitHub qualifiers and a /regex/flags
  * token), returns:
  *

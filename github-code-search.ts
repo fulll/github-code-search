@@ -24,7 +24,7 @@ import { groupByTeamPrefix, flattenTeamSections, applyTeamPick } from "./src/gro
 import { checkForUpdate } from "./src/upgrade.ts";
 import { runInteractive } from "./src/tui.ts";
 import { generateCompletion, detectShell } from "./src/completions.ts";
-import { buildApiQuery, isRegexQuery } from "./src/regex.ts";
+import { buildApiQuery, isRegexQuery, validateQuoteBalance } from "./src/regex.ts";
 import type { OutputFormat, OutputType } from "./src/types.ts";
 
 // Version + build metadata injected at compile time via --define (see build.ts).
@@ -232,6 +232,13 @@ async function searchAction(
   const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
   if (!GITHUB_TOKEN) {
     console.error(pc.red("Error: GITHUB_TOKEN environment variable is not set."));
+    process.exit(1);
+  }
+
+  // Fail fast on unbalanced quotes rather than surfacing a raw GitHub 422 — see issue #149
+  const quoteError = validateQuoteBalance(query);
+  if (quoteError) {
+    console.error(pc.red(`Error: ${quoteError}`));
     process.exit(1);
   }
 
