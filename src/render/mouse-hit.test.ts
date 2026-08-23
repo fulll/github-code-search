@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { hitTestClick, type ClickTarget } from "./mouse-hit.ts";
+import { hitTestClick } from "./mouse-hit.ts";
 import type { RepoGroup, Row } from "../types.ts";
 
 function createTestGroup(name: string, repoSelected = true): RepoGroup {
