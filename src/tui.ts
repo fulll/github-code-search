@@ -20,6 +20,12 @@ import {
   rebuildTeamSections,
 } from "./group.ts";
 import { parseMouseEvent } from "./render/mouse.ts";
+import {
+  createScrollCooldownState,
+  recordScroll,
+  isScrollCooldownActive,
+  updateScrollCooldown,
+} from "./scroll-cooldown.ts";
 import { hitTestClick } from "./render/mouse-hit.ts";
 import type { FilterTarget, OutputFormat, OutputType, RepoGroup, Row } from "./types.ts";
 
@@ -227,10 +233,8 @@ export async function runInteractive(
   let lastClickTime = 0;
   let lastClickRowKey: string | null = null;
 
-  // Scroll cooldown to avoid accidental selection during/after scroll
-  // Trackpad momentum scrolling can last 400-500ms, so use 500ms minimum
-  const SCROLL_COOLDOWN = 500; // milliseconds
-  let lastScrollTime = 0;
+  // Scroll cooldown to prevent accidental selection during/after trackpad momentum scrolling
+  let scrollCooldownState = createScrollCooldownState();
 
   const scheduleStatsUpdate = () => {
     if (statsDebounceTimer !== null) clearTimeout(statsDebounceTimer);
@@ -320,14 +324,14 @@ export async function runInteractive(
         // Wheel up — scroll up by a small step (3 rows)
         scrollOffset = Math.max(0, scrollOffset - 3);
         scrollOffset = normalizeScrollOffset(scrollOffset, rows, groups, getViewportHeight(rows));
-        lastScrollTime = Date.now();
+        scrollCooldownState = recordScroll(scrollCooldownState);
         redraw();
         continue;
       } else if (mouseEvent.button === 65) {
         // Wheel down — scroll down by a small step (3 rows)
         scrollOffset = Math.min(Math.max(0, rows.length - 1), scrollOffset + 3);
         scrollOffset = normalizeScrollOffset(scrollOffset, rows, groups, getViewportHeight(rows));
-        lastScrollTime = Date.now();
+        scrollCooldownState = recordScroll(scrollCooldownState);
         redraw();
         continue;
       }
@@ -357,8 +361,11 @@ export async function runInteractive(
         const rowKey = getRowKey(row);
         const now = Date.now();
 
+        // Update scroll cooldown state (clears isActive flag if timeout expired)
+        scrollCooldownState = updateScrollCooldown(scrollCooldownState, now);
+
         // Ignore selection/fold actions during scroll cooldown to avoid accidental toggles
-        if (now - lastScrollTime < SCROLL_COOLDOWN && target.action !== "navigate") {
+        if (isScrollCooldownActive(scrollCooldownState, now) && target.action !== "navigate") {
           // Only allow navigation during scroll cooldown
           cursor = rows.indexOf(row);
           redraw();
