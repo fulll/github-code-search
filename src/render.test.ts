@@ -628,6 +628,20 @@ describe("renderGroups", () => {
     expect(stripped).toContain("\u25be");
   });
 
+  it("shows dimmed ✓ for deselected repo", () => {
+    const groups = [makeGroup("org/repoA", ["src/a.ts"], true)];
+    groups[0].repoSelected = false;
+    // When repo is deselected, all extracts should be deselected too
+    groups[0].extractSelected = groups[0].extractSelected.map(() => false);
+    const rows = buildRows(groups);
+    const out = renderGroups(groups, 0, rows, 40, 0, "q", "org");
+    // Verify the output contains the ✓ character
+    const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
+    expect(stripped).toContain("✓");
+    // Verify the ✓ is styled with ANSI dim code (pc.dim uses \x1b[2m)
+    expect(out).toMatch(/\x1b\[2m✓/);
+  });
+
   it("shows sticky repo header when extract cursor scrolled past its repo", () => {
     // rows: [repo(0), ext(0,0), ext(0,1), ext(0,2)]
     // cursor=3, scrollOffset=2 → repo row (idx 0) < scrollOffset → sticky

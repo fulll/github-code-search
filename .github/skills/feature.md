@@ -15,6 +15,8 @@ github-code-search.ts   CLI (Commander) — parsing, program flow, output pipe
 │   └── src/cache.ts     Disk cache for team list (used only by api.ts)
 │
 ├── src/tui.ts           Interactive TTY — the only allowed stdin/stdout I/O
+│   └── src/scroll-cooldown.ts Pure: scroll-cooldown state machine (debounces clicks
+│                              during trackpad momentum scrolling)
 │
 ├── src/aggregate.ts     Pure: filter + exclusion logic
 ├── src/group.ts         Pure: team-prefix grouping
@@ -27,7 +29,12 @@ github-code-search.ts   CLI (Commander) — parsing, program flow, output pipe
 │       ├── filter-match.ts Pure: makeExtractMatcher, makeRepoMatcher
 │       ├── rows.ts      Pure: buildRows, rowTerminalLines, isCursorVisible
 │       ├── summary.ts   Pure: buildSummary, buildSummaryFull, buildSelectionSummary
-│       └── selection.ts Pure: applySelectAll, applySelectNone
+│       ├── selection.ts Pure: applySelectAll, applySelectNone
+│       ├── layout-constants.ts Pure: header-line counts, mouse button codes, MOUSE_SCROLL_STEP
+│       ├── mouse.ts     Pure: parseMouseEvent() — SGR mouse-escape-sequence parser
+│       │                (imported directly by `tui.ts`, not re-exported from `render.ts`)
+│       └── mouse-hit.ts Pure: hitTestClick() — maps a click + scrollOffset to a Row/zone
+│                        (imported directly by `tui.ts`, not re-exported from `render.ts`)
 │
 └── src/types.ts         Single source of truth for all shared interfaces
 ```

@@ -72,8 +72,9 @@
           <span class="hiw-step-badge">Step 2</span>
           <h3 class="hiw-step-title">Triage interactively</h3>
           <p class="hiw-step-desc">
-            A keyboard-driven TUI opens. Navigate repos, expand extracts, filter by file path.
-            Select exactly what matters — deselect noise. Works without leaving the terminal.
+            A keyboard and mouse-driven TUI opens (mouse works in compatible terminals). Navigate
+            repos, expand extracts, filter by file path. Select exactly what matters — deselect
+            noise. Works without leaving the terminal.
           </p>
         </div>
       </div>

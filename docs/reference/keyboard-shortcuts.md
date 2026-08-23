@@ -102,3 +102,56 @@ When re-pick mode is active (after pressing `t` on a picked repo marked `◈`):
 | `h` / `?`      | Toggle the help overlay (shows all key bindings)                                                       |
 | `Enter`        | When help overlay is **closed**: confirm and print selected results. When **open**: close the overlay. |
 | `q` / `Ctrl+C` | Quit without printing results                                                                          |
+
+## Mouse support
+
+The interactive TUI supports mouse interaction via the terminal's SGR (Select-Graphic-Rendition) mouse protocol, enabling click-based navigation and selection alongside keyboard shortcuts.
+
+### Scroll wheel
+
+| Action                 | Effect                                                |
+| ---------------------- | ----------------------------------------------------- |
+| Scroll up / down wheel | Scroll the viewport up or down by 3 rows              |
+| Scroll during momentum | Clicks are ignored during trackpad momentum scrolling |
+
+During trackpad momentum scrolling (macOS, Linux), the TUI enters a brief "scroll cooldown" period to ignore accidental clicks while the scroll is still decelerating. This prevents unintended selections.
+
+### Click actions
+
+| Action                                                 | Effect                                                        |
+| ------------------------------------------------------ | ------------------------------------------------------------- |
+| **Single-click on row** (anywhere)                     | Move the cursor to that row (navigation)                      |
+| **Double-click on row**                                | Perform the double-click action for that row type (see below) |
+| **Double-click on fold icon** (▸/▾, repo rows)         | Toggle repo fold state (show/hide extracts)                   |
+| **Double-click on checkbox or row content** (repos)    | Toggle the repo's selection state (cascades to all extracts)  |
+| **Double-click on checkbox or row content** (extracts) | Toggle that extract's selection state                         |
+
+### Click zones
+
+The TUI divides each row into interactive zones:
+
+**Repo rows** (`"▸ ✓ repo-name"`):
+
+| Zone          | Columns | Action on double-click                    |
+| ------------- | ------- | ----------------------------------------- |
+| Fold control  | 1–2     | Toggle fold (show/hide extracts)          |
+| Checkbox zone | 4+      | Toggle repo selection (full-width double) |
+| Navigation    | 3       | Single-click only (move cursor)           |
+
+**Extract rows** (`"  ✓ path:line:col"`):
+
+| Zone          | Columns | Action on double-click                |
+| ------------- | ------- | ------------------------------------- |
+| Indent        | 1–3     | Single-click only (move cursor)       |
+| Checkbox zone | 4+      | Toggle extract selection (full-width) |
+
+Note: All double-click actions are mapped to the row type (repo or extract) and the click column. Clicking anywhere from column 4 onwards (checkbox start) triggers a selection action; clicking on columns 1–3 only triggers navigation or fold (repo rows only).
+
+### Relationship with keyboard
+
+Mouse and keyboard shortcuts are fully complementary:
+
+- **Selection**: Mouse double-click on checkbox = Spacebar `Space`
+- **Navigation**: Mouse single-click = Arrow keys `↑` / `↓`
+- **Fold control**: Mouse double-click on fold icon = Arrow keys `←` / `→`
+- **Select all / Select none**: Keyboard `a` / `n` (no mouse equivalent)

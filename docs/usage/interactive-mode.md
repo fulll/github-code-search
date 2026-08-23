@@ -48,6 +48,43 @@ github-code-search "useFeatureFlag" --org fulll
 | `Enter`        | Confirm and print selected results (also closes the help overlay)                                                                                                       |
 | `q` / `Ctrl+C` | Quit without printing                                                                                                                                                   |
 
+## Mouse support
+
+The TUI supports mouse interaction via the terminal's SGR mouse protocol. You can navigate, select, and fold repos using your mouse alongside keyboard shortcuts.
+
+### Scrolling
+
+- **Scroll wheel** (up/down) — move the viewport up or down by 3 rows.
+- **Momentum scrolling** (trackpad): clicks are ignored during and immediately after the scroll gesture to prevent accidental selections while the scroll is still decelerating.
+
+### Single-click
+
+- **Single-click on any row** — move the cursor to that row (equivalent to `↑`/`↓` navigation).
+
+### Double-click
+
+Double-click actions depend on both the **row type** (repo or extract) and the **click zone** (columns 1–3 vs. columns 4+):
+
+**On a repo row** (`▸ ✓ repo-name`):
+
+| Click zone                       | Action                          |
+| -------------------------------- | ------------------------------- |
+| Fold control (columns 1–2)       | Toggle fold (`←` / `→`)         |
+| Checkbox or content (columns 4+) | Toggle repo selection (`Space`) |
+
+**On an extract row** (`  ✓ path:line:col`):
+
+| Click zone                         | Action                        |
+| ---------------------------------- | ----------------------------- |
+| Content area (columns 4+)          | Toggle extract selection      |
+| Navigation-only zone (columns 1–3) | No action (single-click only) |
+
+The checkbox zone (column 4 and beyond) is **full-width for selection**, so you can double-click anywhere on the row content to toggle selection.
+
+### Accessibility note
+
+Mouse support is optional; all features are fully accessible via keyboard. Many users prefer the keyboard-only workflow for speed and precision during large searches.
+
 ## Selection behaviour
 
 - **Selecting a repo row** (`Space`) cascades to all its extracts.

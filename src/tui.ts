@@ -19,6 +19,20 @@ import {
   flattenTeamSections,
   rebuildTeamSections,
 } from "./group.ts";
+import { parseMouseEvent } from "./render/mouse.ts";
+import {
+  createScrollCooldownState,
+  recordScroll,
+  isScrollCooldownActive,
+  updateScrollCooldown,
+} from "./scroll-cooldown.ts";
+import {
+  getHeaderLines,
+  MOUSE_BUTTON_WHEEL_UP,
+  MOUSE_BUTTON_WHEEL_DOWN,
+  MOUSE_SCROLL_STEP,
+} from "./render.ts";
+import { hitTestClick } from "./render/mouse-hit.ts";
 import type { FilterTarget, OutputFormat, OutputType, RepoGroup, Row } from "./types.ts";
 
 // ─── Key binding constants ────────────────────────────────────────────────────
@@ -39,6 +53,12 @@ const KEY_CTRL_A = "\x01";
 const KEY_CTRL_E = "\x05";
 const KEY_CTRL_W = "\x17";
 const KEY_ALT_BACKSPACE = "\x1b\x7f";
+
+// ─── Terminal mouse reporting (SGR protocol) ──────────────────────────────────
+// https://en.wikipedia.org/wiki/X11_mouse_protocol#SGR_1006_Protocol
+// Enable/disable both basic mouse support (?1000) and SGR encoding (?1006)
+const ANSI_ENABLE_MOUSE_REPORTING = "\x1b[?1000h\x1b[?1006h";
+const ANSI_DISABLE_MOUSE_REPORTING = "\x1b[?1000l\x1b[?1006l";
 const KEY_CTRL_ARROW_LEFT = "\x1b[1;5D";
 const KEY_CTRL_ARROW_RIGHT = "\x1b[1;5C";
 const KEY_ALT_ARROW_LEFT = "\x1b[1;3D"; // Alt/Option+← (xterm, iTerm2 with Use Option as Meta key)
@@ -106,6 +126,11 @@ function openInBrowser(url: string): void {
 
 // ─── Interactive TUI ─────────────────────────────────────────────────────────
 
+/** Compute a unique key for a row to detect double-clicks. */
+function getRowKey(row: Row): string {
+  return `${row.type}:${row.repoIndex}:${row.extractIndex ?? -1}`;
+}
+
 export async function runInteractive(
   groups: RepoGroup[],
   query: string,
@@ -127,6 +152,8 @@ export async function runInteractive(
 
   process.stdin.setRawMode(true);
   readline.emitKeypressEvents(process.stdin);
+  // Enable SGR mouse reporting on the terminal
+  process.stdout.write(ANSI_ENABLE_MOUSE_REPORTING);
 
   let cursor = 0;
   let scrollOffset = 0;
@@ -210,7 +237,20 @@ export async function runInteractive(
     focusedIndex: number;
   } = { active: false, repoIndex: -1, candidates: [], focusedIndex: 0 };
 
-  /** Schedule a debounced stats recompute (while typing in filter bar). */
+  // Persistent rows reference — updated on every redraw so it's available in the event loop
+  let rows: Row[] = [];
+
+  // Flag to signal when to exit the event loop
+  let shouldExit = false;
+
+  // Mouse double-click detection state
+  const DOUBLE_CLICK_DELAY = 300; // milliseconds
+  let lastClickTime = 0;
+  let lastClickRowKey: string | null = null;
+
+  // Scroll cooldown to prevent accidental selection during/after trackpad momentum scrolling
+  let scrollCooldownState = createScrollCooldownState();
+
   const scheduleStatsUpdate = () => {
     if (statsDebounceTimer !== null) clearTimeout(statsDebounceTimer);
     filterLiveStats = null; // show "…" while typing fast
@@ -223,7 +263,7 @@ export async function runInteractive(
 
   const redraw = () => {
     const activeFilter = filterMode ? filterInput : filterPath;
-    const rows = buildRows(groups, activeFilter, filterTarget, filterRegex);
+    rows = buildRows(groups, activeFilter, filterTarget, filterRegex);
     // Normalise scrollOffset downward so the viewport is packed to the bottom.
     // After a fold/unfold, filter change, or navigation near the end of the
     // list, the rows visible from scrollOffset onwards can be fewer than
@@ -261,10 +301,16 @@ export async function runInteractive(
 
   // ─── Exit handler for cleanup ────────────────────────────────────────────
   const exit = () => {
+    // Disable SGR mouse reporting and clear terminal.
+    // This ensures the terminal returns to normal mode before process exits.
+    process.stdout.write(ANSI_DISABLE_MOUSE_REPORTING);
     process.stdout.write(ANSI_CLEAR);
+    if (statsDebounceTimer !== null) clearTimeout(statsDebounceTimer);
     process.stdin.setRawMode(false);
     process.off("SIGWINCH", onResize);
-    process.exit(0);
+    // Set flag to break out of the event loop and allow stdout buffer to flush
+    // before process termination. process.exit() may terminate too early.
+    shouldExit = true;
   };
 
   // ─── Live terminal resize handler ────────────────────────────────────────
@@ -282,6 +328,106 @@ export async function runInteractive(
 
   for await (const chunk of process.stdin) {
     const key = chunk.toString();
+
+    // Try parsing as a mouse event; if it's not a mouse event, treat as keyboard input
+    const mouseEvent = parseMouseEvent(key);
+    if (mouseEvent !== null) {
+      // Ignore mouse release events; only act on press (M)
+      if (mouseEvent.isRelease) {
+        continue;
+      }
+
+      // Handle wheel scroll
+      if (mouseEvent.button === MOUSE_BUTTON_WHEEL_UP) {
+        // Wheel up — scroll up by a small step
+        scrollOffset = Math.max(0, scrollOffset - MOUSE_SCROLL_STEP);
+        scrollOffset = normalizeScrollOffset(scrollOffset, rows, groups, getViewportHeight(rows));
+        scrollCooldownState = recordScroll(scrollCooldownState);
+        redraw();
+        continue;
+      } else if (mouseEvent.button === MOUSE_BUTTON_WHEEL_DOWN) {
+        // Wheel down — scroll down by a small step
+        scrollOffset = Math.min(Math.max(0, rows.length - 1), scrollOffset + MOUSE_SCROLL_STEP);
+        scrollOffset = normalizeScrollOffset(scrollOffset, rows, groups, getViewportHeight(rows));
+        scrollCooldownState = recordScroll(scrollCooldownState);
+        redraw();
+        continue;
+      }
+
+      // Check scroll cooldown BEFORE hit-testing any clicks.
+      // During momentum scrolling, clicks can fire at scroll end positions; ignore them completely.
+      const now = Date.now();
+      scrollCooldownState = updateScrollCooldown(scrollCooldownState, now);
+      if (isScrollCooldownActive(scrollCooldownState, now)) {
+        // Completely ignore all clicks during scroll cooldown
+        continue;
+      }
+
+      // Calculate header lines before the first row to adjust click coordinates.
+      // Includes: title + summary + hints + blank (base 4) + filter bar if active.
+      const headerLines = getHeaderLines(
+        filterMode,
+        filterPath || filterTarget !== "path" || filterRegex,
+      );
+
+      // Hit-test the click against visible rows (non-wheel buttons)
+      const target = hitTestClick(
+        groups,
+        rows,
+        scrollOffset,
+        mouseEvent.x,
+        mouseEvent.y,
+        headerLines,
+      );
+      if (target !== null) {
+        const row = target.row;
+        const rowKey = getRowKey(row);
+
+        const isDoubleClick =
+          lastClickRowKey === rowKey && now - lastClickTime < DOUBLE_CLICK_DELAY;
+
+        // Update last click state for next click detection
+        lastClickTime = now;
+        lastClickRowKey = rowKey;
+
+        // Mouse click semantics (see docs/usage/interactive-mode.md § Mouse support):
+        // - Single-click: always navigate (move cursor) to the clicked row.
+        // - Double-click: apply the zone-specific action (fold or select).
+        //   This is a UX feature that complements keyboard shortcuts (arrow keys for
+        //   navigation, spacebar for selection, arrow keys for fold/unfold).
+        if (isDoubleClick) {
+          // Double-click: apply the action (fold or select)
+          if (target.action === "fold" && row.type === "repo") {
+            const group = groups[row.repoIndex];
+            group.folded = !group.folded;
+            redraw();
+          } else if (target.action === "select") {
+            if (row.type === "repo") {
+              const group = groups[row.repoIndex];
+              // Toggle repo selection and cascade to all extracts (same as spacebar)
+              group.repoSelected = !group.repoSelected;
+              group.extractSelected = group.extractSelected.map(() => group.repoSelected);
+            } else if (row.type === "extract" && row.extractIndex !== undefined) {
+              const group = groups[row.repoIndex];
+              group.extractSelected[row.extractIndex] = !group.extractSelected[row.extractIndex];
+              // Update repo selection to match if any extract is selected
+              group.repoSelected = group.extractSelected.some(Boolean);
+            }
+            redraw();
+          }
+          // If action is "navigate", double-click does nothing (navigate already happened on single click)
+        } else {
+          // Single-click: always navigate to this row
+          const rowIndex = rows.findIndex((r) => r === row);
+          if (rowIndex >= 0) {
+            cursor = rowIndex;
+            scrollOffset = Math.min(scrollOffset, cursor);
+            redraw();
+          }
+        }
+      }
+      continue;
+    }
 
     // Reset the gg pending state on every key that isn't a sequence of one
     // or more plain "g" characters. This allows terminals that batch key
@@ -493,7 +639,7 @@ export async function runInteractive(
     }
 
     // ── Normal mode ───────────────────────────────────────────────────────────────
-    const rows = buildRows(groups, filterPath, filterTarget, filterRegex);
+    rows = buildRows(groups, filterPath, filterTarget, filterRegex);
     const row = rows[cursor];
 
     if (key === KEY_CTRL_C || key === "q") {
@@ -507,9 +653,13 @@ export async function runInteractive(
         redraw();
         continue;
       }
+      // Disable SGR mouse reporting and cleanup before printing output.
+      // This must happen BEFORE console.log to ensure the terminal is in normal mode.
+      process.stdout.write(ANSI_DISABLE_MOUSE_REPORTING);
       process.stdout.write(ANSI_CLEAR);
       process.stdin.setRawMode(false);
       process.off("SIGWINCH", onResize);
+      if (statsDebounceTimer !== null) clearTimeout(statsDebounceTimer);
       console.log(
         buildOutput(groups, query, org, excludedRepos, excludedExtractRefs, format, outputType, {
           includeArchived,
@@ -519,7 +669,9 @@ export async function runInteractive(
           pickTeams: Object.keys(confirmedPicks).length > 0 ? confirmedPicks : undefined,
         }),
       );
-      process.exit(0);
+      // Break out of the event loop to allow stdout buffer to flush before exit
+      shouldExit = true;
+      break;
     }
 
     // `h` / `?` / Esc — toggle help overlay (Esc closes only, h/? toggle)
@@ -760,5 +912,10 @@ export async function runInteractive(
     }
 
     redraw();
+
+    // Break out of the event loop if exit was requested
+    if (shouldExit) {
+      break;
+    }
   }
 }

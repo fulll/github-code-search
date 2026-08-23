@@ -6,7 +6,7 @@
 [![Latest release](https://img.shields.io/github/v/release/fulll/github-code-search)](https://github.com/fulll/github-code-search/releases/latest)
 
 Interactive CLI to search GitHub code across an organization — per-repository aggregation,
-keyboard-driven TUI, fine-grained extract selection, markdown/JSON output.
+keyboard- and mouse-driven TUI, fine-grained extract selection, markdown/JSON output.
 
 → **Full documentation: https://fulll.github.io/github-code-search/**
 
@@ -39,7 +39,7 @@ github-code-search query "TODO" --org my-org
 
 - **Org-wide search** — queries all repositories in a GitHub organization in one command, with automatic pagination up to 1 000 results
 - **Per-repository aggregation** — results grouped by repo, not as a flat list; fold/unfold each repo to focus on what matters
-- **Keyboard-driven TUI** — navigate with arrow keys, toggle selections, filter by file path, confirm with Enter — without leaving the terminal
+- **Keyboard- and mouse-driven TUI** — navigate with arrow keys or mouse clicks, toggle selections, scroll with the wheel, filter by file path, confirm with Enter — without leaving the terminal
 - **Fine-grained selection** — pick exactly the repos and extracts you want; deselected items are recorded as exclusions in the replay command
 - **Structured output** — Markdown document with a `# Results for` query heading, GitHub deeplinks and the exact matched token per extract; or machine-readable JSON that, when segment data is available, includes `matchedText`, `line` and `col` fields — ready to paste into docs, issues or scripts
 - **Team-prefix grouping** — group results by team prefix (e.g. `platform/`, `data/`) using `--group-by-team-prefix`
@@ -109,16 +109,16 @@ Use `/pattern/` syntax to run a regex search. The CLI automatically derives a sa
 
 The official [`gh` CLI](https://cli.github.com/) does support `gh search code`, but it returns a **flat paginated list** — one result per line, no grouping, no interactive selection, no structured output.
 
-|                                            | `gh search code` | `github-code-search` |
-| ------------------------------------------ | :--------------: | :------------------: |
-| Results grouped by repo                    |        ✗         |          ✓           |
-| Interactive TUI (navigate, select, filter) |        ✗         |          ✓           |
-| Fine-grained extract selection             |        ✗         |          ✓           |
-| Markdown / JSON output                     |        ✗         |          ✓           |
-| Replay / CI command                        |        ✗         |          ✓           |
-| Team-prefix grouping                       |        ✗         |          ✓           |
-| Regex search                               |        ✗         |          ✓           |
-| Syntax highlighting in terminal            |        ✗         |          ✓           |
-| Pagination (up to 1 000 results)           |        ✓         |          ✓           |
+|                                                           | `gh search code` | `github-code-search` |
+| --------------------------------------------------------- | :--------------: | :------------------: |
+| Results grouped by repo                                   |        ✗         |          ✓           |
+| Interactive TUI (navigate, select, filter, mouse support) |        ✗         |          ✓           |
+| Fine-grained extract selection                            |        ✗         |          ✓           |
+| Markdown / JSON output                                    |        ✗         |          ✓           |
+| Replay / CI command                                       |        ✗         |          ✓           |
+| Team-prefix grouping                                      |        ✗         |          ✓           |
+| Regex search                                              |        ✗         |          ✓           |
+| Syntax highlighting in terminal                           |        ✗         |          ✓           |
+| Pagination (up to 1 000 results)                          |        ✓         |          ✓           |
 
 `github-code-search` is purpose-built for **org-wide code audits and interactive triage** — not just a search wrapper.

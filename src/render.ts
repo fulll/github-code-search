@@ -10,6 +10,12 @@ import { visibleWidth, stripAnsi, clipToWidth } from "./render/terminal.ts";
 // ─── Re-exports ───────────────────────────────────────────────────────────────
 // Consumers (tui.ts, output.ts, tests) continue to import from render.ts.
 
+export {
+  getHeaderLines,
+  MOUSE_BUTTON_WHEEL_UP,
+  MOUSE_BUTTON_WHEEL_DOWN,
+  MOUSE_SCROLL_STEP,
+} from "./render/layout-constants.ts";
 export { highlightFragment } from "./render/highlight.ts";
 export { buildFilterStats, type FilterStats } from "./render/filter.ts";
 export {
@@ -461,7 +467,7 @@ export function renderGroups(
     );
     if (repoRowIndex >= 0 && repoRowIndex < scrollOffset) {
       const g = groups[cursorRow.repoIndex];
-      const checkbox = g.repoSelected ? pc.green("✓") : " ";
+      const checkbox = g.repoSelected ? pc.green("✓") : pc.dim("✓");
       // Fix: clip to termWidth so the sticky line never wraps — see issue #105.
       stickyRepoLine = clipToWidth(
         pc.dim(`▲ ${checkbox} ${pc.bold(g.repoFullName)} ${pc.dim(buildMatchCountLabel(g))}`),
@@ -564,10 +570,10 @@ export function renderGroups(
 
     if (row.type === "repo") {
       const arrow = group.folded ? pc.magenta("▸") : pc.magenta("▾");
-      // ✓ for selected, space for deselected — keeps the line clean while a
-      // green checkmark clearly signals selection. The space preserves column
-      // alignment so the repo name always starts at the same offset.
-      const checkbox = group.repoSelected ? pc.green("✓") : " ";
+      // Determine checkbox state: green if any extract is selected, dimmed if none are selected.
+      // group.repoSelected is kept in sync with extracts via tui.ts and render/selection.ts,
+      // so we can use it directly without recomputing.
+      const checkbox = group.repoSelected ? pc.green("✓") : pc.dim("✓");
       // On cursor rows, use bold+white for the repo name (dark bg applied
       // to the whole line via renderActiveLine; no inline bgMagenta needed).
       // On inactive rows, use bright purple (same as the bar) in bold.
@@ -602,7 +608,7 @@ export function renderGroups(
       const ei = row.extractIndex!;
       const match = group.matches[ei];
       const selected = group.extractSelected[ei];
-      const checkbox = selected ? pc.green("✓") : " ";
+      const checkbox = selected ? pc.green("✓") : pc.dim("✓");
       const seg = match.textMatches[0]?.matches[0];
       const locSuffix = seg ? `:${seg.line}:${seg.col}` : "";
       // Active extract row: locSuffix uses bold+white (same as path) for

@@ -27,8 +27,8 @@ features:
     details: Results are grouped by repository, not shown as a flat list. Fold or unfold each repo to focus on what matters.
   - icon:
       src: /icons/terminal.svg
-    title: Keyboard-driven TUI
-    details: Navigate with arrow keys, select individual extracts, filter by file path, and confirm with Enter — all without leaving the terminal.
+    title: Keyboard and mouse-driven TUI
+    details: Navigate with arrow keys or mouse clicks, select individual extracts, filter by file path, and confirm with Enter — all without leaving the terminal.
   - icon:
       src: /icons/target.svg
     title: Fine-grained selection
