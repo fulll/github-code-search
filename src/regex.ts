@@ -13,6 +13,49 @@ export function isRegexQuery(q: string): boolean {
 }
 
 /**
+ * Returns true when the `"` at `index` in `s` is escaped, i.e. preceded by an
+ * odd number of consecutive backslashes (GitHub's `\"` escape sequence).
+ */
+function isEscapedQuote(s: string, index: number): boolean {
+  let backslashes = 0;
+  let i = index - 1;
+  while (i >= 0 && s[i] === "\\") {
+    backslashes++;
+    i--;
+  }
+  return backslashes % 2 === 1;
+}
+
+/**
+ * Validates that a plain-text (non-regex) query has a balanced number of
+ * unescaped `"` characters, as required by GitHub's query syntax — an odd
+ * count is rejected by the API with an opaque
+ * `ERROR_TYPE_QUERY_PARSING_FATAL` 422 error.
+ *
+ * Returns `null` when the query is valid (including regex queries, whose
+ * `/pattern/` token is validated separately by `buildApiQuery`). Returns a
+ * human-readable error message — including a corrected example using
+ * GitHub's documented double-escaping syntax — when the query would be
+ * rejected by the API. See issue #149.
+ */
+export function validateQuoteBalance(query: string): string | null {
+  if (isRegexQuery(query)) return null;
+
+  let unescapedCount = 0;
+  for (let i = 0; i < query.length; i++) {
+    if (query[i] === '"' && !isEscapedQuote(query, i)) unescapedCount++;
+  }
+  if (unescapedCount % 2 === 0) return null;
+
+  return (
+    `Unbalanced double quotes in query: ${JSON.stringify(query)}. ` +
+    "GitHub rejects this with a query parsing error. " +
+    "To search for a literal quote character, escape it for both your shell and GitHub, " +
+    'e.g.: github-code-search \'"\\"react\\": \\""\' --org myorg'
+  );
+}
+
+/**
  * Given a raw query string (possibly mixing GitHub qualifiers and a /regex/flags
  * token), returns:
  *
