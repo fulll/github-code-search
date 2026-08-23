@@ -14,15 +14,10 @@ import {
 } from "./render.ts";
 import { buildOutput } from "./output.ts";
 import {
-  applyTeamPick,
   applyTeamPickInTree,
   flattenTeamHierarchy,
-  flattenTeamSections,
-  moveRepoToSection,
   moveRepoToSectionInTree,
   rebuildTeamHierarchy,
-  rebuildTeamSections,
-  undoSectionPick,
   undoSectionPickInTree,
 } from "./group.ts";
 import { parseMouseEvent } from "./render/mouse.ts";
@@ -148,6 +143,7 @@ export async function runInteractive(
   includeArchived = false,
   excludeTemplates = false,
   groupByTeamPrefix = "",
+  consolidateTeamSections = false,
   regexHint = "",
   initialPickTeams: Record<string, string> = {},
 ): Promise<void> {
@@ -470,23 +466,16 @@ export async function runInteractive(
           focusedIndex: (teamPickMode.focusedIndex + 1) % teamPickMode.candidates.length,
         };
       } else if (key === KEY_ENTER_CR || key === KEY_ENTER_LF) {
-        // Enter — confirm pick, reassign repos, exit pick mode
+        // Enter — confirm pick, reassign repos, exit pick mode.
+        // Always tree-aware: the CLI only ever produces sectionPath-tagged
+        // groups (groupByTeamHierarchy), even for a depth-1 (top-level)
+        // section, so rebuildTeamSections/applyTeamPick (which expect the
+        // older flat sectionLabel marker) would silently no-op here — see
+        // issue #182.
         const chosen = teamPickMode.candidates[teamPickMode.focusedIndex];
-        // Fix: branch on sectionPath depth so a pick on a nested
-        // groupByTeamHierarchy section reassigns within the tree instead of
-        // (incorrectly) treating the tree as a flat groupByTeamPrefix list —
-        // see issue #181. A depth-1 path (top-level section) behaves exactly
-        // like the flat path, since a hierarchy tree's top level is the same
-        // shape as groupByTeamPrefix's flat sections.
-        if (teamPickMode.sectionPath.length > 1) {
-          const sections = rebuildTeamHierarchy(groups);
-          const updated = applyTeamPickInTree(sections, teamPickMode.sectionPath, chosen);
-          groups = flattenTeamHierarchy(updated);
-        } else {
-          const sections = rebuildTeamSections(groups);
-          const updated = applyTeamPick(sections, teamPickMode.sectionLabel, chosen);
-          groups = flattenTeamSections(updated);
-        }
+        const sections = rebuildTeamHierarchy(groups);
+        const updated = applyTeamPickInTree(sections, teamPickMode.sectionPath, chosen);
+        groups = flattenTeamHierarchy(updated);
         confirmedPicks[teamPickMode.sectionPath.join(" > ") || teamPickMode.sectionLabel] = chosen;
         teamPickMode = {
           active: false,
@@ -533,21 +522,14 @@ export async function runInteractive(
           focusedIndex: (repickMode.focusedIndex + 1) % repickMode.candidates.length,
         };
       } else if (key === KEY_ENTER_CR || key === KEY_ENTER_LF) {
-        // Enter — confirm re-pick, move repo to the focused candidate team
+        // Enter — confirm re-pick, move repo to the focused candidate team.
+        // Always tree-aware — see issue #182 (same reasoning as pick mode above).
         const targetTeam = repickMode.candidates[repickMode.focusedIndex];
         const g = groups[repickMode.repoIndex];
-        const pickedFrom = g.pickedFrom ?? "";
-        // Fix: a hierarchical pickedFrom ("parent > combined") must move the
-        // repo within the tree, at the same parent depth it was picked from
-        // — see issue #181.
-        if (pickedFrom.includes(" > ")) {
-          const parentPath = pickedFrom.split(" > ").slice(0, -1);
-          const sections = rebuildTeamHierarchy(groups);
-          const updated = moveRepoToSectionInTree(sections, g.repoFullName, parentPath, targetTeam);
-          groups = flattenTeamHierarchy(updated);
-        } else {
-          groups = moveRepoToSection(groups, g.repoFullName, targetTeam);
-        }
+        const parentPath = (g.pickedFrom ?? "").split(" > ").slice(0, -1);
+        const sections = rebuildTeamHierarchy(groups);
+        const updated = moveRepoToSectionInTree(sections, g.repoFullName, parentPath, targetTeam);
+        groups = flattenTeamHierarchy(updated);
         const newRows = buildRows(groups, filterPath, filterTarget, filterRegex);
         cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
         scrollOffset = Math.min(scrollOffset, cursor);
@@ -560,13 +542,9 @@ export async function runInteractive(
         const combinedLabel = groups[repickMode.repoIndex]?.pickedFrom;
         if (combinedLabel) {
           delete confirmedPicks[combinedLabel];
-          if (combinedLabel.includes(" > ")) {
-            const sections = rebuildTeamHierarchy(groups);
-            const updated = undoSectionPickInTree(sections, combinedLabel);
-            groups = flattenTeamHierarchy(updated);
-          } else {
-            groups = undoSectionPick(groups, combinedLabel);
-          }
+          const sections = rebuildTeamHierarchy(groups);
+          const updated = undoSectionPickInTree(sections, combinedLabel);
+          groups = flattenTeamHierarchy(updated);
         }
         const newRows = buildRows(groups, filterPath, filterTarget, filterRegex);
         cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
@@ -724,6 +702,7 @@ export async function runInteractive(
           includeArchived,
           excludeTemplates,
           groupByTeamPrefix,
+          consolidateTeamSections,
           regexHint: regexHint || undefined,
           pickTeams: Object.keys(confirmedPicks).length > 0 ? confirmedPicks : undefined,
         }),

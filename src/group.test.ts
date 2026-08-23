@@ -12,6 +12,8 @@ import {
   moveRepoToSectionInTree,
   rebuildTeamHierarchy,
   rebuildTeamSections,
+  parseTeamPrefixChains,
+  resolvePickTeamAssignment,
   undoPickedRepo,
   undoPickedRepoInTree,
   undoSectionPick,
@@ -1325,5 +1327,138 @@ describe("undoSectionPick", () => {
     })();
     expect(inCombined).toContain("org/repoA");
     expect(inCombined).toContain("org/repoC");
+  });
+});
+
+// ─── parseTeamPrefixChains ──────────────────────────────────────────────────────
+
+describe("parseTeamPrefixChains", () => {
+  it("parses a single flat prefix into a 1-level chain", () => {
+    expect(parseTeamPrefixChains("squad-")).toEqual({ chains: [["squad-"]], warnings: [] });
+  });
+
+  it("parses comma-separated prefixes into independent 1-level chains", () => {
+    expect(parseTeamPrefixChains("squad-,chapter-")).toEqual({
+      chains: [["squad-"], ["chapter-"]],
+      warnings: [],
+    });
+  });
+
+  it("parses a slash-separated chain into a multi-level chain", () => {
+    expect(parseTeamPrefixChains("gamme-/squad-")).toEqual({
+      chains: [["gamme-", "squad-"]],
+      warnings: [],
+    });
+  });
+
+  it("parses a mix of a 2-level chain and an independent 1-level chain", () => {
+    expect(parseTeamPrefixChains("gamme-/squad-,chapter-")).toEqual({
+      chains: [["gamme-", "squad-"], ["chapter-"]],
+      warnings: [],
+    });
+  });
+
+  it("trims whitespace around prefixes and levels", () => {
+    expect(parseTeamPrefixChains(" gamme- / squad- , chapter- ")).toEqual({
+      chains: [["gamme-", "squad-"], ["chapter-"]],
+      warnings: [],
+    });
+  });
+
+  it("drops an empty chain from a leading, trailing, or double comma, with a warning", () => {
+    const { chains, warnings } = parseTeamPrefixChains(",squad-,,chapter-,");
+    expect(chains).toEqual([["squad-"], ["chapter-"]]);
+    expect(warnings.length).toBeGreaterThan(0);
+    expect(warnings.every((w) => w.includes("empty chain segment"))).toBe(true);
+  });
+
+  it("drops an empty level from a leading, trailing, or double slash, with a warning", () => {
+    const { chains, warnings } = parseTeamPrefixChains("/gamme-//squad-/");
+    expect(chains).toEqual([["gamme-", "squad-"]]);
+    expect(warnings.length).toBeGreaterThan(0);
+    expect(warnings[0]).toContain("empty prefix level");
+  });
+
+  it("returns no chains and no warnings for an empty string", () => {
+    // Not a realistic CLI input (the caller checks truthiness first), but
+    // must not throw.
+    expect(parseTeamPrefixChains("")).toEqual({
+      chains: [],
+      warnings: ['--group-by-team-prefix: ignoring empty chain segment in ""'],
+    });
+  });
+});
+
+// ─── resolvePickTeamAssignment ──────────────────────────────────────────────────
+
+describe("resolvePickTeamAssignment", () => {
+  it("resolves a bare label that is unambiguous in the tree", () => {
+    const groups = [makeGroup("org/a", ["squad-a", "squad-b"])];
+    const tree = groupByTeamHierarchy(groups, [["squad-"]]);
+    const result = resolvePickTeamAssignment(tree, "squad-a + squad-b=squad-a");
+    expect(result).toEqual({ path: ["squad-a + squad-b"], chosen: "squad-a" });
+  });
+
+  it("resolves a nested bare label by finding it anywhere in the tree", () => {
+    const groups = [makeGroup("org/a", ["gamme-client", "squad-a", "squad-b"])];
+    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const result = resolvePickTeamAssignment(tree, "squad-a + squad-b=squad-a");
+    expect(result).toEqual({ path: ["gamme-client", "squad-a + squad-b"], chosen: "squad-a" });
+  });
+
+  it("accepts an explicit fully-qualified path (parent > combined)", () => {
+    const groups = [makeGroup("org/a", ["gamme-client", "squad-a", "squad-b"])];
+    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const result = resolvePickTeamAssignment(tree, "gamme-client > squad-a + squad-b=squad-b");
+    expect(result).toEqual({ path: ["gamme-client", "squad-a + squad-b"], chosen: "squad-b" });
+  });
+
+  it("errors when the = separator is missing", () => {
+    const tree = groupByTeamHierarchy([makeGroup("org/a", ["squad-a"])], [["squad-"]]);
+    const result = resolvePickTeamAssignment(tree, "squad-a + squad-b");
+    expect("error" in result).toBe(true);
+    expect((result as { error: string }).error).toContain("missing the =");
+  });
+
+  it("errors when the combined or chosen side is empty", () => {
+    const tree = groupByTeamHierarchy([makeGroup("org/a", ["squad-a"])], [["squad-"]]);
+    const result = resolvePickTeamAssignment(tree, "=squad-a");
+    expect("error" in result).toBe(true);
+  });
+
+  it("errors with the available combined sections when the bare label is not found", () => {
+    const groups = [makeGroup("org/a", ["squad-a", "squad-b"])];
+    const tree = groupByTeamHierarchy(groups, [["squad-"]]);
+    const result = resolvePickTeamAssignment(tree, "squad-x + squad-y=squad-x");
+    expect("error" in result).toBe(true);
+    expect((result as { error: string }).error).toContain("squad-a + squad-b");
+  });
+
+  it("errors when the bare label is ambiguous across multiple branches", () => {
+    const groups = [
+      makeGroup("org/a", ["gamme-x", "squad-a", "squad-b"]),
+      makeGroup("org/b", ["gamme-y", "squad-a", "squad-b"]),
+    ];
+    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"], ["gamme-"]]);
+    const result = resolvePickTeamAssignment(tree, "squad-a + squad-b=squad-a");
+    expect("error" in result).toBe(true);
+    expect((result as { error: string }).error).toContain("ambiguous");
+  });
+
+  it("errors when the combined label is not a multi-team section", () => {
+    const groups = [makeGroup("org/a", ["gamme-client", "squad-a"])];
+    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    // Explicit path pointing at a genuine (non-combined) section.
+    const result = resolvePickTeamAssignment(tree, "gamme-client > squad-a=squad-a");
+    expect("error" in result).toBe(true);
+    expect((result as { error: string }).error).toContain("not a multi-team section");
+  });
+
+  it("errors when the chosen team is not one of the combined candidates", () => {
+    const groups = [makeGroup("org/a", ["squad-a", "squad-b"])];
+    const tree = groupByTeamHierarchy(groups, [["squad-"]]);
+    const result = resolvePickTeamAssignment(tree, "squad-a + squad-b=squad-c");
+    expect("error" in result).toBe(true);
+    expect((result as { error: string }).error).toContain("Allowed choices");
   });
 });

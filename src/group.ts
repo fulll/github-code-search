@@ -752,6 +752,135 @@ export function findCombinedSectionPaths(sections: TeamSection[]): string[][] {
   return paths;
 }
 
+// ─── CLI option parsing (pure) ─────────────────────────────────────────────────
+
+/**
+ * Parses the `--group-by-team-prefix` value into one or more prefix chains
+ * for `groupByTeamHierarchy`: `,` separates independent chains, `/` separates
+ * nesting levels within one chain. E.g. `"gamme-/squad-,chapter-"` produces
+ * `[["gamme-", "squad-"], ["chapter-"]]`.
+ *
+ * Malformed segments (empty chain from a stray/leading/trailing/double `,`,
+ * or an empty level from a stray `/`) are dropped rather than propagated as
+ * an empty-string prefix, with a human-readable warning for each so the
+ * caller can surface it on stderr. A chain that has no valid level left
+ * after cleanup is dropped entirely (also warned).
+ */
+export function parseTeamPrefixChains(spec: string): { chains: string[][]; warnings: string[] } {
+  const warnings: string[] = [];
+  const chains: string[][] = [];
+
+  for (const rawChain of spec.split(",")) {
+    const rawLevels = rawChain.split("/");
+    const levels = rawLevels.map((l) => l.trim()).filter((l) => l.length > 0);
+
+    if (levels.length === 0) {
+      warnings.push(`--group-by-team-prefix: ignoring empty chain segment in "${spec}"`);
+      continue;
+    }
+    if (levels.length !== rawLevels.length) {
+      warnings.push(
+        `--group-by-team-prefix: chain "${rawChain.trim()}" has empty prefix level(s); using "${levels.join("/")}"`,
+      );
+    }
+    chains.push(levels);
+  }
+
+  return { chains, warnings };
+}
+
+/** Successfully resolved `--pick-team` assignment, ready for `applyTeamPickInTree`. */
+export interface ResolvedPickTeam {
+  path: string[];
+  chosen: string;
+}
+
+/**
+ * Parses and resolves one `--pick-team` assignment (`"combined=chosen"`)
+ * against the current `sections` tree, returning either the resolved
+ * `{ path, chosen }` (ready for `applyTeamPickInTree`) or a human-readable
+ * `error` describing why it was rejected — the caller decides how to surface
+ * it (e.g. a stderr warning).
+ *
+ * The combined side may be:
+ *  - a bare label (e.g. `"squad-a + squad-b"`), auto-resolved via
+ *    `findCombinedSectionPaths` — succeeds only when exactly one match
+ *    exists anywhere in the tree;
+ *  - a fully-qualified path joined with `" > "` (e.g.
+ *    `"gamme-client > squad-a + squad-b"`), used as-is without validating
+ *    against `findCombinedSectionPaths` (so it still resolves correctly
+ *    right after an earlier assignment already changed the tree shape).
+ *
+ * `chosen` must be one of the `" + "`-separated candidate teams in the
+ * resolved combined label.
+ */
+export function resolvePickTeamAssignment(
+  sections: TeamSection[],
+  assignment: string,
+): ResolvedPickTeam | { error: string } {
+  const eqIndex = assignment.indexOf("=");
+  if (eqIndex === -1) {
+    return { error: `--pick-team "${assignment}" is missing the = separator; skipping` };
+  }
+  const combinedInput = assignment.slice(0, eqIndex).trim();
+  const chosen = assignment.slice(eqIndex + 1).trim();
+  if (!combinedInput || !chosen) {
+    return {
+      error: `--pick-team "${assignment}" must have non-empty combined and chosen labels; skipping`,
+    };
+  }
+
+  let path: string[];
+  if (combinedInput.includes(PATH_SEPARATOR)) {
+    path = combinedInput.split(PATH_SEPARATOR).map((s) => s.trim());
+  } else {
+    const matches = findCombinedSectionPaths(sections).filter(
+      (p) => p[p.length - 1] === combinedInput,
+    );
+    if (matches.length === 0) {
+      const available = findCombinedSectionPaths(sections)
+        .map((p) => `  "${p.join(PATH_SEPARATOR)}"`)
+        .join("\n");
+      return {
+        error:
+          `--pick-team: no section found with label "${combinedInput}"\n` +
+          (available
+            ? `  Available combined sections:\n${available}`
+            : "  (no combined sections remain)"),
+      };
+    }
+    if (matches.length > 1) {
+      const candidates = matches.map((p) => `  "${p.join(PATH_SEPARATOR)}"`).join("\n");
+      return {
+        error:
+          `--pick-team: label "${combinedInput}" is ambiguous (found in ${matches.length} places).\n` +
+          `  Qualify it with the full path, e.g.:\n${candidates}`,
+      };
+    }
+    path = matches[0];
+  }
+
+  const combinedLabel = path[path.length - 1];
+  const candidateTeams = combinedLabel
+    .split(" + ")
+    .map((c) => c.trim())
+    .filter((c) => c.length > 0);
+  if (candidateTeams.length < 2) {
+    return {
+      error: `--pick-team "${assignment}" has combined label "${combinedLabel}" which is not a multi-team section; skipping`,
+    };
+  }
+  if (!candidateTeams.includes(chosen)) {
+    return {
+      error:
+        `--pick-team "${assignment}" has chosen label "${chosen}" which is not one of the teams in ` +
+        `"${combinedLabel}". Allowed choices: ${candidateTeams.map((c) => `"${c}"`).join(", ")}; skipping`,
+    };
+  }
+
+  return { path, chosen };
+}
+
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
 /**

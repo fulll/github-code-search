@@ -20,7 +20,15 @@ import { aggregate, normaliseExtractRef, normaliseRepo } from "./src/aggregate.t
 import { fetchAllResults, fetchRepoTeams } from "./src/api.ts";
 import { formatRetryWait } from "./src/api-utils.ts";
 import { buildOutput } from "./src/output.ts";
-import { groupByTeamPrefix, flattenTeamSections, applyTeamPick } from "./src/group.ts";
+import {
+  applyTeamPickInTree,
+  consolidateTeamHierarchy,
+  findCombinedSectionPaths,
+  flattenTeamHierarchy,
+  groupByTeamHierarchy,
+  parseTeamPrefixChains,
+  resolvePickTeamAssignment,
+} from "./src/group.ts";
 import { checkForUpdate } from "./src/upgrade.ts";
 import { runInteractive } from "./src/tui.ts";
 import { generateCompletion, detectShell } from "./src/completions.ts";
@@ -66,7 +74,11 @@ function colorDesc(s: string): string {
         return style.dim(docsMatch[1]) + style.style(["cyan", "underline"], docsMatch[2]);
       const exampleMatch = line.match(/^(\s*Example:\s*)(.+)$/);
       if (exampleMatch) return style.dim(exampleMatch[1]) + style.italic(exampleMatch[2]);
-      if (/^\s+(e\.g\.|repoA|myorg\/|squad-|chapter-)/.test(line)) return style.dim(line);
+      // Fix: match with or without leading whitespace — a leading space here
+      // would make Commander's Help.preformatted() (newline followed by
+      // whitespace) treat the WHOLE description as already manually indented
+      // and skip aligning continuation lines to the option column.
+      if (/^\s*(e\.g\.|repoA|myorg\/|squad-|chapter-|gamme-)/.test(line)) return style.dim(line);
       // Colorize any remaining bare URL (http/https) anywhere in the line
       return line.replace(/(https?:\/\/\S+)/g, (url) => style.style(["cyan", "underline"], url));
     })
@@ -126,7 +138,7 @@ function addSearchOptions(cmd: Command): Command {
       [
         "Comma-separated list of repositories to exclude.",
         "Short form (without org prefix) or full form accepted:",
-        "  repoA,repoB  OR  myorg/repoA,myorg/repoB",
+        "repoA,repoB  OR  myorg/repoA,myorg/repoB",
         "Docs: https://fulll.github.io/github-code-search/usage/filtering",
       ].join("\n"),
       "",
@@ -136,7 +148,7 @@ function addSearchOptions(cmd: Command): Command {
       [
         "Comma-separated extract refs to exclude.",
         "Format (shortest): repoName:path:matchIndex",
-        "  e.g.  repoA:src/foo.ts:0,repoB:lib/core.ts:2",
+        "e.g.  repoA:src/foo.ts:0,repoB:lib/core.ts:2",
         "Full form also accepted: myorg/repoA:src/foo.ts:0",
         "Docs: https://fulll.github.io/github-code-search/usage/filtering",
       ].join("\n"),
@@ -162,26 +174,31 @@ function addSearchOptions(cmd: Command): Command {
       ].join("\n"),
       "repo-and-matches",
     )
-    .option(
-      "--include-archived",
-      "Include archived repositories in results (default: false)",
-      false,
-    )
-    .option(
-      "--exclude-template-repositories",
-      "Exclude template repositories from results (default: false)",
-      false,
-    )
+    .option("--include-archived", "Include archived repositories in results", false)
+    .option("--exclude-template-repositories", "Exclude template repositories from results", false)
     .option(
       "--group-by-team-prefix <prefixes>",
       [
         "Comma-separated team-name prefixes used to group result repos by GitHub team.",
-        "Example: squad-,chapter-",
-        "Repos are first grouped by the first prefix (single-team, then multi-team),",
-        "then by the next prefix, and so on. Repos matching no prefix go into 'other'.",
+        "Use / within one entry to nest levels: gamme-/squad- groups by gamme- first,",
+        "then sub-groups each section by squad-. Combine independent chains with ,:",
+        "gamme-/squad-,chapter-",
+        "Repos are first grouped by single-team match, then multi-team, then the next",
+        "level. Repos matching no prefix go into 'other'. Team names that overlap",
+        "(e.g. squad-a and squad-a-legacy) are nested automatically.",
         "Docs: https://fulll.github.io/github-code-search/usage/team-grouping",
       ].join("\n"),
       "",
+    )
+    .option(
+      "--group-by-team-prefix-consolidate",
+      [
+        "Collapse unambiguous single-branch nesting chains into one heading",
+        'with an "(including ...)" suffix instead of one heading per level.',
+        "Only applies with --group-by-team-prefix.",
+        "Docs: https://fulll.github.io/github-code-search/usage/team-grouping",
+      ].join("\n"),
+      false,
     )
     .option(
       "--pick-team <assignment>",
@@ -189,6 +206,8 @@ function addSearchOptions(cmd: Command): Command {
         "Assign a combined team section to a single owner.",
         'Format: "combined label"=chosenTeam  (the = separator is required).',
         'Example: --pick-team "squad-frontend + squad-mobile"=squad-frontend',
+        "The combined label may be unqualified (auto-resolved when unambiguous)",
+        'or a full path when nested / ambiguous: "gamme-client > squad-a + squad-b"=squad-a',
         "Repeatable — one flag per combined section to resolve.",
         "Only applies with --group-by-team-prefix.",
         "Docs: https://fulll.github.io/github-code-search/usage/team-grouping#team-pick-mode",
@@ -224,6 +243,7 @@ async function searchAction(
     includeArchived: boolean;
     excludeTemplateRepositories: boolean;
     groupByTeamPrefix: string;
+    groupByTeamPrefixConsolidate?: boolean;
     pickTeam: string[];
     cache: boolean;
     regexHint?: string;
@@ -348,107 +368,58 @@ async function searchAction(
   // ─── Team-prefix grouping ─────────────────────────────────────────────────
   const pickTeams: Record<string, string> = {};
   if (!opts.groupByTeamPrefix && opts.pickTeam && opts.pickTeam.length > 0) {
-    // Emit per-assignment warnings (same validation as when grouping is enabled) — see issue #121.
     for (const assignment of opts.pickTeam) {
-      const eqIndex = assignment.indexOf("=");
-      if (eqIndex === -1) {
-        process.stderr.write(
-          `warning: --pick-team "${assignment}" is missing the = separator; skipping\n`,
-        );
-        continue;
-      }
-      const combined = assignment.slice(0, eqIndex).trim();
-      const chosen = assignment.slice(eqIndex + 1).trim();
-      if (!combined || !chosen) {
-        process.stderr.write(
-          `warning: --pick-team "${assignment}" must have non-empty combined and chosen labels; skipping\n`,
-        );
-        continue;
-      }
       process.stderr.write(
-        `warning: --pick-team: no section found with label "${combined}"\n  (no combined sections remain)\n`,
+        `warning: --pick-team "${assignment}" requires --group-by-team-prefix; skipping\n`,
       );
     }
   }
   if (opts.groupByTeamPrefix) {
-    const prefixes = opts.groupByTeamPrefix
-      .split(",")
-      .map((p) => p.trim())
-      .filter(Boolean);
-    if (prefixes.length > 0) {
-      const teamMap = await fetchRepoTeams(org, GITHUB_TOKEN!, prefixes, opts.cache, onRateLimit);
+    const { chains, warnings: chainWarnings } = parseTeamPrefixChains(opts.groupByTeamPrefix);
+    for (const w of chainWarnings) process.stderr.write(`warning: ${w}\n`);
+
+    if (chains.length > 0) {
+      const allPrefixes = [...new Set(chains.flat())];
+      const teamMap = await fetchRepoTeams(
+        org,
+        GITHUB_TOKEN!,
+        allPrefixes,
+        opts.cache,
+        onRateLimit,
+      );
       // Attach team lists to each group
       for (const g of groups) {
         g.teams = teamMap.get(g.repoFullName) ?? [];
       }
-      let sections = groupByTeamPrefix(groups, prefixes);
-      // Apply --pick-team assignments before flattening.
-      // Fix: detect non-matching picks and warn on stderr so the user can correct labels.
-      for (const assignment of opts.pickTeam) {
-        const eqIndex = assignment.indexOf("=");
-        if (eqIndex === -1) {
-          process.stderr.write(
-            `warning: --pick-team "${assignment}" is missing the = separator; skipping\n`,
-          );
-          continue;
-        }
-        const combined = assignment.slice(0, eqIndex).trim();
-        const chosen = assignment.slice(eqIndex + 1).trim();
-        if (!combined || !chosen) {
-          process.stderr.write(
-            `warning: --pick-team "${assignment}" must have non-empty combined and chosen labels; skipping\n`,
-          );
-          continue;
-        }
-        // Fix: require the combined label to be a multi-team label (must contain " + ") — see issue #121.
-        const combinedCandidates = combined
-          .split(" + ")
-          .map((part) => part.trim())
-          .filter((part) => part.length > 0);
-        if (combinedCandidates.length < 2) {
-          process.stderr.write(
-            `warning: --pick-team "${assignment}" has combined label "${combined}" which is not a multi-team section; skipping\n`,
-          );
-          continue;
-        }
-        if (!combinedCandidates.includes(chosen)) {
-          process.stderr.write(
-            `warning: --pick-team "${assignment}" has chosen label "${chosen}" which is not one of the teams in ` +
-              `"${combined}". Allowed choices: ${combinedCandidates.map((c) => `"${c}"`).join(", ")}; skipping\n`,
-          );
-          continue;
-        }
-        const updated = applyTeamPick(sections, combined, chosen);
-        if (updated === sections) {
-          // applyTeamPick returns the same reference when the combined label is not found.
-          const available = sections
-            .map((s) => s.label)
-            .filter((l) => l.includes(" + "))
-            .map((l) => `  "${l}"`)
-            .join("\n");
-          process.stderr.write(
-            `warning: --pick-team: no section found with label "${combined}"\n` +
-              (available
-                ? `  Available combined sections:\n${available}\n`
-                : "  (no combined sections remain)\n"),
-          );
-        } else {
-          sections = updated;
-          pickTeams[combined] = chosen;
-        }
+
+      let sections = groupByTeamHierarchy(groups, chains);
+      if (opts.groupByTeamPrefixConsolidate) {
+        sections = consolidateTeamHierarchy(sections);
       }
+
+      // Apply --pick-team assignments before flattening.
+      for (const assignment of opts.pickTeam) {
+        const resolution = resolvePickTeamAssignment(sections, assignment);
+        if ("error" in resolution) {
+          process.stderr.write(`warning: ${resolution.error}\n`);
+          continue;
+        }
+        sections = applyTeamPickInTree(sections, resolution.path, resolution.chosen);
+        pickTeams[resolution.path.join(" > ")] = resolution.chosen;
+      }
+
       // Warn about combined sections that still have no pick assigned, so the user
       // knows which labels to add to the next replay command or interactive session.
-      const unresolved = sections.filter((s) => s.label.includes(" + "));
+      const unresolved = findCombinedSectionPaths(sections);
       if (unresolved.length > 0 && opts.pickTeam.length > 0) {
         process.stderr.write(
           `note: ${unresolved.length} combined section${unresolved.length !== 1 ? "s" : ""} still unresolved ` +
             `(press "p" in TUI or use --pick-team to assign):\n` +
-            unresolved.map((s) => `  "${s.label}"`).join("\n") +
+            unresolved.map((p) => `  "${p.join(" > ")}"`).join("\n") +
             "\n",
         );
       }
-      groups = flattenTeamSections(sections);
+      groups = flattenTeamHierarchy(sections);
     }
   }
 
@@ -458,6 +429,7 @@ async function searchAction(
         includeArchived,
         excludeTemplates,
         groupByTeamPrefix: opts.groupByTeamPrefix,
+        consolidateTeamSections: opts.groupByTeamPrefixConsolidate,
         regexHint: opts.regexHint,
         pickTeams: Object.keys(pickTeams).length > 0 ? pickTeams : undefined,
       }),
@@ -518,6 +490,7 @@ async function searchAction(
       includeArchived,
       excludeTemplates,
       opts.groupByTeamPrefix,
+      Boolean(opts.groupByTeamPrefixConsolidate),
       opts.regexHint ?? "",
       Object.keys(pickTeams).length > 0 ? pickTeams : {},
     );
