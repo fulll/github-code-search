@@ -114,13 +114,18 @@ function extractRegexToken(q: string): RegexToken | null {
 /**
  * Escape a literal API term for GitHub's exact-phrase query syntax when it
  * contains a `"` character — e.g. `"react"` → `"\"react\""`.
- * See GitHub's "Searching for quotes and backslashes" documentation.
+ * See GitHub's "Searching for quotes and backslashes" documentation, which
+ * defines `\\` and `\"` as the only two recognised escape sequences. Backslashes
+ * are escaped first so a literal `\` immediately preceding a `"` cannot be
+ * misread as escaping that quote once wrapped — see CodeQL "Incomplete string
+ * escaping or encoding" (js/incomplete-sanitization).
  * Terms without a `"` are returned unchanged (no behaviour change for the
- * common case).
+ * common case). Exported for unit testing.
  */
-function escapeApiTerm(term: string): string {
+export function escapeApiTerm(term: string): string {
   if (!term.includes('"')) return term;
-  return `"${term.replace(/"/g, '\\"')}"`;
+  const escaped = term.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return `"${escaped}"`;
 }
 
 /**

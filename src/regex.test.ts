@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { buildApiQuery, isRegexQuery } from "./regex.ts";
+import { buildApiQuery, escapeApiTerm, isRegexQuery } from "./regex.ts";
 
 // ─── isRegexQuery ─────────────────────────────────────────────────────────────
 
@@ -268,6 +268,33 @@ describe("buildApiQuery — quote handling in extracted terms (issue #147)", () 
   it("/TODO|FIXME|HACK/ → unquoted OR join is unaffected when no branch has quotes", () => {
     const r = buildApiQuery("/TODO|FIXME|HACK/");
     expect(r.apiQuery).toBe("TODO OR FIXME OR HACK");
+  });
+});
+
+describe("escapeApiTerm — backslash escaping (CodeQL: incomplete string escaping)", () => {
+  it("returns the term unchanged when it has no quote", () => {
+    expect(escapeApiTerm("axios")).toBe("axios");
+  });
+
+  it("returns a term with a bare backslash and no quote unchanged", () => {
+    // No quote present → short-circuits before any escaping is needed.
+    expect(escapeApiTerm("foo\\bar")).toBe("foo\\bar");
+  });
+
+  it('escapes a lone quote: "react" → \\"react\\"', () => {
+    expect(escapeApiTerm('"react"')).toBe('"\\"react\\""');
+  });
+
+  it("escapes backslashes before escaping quotes, so a backslash never swallows the following escaped quote", () => {
+    // Regression: term containing a literal backslash immediately followed by
+    // a quote. Escaping quotes without first escaping backslashes would leave
+    // the backslash unescaped, producing an invalid/ambiguous sequence for
+    // GitHub's parser (which only recognises \\ and \" as escapes).
+    const term = '"a\\b"';
+    const result = escapeApiTerm(term);
+    // Every literal backslash in the input must itself be escaped to \\,
+    // and every literal quote must be escaped to \", all wrapped in "...".
+    expect(result).toBe('"\\"a\\\\b\\""');
   });
 });
 
