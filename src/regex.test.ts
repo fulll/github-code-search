@@ -240,6 +240,37 @@ describe("buildApiQuery — special escape handling in longestLiteralSequence", 
   });
 });
 
+describe("buildApiQuery — quote handling in extracted terms (issue #147)", () => {
+  it('/"react":\\s*"[~^]?[0-9]/ → escaped literal \'"\\"react\\""\' (quotes kept, not dropped)', () => {
+    // Regression: the previous behaviour dropped the `"` characters entirely,
+    // yielding the bare term "react" — verified via the GitHub API to return
+    // 20288 results (mostly noise: react-native, @types/react, docs, imports)
+    // instead of the ~227 candidates the quoted literal returns, all of which
+    // are then narrowed further by the local regex filter.
+    const r = buildApiQuery('/"react":\\s*"[~^]?[0-9]/');
+    expect(r.apiQuery).toBe('"\\"react\\""');
+    expect(r.regexFilter).not.toBeNull();
+    expect(r.warn).toBeUndefined();
+  });
+
+  it('/"axios"/ → escaped literal \'"\\"axios\\""\'', () => {
+    const r = buildApiQuery('/"axios"/');
+    expect(r.apiQuery).toBe('"\\"axios\\""');
+  });
+
+  it("/from.*['\\\"]axios/ → axios (quotes inside a character class are unaffected)", () => {
+    // Regression guard: quotes inside [...] must still be skipped as before —
+    // only quotes appearing as literal (non-class) pattern characters change.
+    const r = buildApiQuery("/from.*['\\\"]axios/");
+    expect(r.apiQuery).toBe("axios");
+  });
+
+  it("/TODO|FIXME|HACK/ → unquoted OR join is unaffected when no branch has quotes", () => {
+    const r = buildApiQuery("/TODO|FIXME|HACK/");
+    expect(r.apiQuery).toBe("TODO OR FIXME OR HACK");
+  });
+});
+
 describe("buildApiQuery — warn cases", () => {
   it("/[~^]?[0-9]+\\.[0-9]+/ → empty term + warn", () => {
     const r = buildApiQuery("/[~^]?[0-9]+\\.[0-9]+/");

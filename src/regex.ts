@@ -112,6 +112,18 @@ function extractRegexToken(q: string): RegexToken | null {
 }
 
 /**
+ * Escape a literal API term for GitHub's exact-phrase query syntax when it
+ * contains a `"` character — e.g. `"react"` → `"\"react\""`.
+ * See GitHub's "Searching for quotes and backslashes" documentation.
+ * Terms without a `"` are returned unchanged (no behaviour change for the
+ * common case).
+ */
+function escapeApiTerm(term: string): string {
+  if (!term.includes('"')) return term;
+  return `"${term.replace(/"/g, '\\"')}"`;
+}
+
+/**
  * Derive a literal API search term from a regex pattern.
  *
  * Strategy (in order):
@@ -119,6 +131,11 @@ function extractRegexToken(q: string): RegexToken | null {
  *    nested inside `(...)` or `[...]`) → join branches with ` OR `.
  * 2. Otherwise → extract all unescaped literal sequences, pick the longest one.
  * 3. If the best term is shorter than 3 characters → return `warn`.
+ *
+ * A `"` character is a valid literal (not a regex metacharacter) and is kept
+ * in the extracted term; it is then escaped and the whole term wrapped in an
+ * outer pair of quotes so the GitHub API treats it as a literal quote rather
+ * than stripping it — see issue #147.
  */
 function extractApiTerm(pattern: string): { term: string; warn?: string } {
   // 1. Top-level alternation detection.
@@ -130,7 +147,7 @@ function extractApiTerm(pattern: string): { term: string; warn?: string } {
     // "< 3 chars → warn + empty term" rule still applies.
     const branchTerms = branches.map((b) => longestLiteralSequence(b));
     if (branchTerms.every((t) => t.length >= 3)) {
-      return { term: branchTerms.join(" OR ") };
+      return { term: branchTerms.map(escapeApiTerm).join(" OR ") };
     }
   }
 
@@ -144,7 +161,7 @@ function extractApiTerm(pattern: string): { term: string; warn?: string } {
         "Use --regex-hint <term> to specify the term to send to the GitHub API.",
     };
   }
-  return { term };
+  return { term: escapeApiTerm(term) };
 }
 
 /**
@@ -202,9 +219,12 @@ function splitTopLevelAlternation(pattern: string): string[] {
  * Extract the longest contiguous sequence of characters useful as a GitHub
  * search term from a regex pattern fragment.
  *
- * Only `[a-zA-Z0-9_-]` characters are accumulated — punctuation and special
- * characters that are valid regex literals (e.g. `\(`) are intentionally
- * excluded because they produce poor search terms.
+ * `[a-zA-Z0-9_"-]` characters are accumulated — `"` is a valid literal (not a
+ * regex metacharacter) and is kept so terms like `"react"` survive extraction
+ * instead of being broken into the far too broad bare word `react` — see
+ * issue #147. Other punctuation and special characters that are valid regex
+ * literals (e.g. `\(`) are intentionally excluded because they produce poor
+ * search terms.
  * Character classes `[...]` are skipped entirely.
  * Uses `>=` when updating `best` so that later (more specific) sequences of
  * equal length are preferred over earlier structural ones (e.g. `old-lib`
@@ -238,14 +258,15 @@ function longestLiteralSequence(pattern: string): string {
     // Handle escape sequences.
     if (ch === "\\") {
       const next = pattern[i + 1] ?? "";
-      // Only accumulate if the escaped char is a word character or hyphen
-      // AND is not a common regex escape or backreference (\b, \d, \s, \w,
-      // \p, \u, \x, \1–9, …) or control-character escape (\n, \r, \t, \f, \v).
+      // Only accumulate if the escaped char is a word character, hyphen or
+      // double quote, AND is not a common regex escape or backreference
+      // (\b, \d, \s, \w, \p, \u, \x, \1–9, …) or control-character escape
+      // (\n, \r, \t, \f, \v).
       // Note: \a and \e are NOT in this list — in JS without u/v they are
       // identity escapes that simply match the literal letter ('a' or 'e'),
       // so they should be accumulated, not broken on.
       // \c = control escape (\cA–\cZ), \k = named back-reference (\k<name>).
-      const isWordLike = /[a-zA-Z0-9_-]/.test(next);
+      const isWordLike = /[a-zA-Z0-9_"-]/.test(next);
       const isSpecialEscape = /[bBdDsSwWpPuUxX0-9nrtfvck]/.test(next);
       if (isWordLike && !isSpecialEscape) {
         current += next;
@@ -260,7 +281,7 @@ function longestLiteralSequence(pattern: string): string {
     }
 
     // Only accumulate characters that make a useful GitHub search term.
-    if (/[a-zA-Z0-9_-]/.test(ch)) {
+    if (/[a-zA-Z0-9_"-]/.test(ch)) {
       current += ch;
     } else {
       if (current.length >= best.length) best = current;
