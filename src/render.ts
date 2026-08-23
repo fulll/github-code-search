@@ -362,7 +362,8 @@ export function renderGroups(
     // 🔍 is 2 cols wide in most terminals; targetBadge is pure ASCII
     const prefixVisLen = 2 + visibleWidth(targetBadge);
     const fieldWidth = Math.max(8, termWidth - prefixVisLen - statsRightVisLen);
-    const padWidth = Math.max(0, fieldWidth - filterInput.length - 1);
+    const inputVisLen = visibleWidth(before + atCursor + after);
+    const padWidth = Math.max(0, fieldWidth - inputVisLen);
     const pad = " ".repeat(padWidth);
 
     // Underline the whole field; cursor char gets inverse video on top
