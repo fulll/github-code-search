@@ -161,7 +161,7 @@ GitHub, e.g.: github-code-search '"\"react\": \""' --org myorg
 ```
 
 ::: warning Shell escaping consumes backslashes too
-Typing `"\"react\": \""` directly (double-quoted at the shell level) does **not** work: your shell resolves `\"` to a literal `"` *before* the CLI ever sees it, so the program receives the same unbalanced `"react": "` string as if you had typed no backslashes at all. Always wrap the whole argument in **single** quotes so the backslashes reach GitHub unchanged, as in the example above.
+Typing `"\"react\": \""` directly (double-quoted at the shell level) does **not** work: your shell resolves `\"` to a literal `"` _before_ the CLI ever sees it, so the program receives the same unbalanced `"react": "` string as if you had typed no backslashes at all. Always wrap the whole argument in **single** quotes so the backslashes reach GitHub unchanged, as in the example above.
 :::
 
 ## API limits
