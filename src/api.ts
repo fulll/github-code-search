@@ -196,6 +196,10 @@ export async function fetchAllResults(
   org: string,
   token: string,
   onRateLimit?: (waitMs: number) => Promise<void>,
+  // Only regex-mode local filtering (issue #148) ever reads `fileContent`.
+  // Default to false so ordinary (non-regex) queries don't keep every
+  // downloaded raw file alive in memory for the whole run — see PR #154 review.
+  keepFileContent = false,
 ): Promise<CodeMatch[]> {
   // Write the initial progress line (no newline — will be overwritten by \r).
   process.stderr.write(pc.dim("  Fetching results from GitHub…"));
@@ -280,8 +284,9 @@ export async function fetchAllResults(
       isTemplate: item.repository.is_template === true,
       // Propagate the already-downloaded content for local regex filtering
       // fallback — see issue #148. No extra network calls: reuses the content
-      // fetched above for line-number resolution.
-      fileContent,
+      // fetched above for line-number resolution. Opt-in via `keepFileContent`
+      // so non-regex queries don't retain every raw file in memory.
+      fileContent: keepFileContent ? fileContent : undefined,
       textMatches: (item.text_matches ?? []).map((m) => {
         const fragment: string = m.fragment ?? "";
         const fragmentStartLine = fileContent ? computeFragmentStartLine(fileContent, fragment) : 1;

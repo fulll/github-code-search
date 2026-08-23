@@ -80,40 +80,74 @@ function recomputeSegments(
 // ─── Aggregation ─────────────────────────────────────────────────────────────
 
 /**
- * Extracts a small multi-line window of `content` around the 1-based line
- * `matchLine`, mirroring the size of context GitHub's own fragment field
- * typically provides. Used to build a display-friendly fallback `TextMatch`
- * when the API-provided fragment does not contain a match but the full
- * downloaded file content does — see issue #148.
+ * Finds every match of `re` directly against the full downloaded `content`
+ * and builds a display-friendly fallback `TextMatch` per match, used when the
+ * API-provided fragment does not contain a match but the full file content
+ * does — see issue #148.
+ *
+ * Matches (and their line/col) are computed once against the *entire* file in
+ * a single forward pass — no rescanning of the preceding text per match, and
+ * no fixed-size window built only from the match's start line, so a match
+ * spanning more than `contextLines * 2 + 1` lines (or reached via
+ * lookaround) is never silently dropped: the window is expanded to always
+ * contain the match's full span.
  */
-function sliceContextWindow(
+function fallbackMatchesFromFullContent(
   content: string,
-  matchLine: number,
+  re: RegExp,
   contextLines = 2,
-): { fragment: string; fragmentStartLine: number } {
-  const lines = content.split("\n");
-  const startLine = Math.max(1, matchLine - contextLines);
-  const endLine = Math.min(lines.length, matchLine + contextLines);
-  return {
-    fragment: lines.slice(startLine - 1, endLine).join("\n"),
-    fragmentStartLine: startLine,
-  };
-}
-
-/**
- * Finds the 1-based line numbers where `re` matches within `content`.
- * `re` must be a global RegExp; its `lastIndex` is reset before use.
- */
-function findMatchLines(content: string, re: RegExp): Set<number> {
+): TextMatch[] {
   re.lastIndex = 0;
-  const lines = new Set<number>();
+  // Precompute newline offsets once — O(n) — so line/col and window-boundary
+  // lookups are O(log n) via binary search instead of O(n) per match.
+  const newlines: number[] = [];
+  for (let i = 0; i < content.length; i++) {
+    if (content[i] === "\n") newlines.push(i);
+  }
+  const lineOfOffset = (offset: number): number => {
+    let lo = 0;
+    let hi = newlines.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (newlines[mid] < offset) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo + 1; // 1-based
+  };
+  const startOffsetOfLine = (line: number): number => (line === 1 ? 0 : newlines[line - 2] + 1);
+  const totalLines = newlines.length + 1;
+  const lines = content.split("\n");
+
+  const results: TextMatch[] = [];
   let m: RegExpExecArray | null;
   while ((m = re.exec(content)) !== null) {
-    const before = content.slice(0, m.index);
-    lines.add((before.match(/\n/g)?.length ?? 0) + 1);
-    if (m[0].length === 0) re.lastIndex++;
+    const start = m.index;
+    const end = start + m[0].length;
+    const startLine = lineOfOffset(start);
+    // `end - 1` so a match ending exactly on a newline still resolves to the
+    // line it belongs to rather than the following (empty) one.
+    const endLine = end > start ? lineOfOffset(end - 1) : startLine;
+
+    const windowStartLine = Math.max(1, startLine - contextLines);
+    const windowEndLine = Math.min(totalLines, endLine + contextLines);
+    const windowStartOffset = startOffsetOfLine(windowStartLine);
+    const fragment = lines.slice(windowStartLine - 1, windowEndLine).join("\n");
+    const col = start - startOffsetOfLine(startLine) + 1;
+
+    results.push({
+      fragment,
+      matches: [
+        {
+          text: m[0],
+          indices: [start - windowStartOffset, end - windowStartOffset],
+          line: startLine,
+          col,
+        },
+      ],
+    });
+    if (m[0].length === 0) re.lastIndex++; // guard against zero-width matches
   }
-  return lines;
+  return results;
 }
 
 export function aggregate(
@@ -166,14 +200,7 @@ export function aggregate(
       // narrow to include the whole regex match even though the file does
       // contain it, silently dropping otherwise-valid results — see issue #148.
       if (updatedTextMatches.length === 0 && m.fileContent) {
-        const fileContent = m.fileContent;
-        updatedTextMatches = [...findMatchLines(fileContent, globalRe)]
-          .map((matchLine) => {
-            const { fragment, fragmentStartLine } = sliceContextWindow(fileContent, matchLine);
-            const segs = recomputeSegments(fragment, globalRe, fragmentStartLine);
-            return segs.length > 0 ? { fragment, matches: segs } : null;
-          })
-          .filter((tm): tm is TextMatch => tm !== null);
+        updatedTextMatches = fallbackMatchesFromFullContent(m.fileContent, globalRe);
       }
       // Restore the caller's original lastIndex (rather than hard-coding 0),
       // so aggregate() doesn't have observable side effects on its inputs.

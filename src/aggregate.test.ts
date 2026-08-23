@@ -410,4 +410,61 @@ describe("aggregate — regexFilter fallback to full fileContent", () => {
     const groups = aggregate(matches, new Set(), new Set(), false, /"react": "18/);
     expect(groups).toHaveLength(0);
   });
+
+  it("keeps a match whose span reaches beyond the default ±2-line context window", () => {
+    // The match runs from "BEGIN" (line 11) to "END" (line 22) — far wider
+    // than a fixed window built only around the match's start line, which
+    // would never include "END" and silently drop an otherwise-valid match.
+    const decoysBefore = Array.from({ length: 10 }, (_, i) => `d${i + 1}`);
+    const body = Array.from({ length: 10 }, (_, i) => `m${i + 1}`);
+    const decoysAfter = Array.from({ length: 3 }, (_, i) => `d${i + 11}`);
+    const fileContent = [...decoysBefore, "BEGIN", ...body, "END", ...decoysAfter].join("\n");
+    const matches: CodeMatch[] = [
+      {
+        path: "file.txt",
+        repoFullName: "myorg/repoA",
+        htmlUrl: "",
+        archived: false,
+        fileContent,
+        textMatches: [{ fragment: "unrelated fragment", matches: [] }],
+      },
+    ];
+
+    const groups = aggregate(matches, new Set(), new Set(), false, /BEGIN[\s\S]*?END/);
+    expect(groups).toHaveLength(1);
+    const tm = groups[0].matches[0].textMatches[0];
+    expect(tm.matches[0].text).toBe(["BEGIN", ...body, "END"].join("\n"));
+    expect(tm.matches[0].line).toBe(11);
+    expect(tm.fragment).toContain("BEGIN");
+    expect(tm.fragment).toContain("END");
+    expect(tm.fragment).not.toContain("d1\n");
+  });
+
+  it("finds every separate match rather than only the first when falling back to fileContent", () => {
+    const fileContent = [
+      "match_A here",
+      "gap",
+      "gap",
+      "gap",
+      "gap",
+      "gap",
+      "gap",
+      "another match_A here",
+    ].join("\n");
+    const matches: CodeMatch[] = [
+      {
+        path: "file.txt",
+        repoFullName: "myorg/repoA",
+        htmlUrl: "",
+        archived: false,
+        fileContent,
+        textMatches: [{ fragment: "unrelated fragment", matches: [] }],
+      },
+    ];
+
+    const groups = aggregate(matches, new Set(), new Set(), false, /match_A/);
+    const tms = groups[0].matches[0].textMatches;
+    expect(tms).toHaveLength(2);
+    expect(tms.map((tm) => tm.matches[0].line)).toEqual([1, 8]);
+  });
 });
