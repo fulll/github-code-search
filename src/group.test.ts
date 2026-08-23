@@ -280,6 +280,47 @@ describe("groupByTeamHierarchy — auto-nesting of overlapping team names", () =
     expect(combined).toBeDefined();
     expect(combined!.children ?? []).toHaveLength(0);
   });
+
+  it("omits the children field entirely on leaf sections instead of an empty array", () => {
+    const groups = [makeGroup("org/a", ["squad-front"])];
+    const sections = groupByTeamHierarchy(groups, [["squad-"]]);
+    expect(sections[0].children).toBeUndefined();
+  });
+
+  it("keeps a parent's own groups when it also has an overlap-nested child", () => {
+    const groups = [
+      makeGroup("org/a", ["gamme-lead-client"]),
+      makeGroup("org/b", ["gamme-lead-client-p1"]),
+    ];
+    const sections = groupByTeamHierarchy(groups, [["gamme-"]]);
+    expect(sections[0].groups.map((g) => g.repoFullName)).toEqual(["org/a"]);
+    expect(sections[0].children).toHaveLength(1);
+  });
+
+  it("splits a parent's own groups by the next chain level even when it also has an overlap-nested child", () => {
+    const groups = [
+      makeGroup("org/a", ["gamme-lead-client"]),
+      makeGroup("org/b", ["gamme-lead-client-p1", "squad-mobile"]),
+      makeGroup("org/c", ["gamme-lead-client", "squad-billing"]),
+    ];
+    const sections = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    expect(sections).toHaveLength(1);
+    const parent = sections[0];
+    expect(parent.label).toBe("gamme-lead-client");
+    // Fully subdivided — none of its own repos are left flat on the parent.
+    expect(parent.groups).toEqual([]);
+    const childLabels = (parent.children ?? []).map((c) => c.label).toSorted();
+    expect(childLabels).toEqual(["gamme-lead-client-p1", "other", "squad-billing"]);
+    const squadBilling = parent.children!.find((c) => c.label === "squad-billing")!;
+    expect(squadBilling.groups.map((g) => g.repoFullName)).toEqual(["org/c"]);
+    const other = parent.children!.find((c) => c.label === "other")!;
+    expect(other.groups.map((g) => g.repoFullName)).toEqual(["org/a"]);
+    // The overlap-nested child was ALSO subdivided by the next chain level.
+    const p1 = parent.children!.find((c) => c.label === "gamme-lead-client-p1")!;
+    expect(p1.children).toHaveLength(1);
+    expect(p1.children![0].label).toBe("squad-mobile");
+    expect(p1.children![0].groups.map((g) => g.repoFullName)).toEqual(["org/b"]);
+  });
 });
 
 // ─── flattenTeamSections ──────────────────────────────────────────────────────

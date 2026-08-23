@@ -124,36 +124,40 @@ export function groupByTeamHierarchy(groups: RepoGroup[], chains: string[][]): T
   }
 
   if (remaining.size > 0) {
-    sections.push({ label: "other", groups: [...remaining], level: 0, children: [] });
+    sections.push({ label: "other", groups: [...remaining], level: 0 });
   }
 
-  return sections;
+  return sections.map(pruneEmptyChildren);
 }
 
 /**
- * Recursively subdivides `node` by the next prefix in `chain` (at `depth`),
- * descending first through any auto-nested overlap children (same `depth`,
- * since auto-nesting does not consume an explicit chain level) before
- * splitting an actual leaf's `groups`. No-op once `depth` exceeds the chain
- * or the node has no repos left to split.
+ * Recursively subdivides `node` by the next prefix in `chain` (at `depth`).
+ * Any pre-existing overlap-nested `children` haven't consumed `chain[depth]`
+ * yet either, so they're recursed into first (at the same `depth`); `node`'s
+ * own `groups` (repos owned directly by this section, which can coexist with
+ * overlap children — see `TeamSection`) are then split into *additional*
+ * children. No-op once `depth` exceeds the chain or there is nothing left to
+ * split at this node.
  */
 function applyChainDepth(node: TeamSection, chain: string[], depth: number): TeamSection {
-  if (node.children && node.children.length > 0) {
-    return { ...node, children: node.children.map((c) => applyChainDepth(c, chain, depth)) };
+  const recursedChildren = (node.children ?? []).map((c) => applyChainDepth(c, chain, depth));
+
+  if (depth >= chain.length || node.groups.length === 0) {
+    return recursedChildren.length > 0 ? { ...node, children: recursedChildren } : node;
   }
-  if (depth >= chain.length) return node;
 
   const level = (node.level ?? 0) + 1;
   const localRemaining = new Set(node.groups);
   const siblings = bucketSingleLevel(localRemaining, chain[depth]).map((s) => ({ ...s, level }));
   if (localRemaining.size > 0) {
-    siblings.push({ label: "other", groups: [...localRemaining], level, children: [] });
+    siblings.push({ label: "other", groups: [...localRemaining], level });
   }
-  if (siblings.length === 0) return node;
 
-  const nested = nestOverlappingLabels(siblings, level);
-  const children = nested.map((c) => applyChainDepth(c, chain, depth + 1));
-  return { ...node, groups: [], children };
+  const splitChildren = nestOverlappingLabels(siblings, level).map((c) =>
+    applyChainDepth(c, chain, depth + 1),
+  );
+
+  return { ...node, groups: [], children: [...recursedChildren, ...splitChildren] };
 }
 
 /**
@@ -169,9 +173,9 @@ function nestOverlappingLabels(sections: TeamSection[], level: number): TeamSect
   const nestable = sections.filter((s) => s.label !== "other" && !s.label.includes(" + "));
   const rest = sections
     .filter((s) => s.label === "other" || s.label.includes(" + "))
-    .map((s) => ({ ...s, level, children: [] }));
+    .map((s) => ({ ...s, level }));
 
-  const nodeByLabel = new Map<string, TeamSection>(
+  const nodeByLabel = new Map<string, TeamSection & { children: TeamSection[] }>(
     nestable.map((s) => [s.label, { ...s, level, children: [] }]),
   );
 
@@ -191,7 +195,7 @@ function nestOverlappingLabels(sections: TeamSection[], level: number): TeamSect
   }
 
   for (const [child, parent] of parentOf) {
-    nodeByLabel.get(parent)!.children!.push(nodeByLabel.get(child)!);
+    nodeByLabel.get(parent)!.children.push(nodeByLabel.get(child)!);
   }
 
   const roots = nestable
@@ -208,6 +212,21 @@ function assignLevels(node: TeamSection, lvl: number): TeamSection {
     node.children = node.children.map((c) => assignLevels(c, lvl + 1));
   }
   return node;
+}
+
+/**
+ * Recursively drops an empty `children` array so the field is only present
+ * when a section actually has nested sub-sections, matching `TeamSection`'s
+ * documented invariant. Pure — returns a new tree, does not mutate `node`.
+ */
+function pruneEmptyChildren(node: TeamSection): TeamSection {
+  if (!node.children) return node;
+  if (node.children.length === 0) {
+    const { children: _empty, ...rest } = node;
+    void _empty;
+    return rest as TeamSection;
+  }
+  return { ...node, children: node.children.map(pruneEmptyChildren) };
 }
 
 /**
