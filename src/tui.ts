@@ -227,6 +227,11 @@ export async function runInteractive(
   let lastClickTime = 0;
   let lastClickRowKey: string | null = null;
 
+  // Scroll-in-progress flag to avoid accidental selection during/after scroll
+  const SCROLL_COOLDOWN = 300; // milliseconds
+  let scrollInProgress = false;
+  let scrollCooldownTimer: NodeJS.Timeout | null = null;
+
   const scheduleStatsUpdate = () => {
     if (statsDebounceTimer !== null) clearTimeout(statsDebounceTimer);
     filterLiveStats = null; // show "…" while typing fast
@@ -280,6 +285,8 @@ export async function runInteractive(
     // Disable SGR mouse reporting and clear terminal
     process.stdout.write("\x1b[?1000l\x1b[?1006l");
     process.stdout.write(ANSI_CLEAR);
+    if (scrollCooldownTimer !== null) clearTimeout(scrollCooldownTimer);
+    if (statsDebounceTimer !== null) clearTimeout(statsDebounceTimer);
     process.stdin.setRawMode(false);
     process.off("SIGWINCH", onResize);
     process.exit(0);
@@ -315,12 +322,26 @@ export async function runInteractive(
         scrollOffset = Math.max(0, scrollOffset - 3);
         scrollOffset = normalizeScrollOffset(scrollOffset, rows, groups, getViewportHeight(rows));
         redraw();
+        // Mark scroll in progress and set cooldown timer
+        scrollInProgress = true;
+        if (scrollCooldownTimer !== null) clearTimeout(scrollCooldownTimer);
+        scrollCooldownTimer = setTimeout(() => {
+          scrollInProgress = false;
+          scrollCooldownTimer = null;
+        }, SCROLL_COOLDOWN);
         continue;
       } else if (mouseEvent.button === 65) {
         // Wheel down — scroll down by a small step (3 rows)
         scrollOffset = Math.min(Math.max(0, rows.length - 1), scrollOffset + 3);
         scrollOffset = normalizeScrollOffset(scrollOffset, rows, groups, getViewportHeight(rows));
         redraw();
+        // Mark scroll in progress and set cooldown timer
+        scrollInProgress = true;
+        if (scrollCooldownTimer !== null) clearTimeout(scrollCooldownTimer);
+        scrollCooldownTimer = setTimeout(() => {
+          scrollInProgress = false;
+          scrollCooldownTimer = null;
+        }, SCROLL_COOLDOWN);
         continue;
       }
 
@@ -350,6 +371,14 @@ export async function runInteractive(
         const now = Date.now();
         const isDoubleClick =
           lastClickRowKey === rowKey && now - lastClickTime < DOUBLE_CLICK_DELAY;
+
+        // Ignore selection/fold actions during scroll cooldown to avoid accidental toggles
+        if (scrollInProgress && target.action !== "navigate") {
+          // Only allow navigation during scroll cooldown
+          cursor = rows.indexOf(row);
+          redraw();
+          continue;
+        }
 
         // Update last click state for next click detection
         lastClickTime = now;
