@@ -19,7 +19,7 @@ const ROWS: Row[] = [
   },
   {
     feature: "Interactive TUI \u2014 navigate, select, filter",
-    desc: "Arrow-key navigation, path-based filter and live selection without leaving the terminal.",
+    desc: "Keyboard and mouse support: arrow keys or clicks for navigation, path-based filter, live selection — all without leaving the terminal.",
     gh: false,
     gcs: true,
     docLink: "/usage/interactive-mode",
