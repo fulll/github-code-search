@@ -130,7 +130,8 @@ export async function runInteractive(
 
   let cursor = 0;
   let scrollOffset = 0;
-  const termHeight = process.stdout.rows ?? 40;
+  let termHeight = process.stdout.rows ?? 40;
+  let termWidth = process.stdout.columns ?? 120;
   // HEADER_LINES (4) + position indicator (2) = 6 fixed lines consumed by renderGroups.
   // filterBarLines (0–2) and the sticky repo line (0–1) are added dynamically below.
   // Use getViewportHeight() for scroll decisions so they match what renderGroups actually renders.
@@ -258,6 +259,27 @@ export async function runInteractive(
 
   redraw();
 
+  // ─── Exit handler for cleanup ────────────────────────────────────────────
+  const exit = () => {
+    process.stdout.write(ANSI_CLEAR);
+    process.stdin.setRawMode(false);
+    process.off("SIGWINCH", onResize);
+    process.exit(0);
+  };
+
+  // ─── Live terminal resize handler ────────────────────────────────────────
+  const onResize = () => {
+    const newHeight = process.stdout.rows ?? 40;
+    const newWidth = process.stdout.columns ?? 120;
+    if (newHeight !== termHeight || newWidth !== termWidth) {
+      termHeight = newHeight;
+      termWidth = newWidth;
+      redraw();
+    }
+  };
+
+  process.on("SIGWINCH", onResize);
+
   for await (const chunk of process.stdin) {
     const key = chunk.toString();
 
@@ -271,9 +293,7 @@ export async function runInteractive(
     // Feat: team pick mode — resolve multi-team section ownership — see issue #85
     if (teamPickMode.active) {
       if (key === KEY_CTRL_C) {
-        process.stdout.write(ANSI_CLEAR);
-        process.stdin.setRawMode(false);
-        process.exit(0);
+        exit();
       } else if (key === ANSI_ARROW_LEFT) {
         // ← — cycle candidate teams backwards
         teamPickMode = {
@@ -312,9 +332,7 @@ export async function runInteractive(
     // Feat: re-pick mode — re-assign a picked (◈) repo to a different team — see issue #87
     if (repickMode.active) {
       if (key === KEY_CTRL_C) {
-        process.stdout.write(ANSI_CLEAR);
-        process.stdin.setRawMode(false);
-        process.exit(0);
+        exit();
       } else if (key === ANSI_ARROW_LEFT) {
         // ← — cycle candidate teams backwards
         repickMode = {
@@ -366,9 +384,7 @@ export async function runInteractive(
     // ── Filter input mode ────────────────────────────────────────────────────
     if (filterMode) {
       if (key === KEY_CTRL_C) {
-        process.stdout.write(ANSI_CLEAR);
-        process.stdin.setRawMode(false);
-        process.exit(0);
+        exit();
       } else if (key === "\x1b" && !key.startsWith("\x1b[") && !key.startsWith("\x1b\x1b")) {
         // ESC (bare) — cancel filter input
         filterMode = false;
@@ -481,9 +497,7 @@ export async function runInteractive(
     const row = rows[cursor];
 
     if (key === KEY_CTRL_C || key === "q") {
-      process.stdout.write(ANSI_CLEAR);
-      process.stdin.setRawMode(false);
-      process.exit(0);
+      exit();
     }
 
     if (key === KEY_ENTER_CR || key === KEY_ENTER_LF) {
@@ -495,6 +509,7 @@ export async function runInteractive(
       }
       process.stdout.write(ANSI_CLEAR);
       process.stdin.setRawMode(false);
+      process.off("SIGWINCH", onResize);
       console.log(
         buildOutput(groups, query, org, excludedRepos, excludedExtractRefs, format, outputType, {
           includeArchived,
