@@ -214,6 +214,9 @@ export async function runInteractive(
     focusedIndex: number;
   } = { active: false, repoIndex: -1, candidates: [], focusedIndex: 0 };
 
+  // Persistent rows reference — updated on every redraw so it's available in the event loop
+  let rows: Row[] = [];
+
   /** Schedule a debounced stats recompute (while typing in filter bar). */
   const scheduleStatsUpdate = () => {
     if (statsDebounceTimer !== null) clearTimeout(statsDebounceTimer);
@@ -227,7 +230,7 @@ export async function runInteractive(
 
   const redraw = () => {
     const activeFilter = filterMode ? filterInput : filterPath;
-    const rows = buildRows(groups, activeFilter, filterTarget, filterRegex);
+    rows = buildRows(groups, activeFilter, filterTarget, filterRegex);
     // Normalise scrollOffset downward so the viewport is packed to the bottom.
     // After a fold/unfold, filter change, or navigation near the end of the
     // list, the rows visible from scrollOffset onwards can be fewer than
@@ -296,27 +299,13 @@ export async function runInteractive(
       if (mouseEvent.button === 64) {
         // Wheel up — scroll up by a small step (3 rows)
         scrollOffset = Math.max(0, scrollOffset - 3);
-        scrollOffset = normalizeScrollOffset(
-          groups,
-          rows,
-          scrollOffset,
-          termHeight,
-          filterBarLines,
-          stickyRepoLine !== null ? 1 : 0,
-        );
+        scrollOffset = normalizeScrollOffset(scrollOffset, rows, groups, getViewportHeight(rows));
         redraw();
         continue;
       } else if (mouseEvent.button === 65) {
         // Wheel down — scroll down by a small step (3 rows)
         scrollOffset = Math.min(Math.max(0, rows.length - 1), scrollOffset + 3);
-        scrollOffset = normalizeScrollOffset(
-          groups,
-          rows,
-          scrollOffset,
-          termHeight,
-          filterBarLines,
-          stickyRepoLine !== null ? 1 : 0,
-        );
+        scrollOffset = normalizeScrollOffset(scrollOffset, rows, groups, getViewportHeight(rows));
         redraw();
         continue;
       }
