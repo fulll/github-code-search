@@ -338,6 +338,75 @@ describe("fetchAllResults", () => {
     const results = await fetchAllResults("hello", "org", "tok");
     expect(results[0].textMatches[0].matches[0].line).toBe(1);
   });
+
+  it("propagates the downloaded raw content into fileContent when keepFileContent is true", async () => {
+    const fileContent = "line one\nline two\nconst x = doSomething()\n";
+    const fakeItem = {
+      path: "src/mod.ts",
+      html_url: "https://github.com/org/repo/blob/main/src/mod.ts",
+      repository: { full_name: "org/repo", archived: false },
+      text_matches: [{ fragment: "const x = doSomething()", matches: [] }],
+    };
+    globalThis.fetch = (async (url: string | URL | Request) => {
+      const urlStr = url.toString();
+      if (new URL(urlStr).hostname === "raw.githubusercontent.com") {
+        return new Response(fileContent, { status: 200 });
+      }
+      return new Response(JSON.stringify({ items: [fakeItem], total_count: 1 }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    const results = await fetchAllResults("doSomething", "org", "tok", undefined, true);
+    expect(results[0].fileContent).toBe(fileContent);
+  });
+
+  it("leaves fileContent absent when the raw content fetch fails, even with keepFileContent true", async () => {
+    const fakeItem = {
+      path: "src/mod.ts",
+      html_url: "https://github.com/org/repo/blob/main/src/mod.ts",
+      repository: { full_name: "org/repo", archived: false },
+      text_matches: [{ fragment: "hello world", matches: [] }],
+    };
+    globalThis.fetch = (async (url: string | URL | Request) => {
+      const urlStr = url.toString();
+      if (new URL(urlStr).hostname === "raw.githubusercontent.com") {
+        return new Response("Not Found", { status: 404 });
+      }
+      return new Response(JSON.stringify({ items: [fakeItem], total_count: 1 }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    const results = await fetchAllResults("hello", "org", "tok", undefined, true);
+    expect(results[0].fileContent).toBeUndefined();
+  });
+
+  it("does not retain fileContent when keepFileContent is false (default — non-regex queries)", async () => {
+    const fileContent = "line one\nline two\nconst x = doSomething()\n";
+    const fakeItem = {
+      path: "src/mod.ts",
+      html_url: "https://github.com/org/repo/blob/main/src/mod.ts",
+      repository: { full_name: "org/repo", archived: false },
+      text_matches: [{ fragment: "const x = doSomething()", matches: [] }],
+    };
+    globalThis.fetch = (async (url: string | URL | Request) => {
+      const urlStr = url.toString();
+      if (new URL(urlStr).hostname === "raw.githubusercontent.com") {
+        return new Response(fileContent, { status: 200 });
+      }
+      return new Response(JSON.stringify({ items: [fakeItem], total_count: 1 }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    // No keepFileContent argument — defaults to false.
+    const results = await fetchAllResults("doSomething", "org", "tok");
+    expect(results[0].fileContent).toBeUndefined();
+  });
 });
 
 // ─── fetchRepoTeams ──────────────────────────────────────────────────────────

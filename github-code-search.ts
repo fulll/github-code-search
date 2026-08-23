@@ -326,7 +326,15 @@ async function searchAction(
     );
   }
 
-  const rawMatches = await fetchAllResults(effectiveQuery, org, GITHUB_TOKEN!, onRateLimit);
+  // Only retain raw file content when a regex filter is active — it's the
+  // only consumer (local fallback matching, issue #148) — see PR #154 review.
+  const rawMatches = await fetchAllResults(
+    effectiveQuery,
+    org,
+    GITHUB_TOKEN!,
+    onRateLimit,
+    regexFilter !== undefined,
+  );
   let groups = aggregate(
     rawMatches,
     excludedRepos,

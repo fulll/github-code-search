@@ -334,3 +334,137 @@ describe("aggregate — regexFilter", () => {
     expect(groups[0].matches[0].textMatches[0].fragment).toBe("import axios from 'axios'");
   });
 });
+
+// ─── aggregate — fileContent fallback (issue #148) ────────────────────────────
+
+describe("aggregate — regexFilter fallback to full fileContent", () => {
+  it("keeps a match whose API fragment does not contain the full regex match but whose fileContent does", () => {
+    // The API fragment only shows a narrower context (e.g. "react-dom" noise);
+    // the regex needs "react": "18 which only the full file content has.
+    const fileContent =
+      'deps:\n  "prettier": "latest",\n  "react": "18.2.0",\n  "react-dom": "18.2.0"\n';
+    const matches: CodeMatch[] = [
+      {
+        path: "package.json",
+        repoFullName: "myorg/repoA",
+        htmlUrl: "https://github.com/myorg/repoA/blob/main/package.json",
+        archived: false,
+        fileContent,
+        textMatches: [{ fragment: '"react-dom": "18.2.0"', matches: [] }],
+      },
+    ];
+
+    const groups = aggregate(matches, new Set(), new Set(), false, /"react": "18/);
+    expect(groups).toHaveLength(1);
+    const tm = groups[0].matches[0].textMatches[0];
+    expect(tm.fragment).toContain('"react": "18');
+    expect(tm.matches[0].text).toBe('"react": "18');
+  });
+
+  it("drops the match when neither the fragment nor fileContent contain a match", () => {
+    const matches: CodeMatch[] = [
+      {
+        path: "package.json",
+        repoFullName: "myorg/repoA",
+        htmlUrl: "",
+        archived: false,
+        fileContent: 'deps:\n  "vue": "3.0.0"\n',
+        textMatches: [{ fragment: '"vue": "3.0.0"', matches: [] }],
+      },
+    ];
+
+    const groups = aggregate(matches, new Set(), new Set(), false, /"react": "18/);
+    expect(groups).toHaveLength(0);
+  });
+
+  it("does not use fileContent when the API fragment already matches (no behaviour change)", () => {
+    const fileContent = 'deps:\n  "react": "18.2.0"\n';
+    const matches: CodeMatch[] = [
+      {
+        path: "package.json",
+        repoFullName: "myorg/repoA",
+        htmlUrl: "",
+        archived: false,
+        fileContent,
+        textMatches: [{ fragment: '"react": "18.2.0"', matches: [] }],
+      },
+    ];
+
+    const groups = aggregate(matches, new Set(), new Set(), false, /"react": "18/);
+    expect(groups[0].matches[0].textMatches[0].fragment).toBe('"react": "18.2.0"');
+  });
+
+  it("falls back to fragment-only behaviour (drops the match) when fileContent is absent", () => {
+    // Backward compatibility: no fileContent field at all (e.g. raw content
+    // fetch failed) behaves exactly as before this issue's fix.
+    const matches: CodeMatch[] = [
+      {
+        path: "package.json",
+        repoFullName: "myorg/repoA",
+        htmlUrl: "",
+        archived: false,
+        textMatches: [{ fragment: '"react-dom": "18.2.0"', matches: [] }],
+      },
+    ];
+
+    const groups = aggregate(matches, new Set(), new Set(), false, /"react": "18/);
+    expect(groups).toHaveLength(0);
+  });
+
+  it("keeps a match whose span reaches beyond the default ±2-line context window", () => {
+    // The match runs from "BEGIN" (line 11) to "END" (line 22) — far wider
+    // than a fixed window built only around the match's start line, which
+    // would never include "END" and silently drop an otherwise-valid match.
+    const decoysBefore = Array.from({ length: 10 }, (_, i) => `d${i + 1}`);
+    const body = Array.from({ length: 10 }, (_, i) => `m${i + 1}`);
+    const decoysAfter = Array.from({ length: 3 }, (_, i) => `d${i + 11}`);
+    const fileContent = [...decoysBefore, "BEGIN", ...body, "END", ...decoysAfter].join("\n");
+    const matches: CodeMatch[] = [
+      {
+        path: "file.txt",
+        repoFullName: "myorg/repoA",
+        htmlUrl: "",
+        archived: false,
+        fileContent,
+        textMatches: [{ fragment: "unrelated fragment", matches: [] }],
+      },
+    ];
+
+    const groups = aggregate(matches, new Set(), new Set(), false, /BEGIN[\s\S]*?END/);
+    expect(groups).toHaveLength(1);
+    const tm = groups[0].matches[0].textMatches[0];
+    expect(tm.matches[0].text).toBe(["BEGIN", ...body, "END"].join("\n"));
+    expect(tm.matches[0].line).toBe(11);
+    expect(tm.fragment).toContain("BEGIN");
+    expect(tm.fragment).toContain("END");
+    expect(tm.fragment).not.toContain("d1\n");
+  });
+
+  it("finds every separate match rather than only the first when falling back to fileContent", () => {
+    const fileContent = [
+      "match_A here",
+      "gap",
+      "gap",
+      "gap",
+      "gap",
+      "gap",
+      "gap",
+      "another match_A here",
+    ].join("\n");
+    const matches: CodeMatch[] = [
+      {
+        path: "file.txt",
+        repoFullName: "myorg/repoA",
+        htmlUrl: "",
+        archived: false,
+        fileContent,
+        textMatches: [{ fragment: "unrelated fragment", matches: [] }],
+      },
+    ];
+
+    const groups = aggregate(matches, new Set(), new Set(), false, /match_A/);
+    const tms = groups[0].matches[0].textMatches;
+    expect(tms).toHaveLength(2);
+    expect(tms.map((tm) => tm.matches[0].line)).toEqual([1, 8]);
+  });
+});

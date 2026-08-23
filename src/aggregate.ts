@@ -79,6 +79,77 @@ function recomputeSegments(
 
 // ─── Aggregation ─────────────────────────────────────────────────────────────
 
+/**
+ * Finds every match of `re` directly against the full downloaded `content`
+ * and builds a display-friendly fallback `TextMatch` per match, used when the
+ * API-provided fragment does not contain a match but the full file content
+ * does — see issue #148.
+ *
+ * Matches (and their line/col) are computed once against the *entire* file in
+ * a single forward pass — no rescanning of the preceding text per match, and
+ * no fixed-size window built only from the match's start line, so a match
+ * spanning more than `contextLines * 2 + 1` lines (or reached via
+ * lookaround) is never silently dropped: the window is expanded to always
+ * contain the match's full span.
+ */
+function fallbackMatchesFromFullContent(
+  content: string,
+  re: RegExp,
+  contextLines = 2,
+): TextMatch[] {
+  re.lastIndex = 0;
+  // Precompute newline offsets once — O(n) — so line/col and window-boundary
+  // lookups are O(log n) via binary search instead of O(n) per match.
+  const newlines: number[] = [];
+  for (let i = 0; i < content.length; i++) {
+    if (content[i] === "\n") newlines.push(i);
+  }
+  const lineOfOffset = (offset: number): number => {
+    let lo = 0;
+    let hi = newlines.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (newlines[mid] < offset) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo + 1; // 1-based
+  };
+  const startOffsetOfLine = (line: number): number => (line === 1 ? 0 : newlines[line - 2] + 1);
+  const totalLines = newlines.length + 1;
+  const lines = content.split("\n");
+
+  const results: TextMatch[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(content)) !== null) {
+    const start = m.index;
+    const end = start + m[0].length;
+    const startLine = lineOfOffset(start);
+    // `end - 1` so a match ending exactly on a newline still resolves to the
+    // line it belongs to rather than the following (empty) one.
+    const endLine = end > start ? lineOfOffset(end - 1) : startLine;
+
+    const windowStartLine = Math.max(1, startLine - contextLines);
+    const windowEndLine = Math.min(totalLines, endLine + contextLines);
+    const windowStartOffset = startOffsetOfLine(windowStartLine);
+    const fragment = lines.slice(windowStartLine - 1, windowEndLine).join("\n");
+    const col = start - startOffsetOfLine(startLine) + 1;
+
+    results.push({
+      fragment,
+      matches: [
+        {
+          text: m[0],
+          indices: [start - windowStartOffset, end - windowStartOffset],
+          line: startLine,
+          col,
+        },
+      ],
+    });
+    if (m[0].length === 0) re.lastIndex++; // guard against zero-width matches
+  }
+  return results;
+}
+
 export function aggregate(
   matches: CodeMatch[],
   excludedRepos: Set<string>,
@@ -107,7 +178,7 @@ export function aggregate(
       // Preserve the caller's lastIndex: aggregate() must not have observable
       // side-effects on the passed-in RegExp instance.
       const savedLastIndex = regexFilter!.lastIndex;
-      const updatedTextMatches: TextMatch[] = m.textMatches
+      let updatedTextMatches: TextMatch[] = m.textMatches
         .map((tm) => {
           // Derive the absolute start line of this fragment from the first API
           // segment. If no API segment is available, fall back to 1 so that
@@ -124,6 +195,13 @@ export function aggregate(
           return segs.length > 0 ? { fragment: tm.fragment, matches: segs } : null;
         })
         .filter((tm): tm is TextMatch => tm !== null);
+      // Fix: fall back to the full downloaded file content when none of the
+      // API-provided fragments contain a match — the API fragment can be too
+      // narrow to include the whole regex match even though the file does
+      // contain it, silently dropping otherwise-valid results — see issue #148.
+      if (updatedTextMatches.length === 0 && m.fileContent) {
+        updatedTextMatches = fallbackMatchesFromFullContent(m.fileContent, globalRe);
+      }
       // Restore the caller's original lastIndex (rather than hard-coding 0),
       // so aggregate() doesn't have observable side effects on its inputs.
       regexFilter!.lastIndex = savedLastIndex;
