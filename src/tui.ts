@@ -308,6 +308,9 @@ export async function runInteractive(
     if (statsDebounceTimer !== null) clearTimeout(statsDebounceTimer);
     process.stdin.setRawMode(false);
     process.off("SIGWINCH", onResize);
+    // Unref stdin so the pending `for await` read can't keep the event loop
+    // alive while breaking out of the loop awaits the stream's teardown.
+    process.stdin.unref();
     // Set flag to break out of the event loop and allow stdout buffer to flush
     // before process termination. process.exit() may terminate too early.
     shouldExit = true;
@@ -659,6 +662,9 @@ export async function runInteractive(
       process.stdout.write(ANSI_CLEAR);
       process.stdin.setRawMode(false);
       process.off("SIGWINCH", onResize);
+      // Unref stdin so the pending `for await` read can't keep the event loop
+      // alive while breaking out of the loop awaits the stream's teardown.
+      process.stdin.unref();
       if (statsDebounceTimer !== null) clearTimeout(statsDebounceTimer);
       console.log(
         buildOutput(groups, query, org, excludedRepos, excludedExtractRefs, format, outputType, {
