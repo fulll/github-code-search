@@ -135,6 +135,37 @@ function firstDivergingPathIndex(
 }
 
 /**
+ * Reconstructs the full ancestor path (root-to-node labels) for the section
+ * row at `rowIndex`, by scanning backward through `rows` for the most recent
+ * section row at each decreasing `sectionLevel`. Used to identify a
+ * combined-label section unambiguously in a `groupByTeamHierarchy` tree,
+ * where the same label (e.g. `"other"`) can appear under multiple parents.
+ *
+ * Returns `[]` if the row at `rowIndex` is not a section row. For a flat
+ * `groupByTeamPrefix` section (`sectionLevel` 0 or unset), the path is just
+ * the row's own label.
+ */
+export function getSectionPath(rows: Row[], rowIndex: number): string[] {
+  const row = rows[rowIndex];
+  if (row?.type !== "section" || row.sectionLabel === undefined) return [];
+
+  const path: string[] = [row.sectionLabel];
+  let neededLevel = (row.sectionLevel ?? 0) - 1;
+  for (let i = rowIndex - 1; i >= 0 && neededLevel >= 0; i--) {
+    const r = rows[i];
+    if (
+      r.type === "section" &&
+      r.sectionLabel !== undefined &&
+      (r.sectionLevel ?? 0) === neededLevel
+    ) {
+      path.unshift(r.sectionLabel);
+      neededLevel--;
+    }
+  }
+  return path;
+}
+
+/**
  * Normalises scrollOffset downward so the viewport is always packed from the
  * bottom. After a fold, a filter change, or navigating near the end of the
  * list, the rows visible from scrollOffset to rows.length-1 can occupy fewer

@@ -1,15 +1,21 @@
 import { describe, expect, it } from "bun:test";
 import {
   applyTeamPick,
+  applyTeamPickInTree,
   consolidateTeamHierarchy,
+  findCombinedSectionPaths,
   flattenTeamHierarchy,
   flattenTeamSections,
   groupByTeamHierarchy,
   groupByTeamPrefix,
   moveRepoToSection,
+  moveRepoToSectionInTree,
+  rebuildTeamHierarchy,
   rebuildTeamSections,
   undoPickedRepo,
+  undoPickedRepoInTree,
   undoSectionPick,
+  undoSectionPickInTree,
 } from "./group.ts";
 import type { RepoGroup, TeamSection } from "./types.ts";
 
@@ -491,6 +497,320 @@ describe("flattenTeamHierarchy", () => {
 
   it("returns an empty array for an empty tree", () => {
     expect(flattenTeamHierarchy([])).toEqual([]);
+  });
+});
+
+// ─── rebuildTeamHierarchy ──────────────────────────────────────────────────────
+
+describe("rebuildTeamHierarchy", () => {
+  it("round-trips a 2-level tree through flattenTeamHierarchy", () => {
+    const groups = [
+      makeGroup("org/a", ["gamme-client", "squad-dashboard"]),
+      makeGroup("org/b", ["gamme-client", "squad-billing"]),
+    ];
+    const original = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const rebuilt = rebuildTeamHierarchy(flattenTeamHierarchy(original));
+    expect(rebuilt).toEqual(original);
+  });
+
+  it("round-trips a tree where a node has both own groups and children (overlap parent)", () => {
+    const groups = [
+      makeGroup("org/a", ["gamme-lead-client"]),
+      makeGroup("org/b", ["gamme-lead-client-p1"]),
+    ];
+    const original = groupByTeamHierarchy(groups, [["gamme-"]]);
+    const rebuilt = rebuildTeamHierarchy(flattenTeamHierarchy(original));
+    expect(rebuilt).toEqual(original);
+  });
+
+  it("round-trips multiple independent top-level chains", () => {
+    const groups = [
+      makeGroup("org/a", ["gamme-client", "squad-dashboard"]),
+      makeGroup("org/b", ["chapter-backend"]),
+      makeGroup("org/c", []),
+    ];
+    const original = groupByTeamHierarchy(groups, [["gamme-", "squad-"], ["chapter-"]]);
+    const rebuilt = rebuildTeamHierarchy(flattenTeamHierarchy(original));
+    expect(rebuilt).toEqual(original);
+  });
+
+  it("returns an empty array for an empty input", () => {
+    expect(rebuildTeamHierarchy([])).toEqual([]);
+  });
+});
+
+// ─── applyTeamPickInTree ────────────────────────────────────────────────────────
+
+describe("applyTeamPickInTree", () => {
+  it("behaves like applyTeamPick for a top-level (depth-1) path", () => {
+    const flatSections: TeamSection[] = [
+      { label: "squad-frontend", groups: [makeGroup("org/a", ["squad-frontend"])] },
+      {
+        label: "squad-frontend + squad-mobile",
+        groups: [makeGroup("org/shared", ["squad-frontend", "squad-mobile"])],
+      },
+    ];
+    const viaFlat = applyTeamPick(flatSections, "squad-frontend + squad-mobile", "squad-frontend");
+    const viaTree = applyTeamPickInTree(
+      flatSections,
+      ["squad-frontend + squad-mobile"],
+      "squad-frontend",
+    );
+    expect(viaTree).toEqual(viaFlat);
+  });
+
+  it("reassigns a nested combined section to a sibling at the same depth", () => {
+    const groups = [
+      makeGroup("org/shared", ["gamme-client", "squad-a", "squad-b"]),
+      makeGroup("org/a", ["gamme-client", "squad-a"]),
+    ];
+    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const updated = applyTeamPickInTree(tree, ["gamme-client", "squad-a + squad-b"], "squad-a");
+    const gamme = updated.find((s) => s.label === "gamme-client")!;
+    const childLabels = (gamme.children ?? []).map((c) => c.label);
+    expect(childLabels).not.toContain("squad-a + squad-b");
+    const squadA = gamme.children!.find((c) => c.label === "squad-a")!;
+    expect(squadA.groups.map((g) => g.repoFullName).toSorted()).toEqual(["org/a", "org/shared"]);
+  });
+
+  it("tags moved repos with pickedFrom = joined path", () => {
+    const groups = [makeGroup("org/shared", ["gamme-client", "squad-a", "squad-b"])];
+    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const updated = applyTeamPickInTree(tree, ["gamme-client", "squad-a + squad-b"], "squad-a");
+    const gamme = updated.find((s) => s.label === "gamme-client")!;
+    const squadA = gamme.children!.find((c) => c.label === "squad-a")!;
+    expect(squadA.groups[0].pickedFrom).toBe("gamme-client > squad-a + squad-b");
+  });
+
+  it("creates a new sibling section when the chosen team has none yet", () => {
+    const groups = [makeGroup("org/shared", ["gamme-client", "squad-a", "squad-b"])];
+    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const updated = applyTeamPickInTree(tree, ["gamme-client", "squad-a + squad-b"], "squad-b");
+    const gamme = updated.find((s) => s.label === "gamme-client")!;
+    expect(gamme.children!.map((c) => c.label)).toContain("squad-b");
+  });
+
+  it("is a no-op when a path segment is not found", () => {
+    const groups = [makeGroup("org/shared", ["gamme-client", "squad-a", "squad-b"])];
+    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const result = applyTeamPickInTree(tree, ["nope", "squad-a + squad-b"], "squad-a");
+    expect(result).toEqual(tree);
+  });
+
+  it("preserves the picked section's own children (does not drop the subtree)", () => {
+    // Regression: a top-level combined section ("gamme-a + gamme-a-security-p1")
+    // that was already subdivided by the next chain level (squad-) must keep
+    // its nested children when picked — only its own (now empty) `groups`
+    // were carried over before the fix, silently dropping every repo nested
+    // underneath.
+    const groups = [
+      makeGroup("org/tools-mobile", [
+        "gamme-lead-mobile",
+        "gamme-lead-mobile-security-p1",
+        "squad-core",
+        "squad-mobile",
+      ]),
+      makeGroup("org/wizard-mobile", ["gamme-lead-mobile", "gamme-lead-mobile-security-p1"]),
+    ];
+    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const combined = tree.find((s) => s.label.includes(" + "))!;
+    expect(combined.label).toBe("gamme-lead-mobile + gamme-lead-mobile-security-p1");
+    expect(combined.groups).toEqual([]); // fully subdivided by squad- before the pick
+    expect(combined.children).toHaveLength(2); // "squad-core + squad-mobile" and "other"
+
+    const updated = applyTeamPickInTree(tree, [combined.label], "gamme-lead-mobile");
+
+    expect(updated.map((s) => s.label)).not.toContain(combined.label);
+    const picked = updated.find((s) => s.label === "gamme-lead-mobile")!;
+    expect(picked).toBeDefined();
+    expect(picked.children).toHaveLength(2);
+    const squadChild = picked.children!.find((c) => c.label === "squad-core + squad-mobile")!;
+    expect(squadChild.groups.map((g) => g.repoFullName)).toEqual(["org/tools-mobile"]);
+    const otherChild = picked.children!.find((c) => c.label === "other")!;
+    expect(otherChild.groups.map((g) => g.repoFullName)).toEqual(["org/wizard-mobile"]);
+    // Every repo in the moved subtree is tagged, not just the top node's own groups.
+    expect(squadChild.groups[0].pickedFrom).toBe(combined.label);
+    expect(otherChild.groups[0].pickedFrom).toBe(combined.label);
+  });
+
+  it("merges the picked subtree's children into an existing target section's children", () => {
+    const groups = [
+      makeGroup("org/existing", ["gamme-lead-mobile", "squad-existing"]),
+      makeGroup("org/tools-mobile", [
+        "gamme-lead-mobile",
+        "gamme-lead-mobile-security-p1",
+        "squad-core",
+      ]),
+    ];
+    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const combined = tree.find((s) => s.label.includes(" + "))!;
+    const updated = applyTeamPickInTree(tree, [combined.label], "gamme-lead-mobile");
+    const picked = updated.find((s) => s.label === "gamme-lead-mobile")!;
+    const childLabels = picked.children!.map((c) => c.label).toSorted();
+    expect(childLabels).toEqual(["squad-core", "squad-existing"]);
+  });
+
+  it("returns sections unchanged for an empty combinedPath", () => {
+    const groups = [makeGroup("org/a")];
+    const tree = groupByTeamHierarchy(groups, [["squad-"]]);
+    expect(applyTeamPickInTree(tree, [], "squad-a")).toBe(tree);
+  });
+});
+
+// ─── undoSectionPickInTree ──────────────────────────────────────────────────────
+
+describe("undoSectionPickInTree", () => {
+  it("restores every repo tagged with the matching pickedFrom back to the combined section", () => {
+    const groups = [
+      makeGroup("org/shared", ["gamme-client", "squad-a", "squad-b"]),
+      makeGroup("org/a", ["gamme-client", "squad-a"]),
+    ];
+    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const picked = applyTeamPickInTree(tree, ["gamme-client", "squad-a + squad-b"], "squad-a");
+    const restored = undoSectionPickInTree(picked, "gamme-client > squad-a + squad-b");
+    const gamme = restored.find((s) => s.label === "gamme-client")!;
+    const childLabels = gamme.children!.map((c) => c.label).toSorted();
+    expect(childLabels).toEqual(["squad-a", "squad-a + squad-b"]);
+    const combined = gamme.children!.find((c) => c.label === "squad-a + squad-b")!;
+    expect(combined.groups.map((g) => g.repoFullName)).toEqual(["org/shared"]);
+    expect(combined.groups[0].pickedFrom).toBeUndefined();
+  });
+
+  it("drops a section left empty after the restore", () => {
+    const groups = [makeGroup("org/shared", ["gamme-client", "squad-a", "squad-b"])];
+    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const picked = applyTeamPickInTree(tree, ["gamme-client", "squad-a + squad-b"], "squad-a");
+    const restored = undoSectionPickInTree(picked, "gamme-client > squad-a + squad-b");
+    const gamme = restored.find((s) => s.label === "gamme-client")!;
+    // squad-a only ever held the moved repo — it must be gone after the restore.
+    expect(gamme.children!.map((c) => c.label)).not.toContain("squad-a");
+  });
+
+  it("is a no-op when no repo has a matching pickedFrom", () => {
+    const groups = [makeGroup("org/a", ["squad-a", "squad-b"])];
+    const tree = groupByTeamHierarchy(groups, [["squad-"]]);
+    expect(undoSectionPickInTree(tree, "nope")).toBe(tree);
+  });
+
+  it("behaves like undoSectionPick for a top-level (depth-1) path", () => {
+    const flatSections: TeamSection[] = [
+      {
+        label: "squad-frontend",
+        groups: [{ ...makeGroup("org/shared"), pickedFrom: "squad-frontend + squad-mobile" }],
+      },
+    ];
+    const viaFlat = undoSectionPick(
+      flattenTeamSections(flatSections),
+      "squad-frontend + squad-mobile",
+    );
+    const viaTree = flattenTeamHierarchy(
+      undoSectionPickInTree(
+        rebuildTeamHierarchy(flattenTeamSections(flatSections)),
+        "squad-frontend + squad-mobile",
+      ),
+    );
+    expect(viaTree.map((g) => g.repoFullName)).toEqual(viaFlat.map((g) => g.repoFullName));
+  });
+});
+
+// ─── moveRepoToSectionInTree ────────────────────────────────────────────────────
+
+describe("moveRepoToSectionInTree", () => {
+  it("moves a repo to a sibling under the given parent path", () => {
+    const groups = [
+      makeGroup("org/shared", ["gamme-client", "squad-a", "squad-b"]),
+      makeGroup("org/a", ["gamme-client", "squad-a"]),
+    ];
+    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const picked = applyTeamPickInTree(tree, ["gamme-client", "squad-a + squad-b"], "squad-a");
+    const moved = moveRepoToSectionInTree(picked, "org/shared", ["gamme-client"], "squad-b");
+    const gamme = moved.find((s) => s.label === "gamme-client")!;
+    const squadB = gamme.children!.find((c) => c.label === "squad-b")!;
+    expect(squadB.groups.map((g) => g.repoFullName)).toEqual(["org/shared"]);
+    const squadA = gamme.children!.find((c) => c.label === "squad-a")!;
+    expect(squadA.groups.map((g) => g.repoFullName)).toEqual(["org/a"]);
+  });
+
+  it("creates the target section when it doesn't exist yet", () => {
+    const groups = [makeGroup("org/shared", ["gamme-client", "squad-a", "squad-b"])];
+    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const picked = applyTeamPickInTree(tree, ["gamme-client", "squad-a + squad-b"], "squad-a");
+    const moved = moveRepoToSectionInTree(picked, "org/shared", ["gamme-client"], "squad-c");
+    const gamme = moved.find((s) => s.label === "gamme-client")!;
+    expect(gamme.children!.map((c) => c.label)).toContain("squad-c");
+  });
+
+  it("is a no-op when the repo is not found anywhere in the tree", () => {
+    const groups = [makeGroup("org/a", ["squad-a"])];
+    const tree = groupByTeamHierarchy(groups, [["squad-"]]);
+    expect(moveRepoToSectionInTree(tree, "org/does-not-exist", [], "squad-b")).toBe(tree);
+  });
+});
+
+// ─── undoPickedRepoInTree ───────────────────────────────────────────────────────
+
+describe("undoPickedRepoInTree", () => {
+  it("restores a single picked repo back to its original combined section", () => {
+    const groups = [
+      makeGroup("org/shared", ["gamme-client", "squad-a", "squad-b"]),
+      makeGroup("org/a", ["gamme-client", "squad-a"]),
+    ];
+    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const picked = applyTeamPickInTree(tree, ["gamme-client", "squad-a + squad-b"], "squad-a");
+    const restored = undoPickedRepoInTree(picked, "org/shared");
+    const gamme = restored.find((s) => s.label === "gamme-client")!;
+    const combined = gamme.children!.find((c) => c.label === "squad-a + squad-b")!;
+    expect(combined.groups.map((g) => g.repoFullName)).toEqual(["org/shared"]);
+    expect(combined.groups[0].pickedFrom).toBeUndefined();
+    // The other repo that was also moved stays picked.
+    const squadA = gamme.children!.find((c) => c.label === "squad-a")!;
+    expect(squadA.groups.map((g) => g.repoFullName)).toEqual(["org/a"]);
+  });
+
+  it("is a no-op for a repo with no pickedFrom", () => {
+    const groups = [makeGroup("org/a", ["squad-a"])];
+    const tree = groupByTeamHierarchy(groups, [["squad-"]]);
+    expect(undoPickedRepoInTree(tree, "org/a")).toBe(tree);
+  });
+
+  it("is a no-op when the repo is not found", () => {
+    const groups = [makeGroup("org/a", ["squad-a"])];
+    const tree = groupByTeamHierarchy(groups, [["squad-"]]);
+    expect(undoPickedRepoInTree(tree, "org/does-not-exist")).toBe(tree);
+  });
+});
+
+// ─── findCombinedSectionPaths ───────────────────────────────────────────────────
+
+describe("findCombinedSectionPaths", () => {
+  it("finds a top-level combined section", () => {
+    const groups = [makeGroup("org/a", ["squad-a", "squad-b"])];
+    const tree = groupByTeamHierarchy(groups, [["squad-"]]);
+    expect(findCombinedSectionPaths(tree)).toEqual([["squad-a + squad-b"]]);
+  });
+
+  it("finds a nested combined section with its full ancestor path", () => {
+    const groups = [makeGroup("org/a", ["gamme-client", "squad-a", "squad-b"])];
+    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    expect(findCombinedSectionPaths(tree)).toEqual([["gamme-client", "squad-a + squad-b"]]);
+  });
+
+  it("returns an empty array when there is no combined section", () => {
+    const groups = [makeGroup("org/a", ["squad-a"])];
+    const tree = groupByTeamHierarchy(groups, [["squad-"]]);
+    expect(findCombinedSectionPaths(tree)).toEqual([]);
+  });
+
+  it("finds multiple combined sections across different branches", () => {
+    const groups = [
+      makeGroup("org/a", ["gamme-x", "squad-a", "squad-b"]),
+      makeGroup("org/b", ["gamme-y", "chapter-a", "chapter-b"]),
+    ];
+    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"], ["gamme-"]]);
+    // Both repos start with a different top-level "gamme-" match, so this
+    // exercises two independent combined sections at the same nested depth.
+    const paths = findCombinedSectionPaths(tree);
+    expect(paths).toContainEqual(["gamme-x", "squad-a + squad-b"]);
   });
 });
 

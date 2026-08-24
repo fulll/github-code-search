@@ -2,7 +2,7 @@ import * as style from "./style.ts";
 import type { FilterTarget, RepoGroup, Row, TextMatchSegment } from "./types.ts";
 import { highlightFragment } from "./render/highlight.ts";
 import { buildFilterStats, type FilterStats } from "./render/filter.ts";
-import { rowTerminalLines } from "./render/rows.ts";
+import { getSectionPath, rowTerminalLines } from "./render/rows.ts";
 import { buildMatchCountLabel, buildSummaryFull } from "./render/summary.ts";
 import { renderTeamPickHeader } from "./render/team-pick.ts";
 import { visibleWidth, stripAnsi, clipToWidth } from "./render/terminal.ts";
@@ -23,6 +23,7 @@ export {
   buildRows,
   isCursorVisible,
   normalizeScrollOffset,
+  getSectionPath,
 } from "./render/rows.ts";
 export {
   buildMatchCountLabel,
@@ -274,6 +275,11 @@ interface RenderOptions {
   teamPickMode?: {
     active: boolean;
     sectionLabel: string;
+    /** Full ancestor path (root first, ending with `sectionLabel`) used to
+     *  unambiguously match the target row in a `groupByTeamHierarchy` tree,
+     *  where the same label can appear under multiple parents. Falls back to
+     *  matching on `sectionLabel` alone when absent (flat sections). */
+    sectionPath?: string[];
     candidates: string[];
     focusedIndex: number;
   };
@@ -532,8 +538,16 @@ export function renderGroups(
       // Emit the blank separator only when there are rows above in the viewport.
       if (usedLines > 0) lines.push("");
       // Feat: team pick mode — show pick bar when active for this section — see issue #85.
+      // Fix: match by full ancestor path (not just label) when available, so
+      // the same label at a different tree branch isn't targeted by mistake
+      // in a groupByTeamHierarchy tree — see issue #181.
       const pickMode = opts.teamPickMode;
-      if (pickMode?.active && pickMode.sectionLabel === row.sectionLabel) {
+      if (
+        pickMode?.active &&
+        (pickMode.sectionPath !== undefined
+          ? pickMode.sectionPath.join(" > ") === getSectionPath(rows, i).join(" > ")
+          : pickMode.sectionLabel === row.sectionLabel)
+      ) {
         // Fix: clip pick bar to (termWidth - 3) so "── " + bar never wraps — see issue #121.
         const bar = renderTeamPickHeader(
           pickMode.candidates,

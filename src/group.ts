@@ -439,6 +439,319 @@ function firstDivergingIndex(a: PathEntry[], b: PathEntry[]): number {
   return i;
 }
 
+// ─── Hierarchical (path-addressed) pick-team ──────────────────────────────────
+//
+// A section `label` alone is not unique across a `groupByTeamHierarchy` tree
+// (e.g. `"other"` can appear under multiple parents), so hierarchy-aware pick
+// operations address a section by its full root-to-node `path` (an array of
+// ancestor labels ending with the section's own label). The same path,
+// joined with `" > "`, is stored in `pickedFrom` so `undoSectionPickInTree`
+// can find every repo picked from that exact section later. For a top-level
+// section (`path.length === 1`), this is behaviourally identical to the flat
+// `applyTeamPick` / `undoSectionPick` (same joined string as the bare label).
+
+const PATH_SEPARATOR = " > ";
+
+/**
+ * Reconstructs a `groupByTeamHierarchy` tree from a flat `RepoGroup[]`
+ * produced by `flattenTeamHierarchy`. The inverse of `flattenTeamHierarchy`.
+ *
+ * Walks the flat list maintaining a "current node per depth" stack; each
+ * `sectionPath` entry pushes (or replaces, if shallower) a node onto that
+ * stack, and repos are appended to whichever node is deepest on the stack
+ * at the time they're encountered — correctly handling nodes that own repos
+ * directly *and* have nested children (see `TeamSection`).
+ */
+export function rebuildTeamHierarchy(groups: RepoGroup[]): TeamSection[] {
+  const roots: TeamSection[] = [];
+  let stack: TeamSection[] = [];
+
+  for (const g of groups) {
+    if (g.sectionPath !== undefined && g.sectionPath.length > 0) {
+      stack = stack.slice(0, g.sectionPath[0].level);
+      for (const entry of g.sectionPath) {
+        const node: TeamSection = { label: entry.label, groups: [], level: entry.level };
+        if (stack.length === 0) {
+          roots.push(node);
+        } else {
+          const parent = stack[stack.length - 1];
+          parent.children = [...(parent.children ?? []), node];
+        }
+        stack.push(node);
+      }
+    }
+    const { sectionPath: _removed, ...rest } = g;
+    void _removed;
+    const repo = rest as RepoGroup;
+    if (stack.length === 0) {
+      // No section context at all — shouldn't happen for hierarchy-produced
+      // input, but keep the repo visible as its own top-level entry rather
+      // than silently dropping it.
+      roots.push({ label: repo.repoFullName, groups: [repo] });
+      continue;
+    }
+    const leaf = stack[stack.length - 1];
+    leaf.groups = [...leaf.groups, repo];
+  }
+
+  return roots;
+}
+
+/**
+ * Navigates to the node at `parentPath` (ancestor labels, NOT including the
+ * target section's own label) and replaces its children — or the top-level
+ * `sections` array when `parentPath` is empty — with `updater`'s result.
+ *
+ * If a segment of `parentPath` is missing (e.g. an ancestor was pruned by
+ * `removeMatchingRepos` because moving its only repo away left it with no
+ * groups and no children), it is recreated fresh rather than silently
+ * no-op-ing — otherwise undoing/re-picking the *last* repo under a branch
+ * could make that branch permanently unreachable.
+ */
+function updateSiblingsAtPath(
+  sections: TeamSection[],
+  parentPath: string[],
+  updater: (siblings: TeamSection[]) => TeamSection[],
+): TeamSection[] {
+  if (parentPath.length === 0) return updater(sections);
+
+  const [head, ...rest] = parentPath;
+  const idx = sections.findIndex((s) => s.label === head);
+  if (idx === -1) {
+    const children = updateSiblingsAtPath([], rest, updater);
+    // Only materialize the missing ancestor if the update actually produced
+    // something inside it — otherwise this is a genuine no-op (e.g. a
+    // typo'd path) and adding an empty node here would pollute the tree.
+    return children.length === 0 ? sections : [...sections, { label: head, groups: [], children }];
+  }
+
+  const updatedChildren = updateSiblingsAtPath(sections[idx].children ?? [], rest, updater);
+  return sections.map((s, i) => (i === idx ? { ...s, children: updatedChildren } : s));
+}
+
+/**
+ * Merges `repos` into the sibling named `label` under `parentPath`, creating
+ * it — inserted before an `"other"` sibling, or appended — if it doesn't
+ * already exist. Shared by every hierarchical pick/undo/move operation below.
+ */
+function mergeOrCreateAtPath(
+  sections: TeamSection[],
+  parentPath: string[],
+  label: string,
+  repos: RepoGroup[],
+): TeamSection[] {
+  return updateSiblingsAtPath(sections, parentPath, (siblings) => {
+    const idx = siblings.findIndex((s) => s.label === label);
+    if (idx !== -1) {
+      return siblings.map((s, i) => (i === idx ? { ...s, groups: [...s.groups, ...repos] } : s));
+    }
+    const newSection: TeamSection = { label, groups: repos };
+    const otherIdx = siblings.findIndex((s) => s.label === "other");
+    return otherIdx === -1
+      ? [...siblings, newSection]
+      : [...siblings.slice(0, otherIdx), newSection, ...siblings.slice(otherIdx)];
+  });
+}
+
+/**
+ * Removes every repo matching `predicate` anywhere in the tree, dropping
+ * sections left with no groups and no children afterward. Returns the
+ * stripped tree; matched repos (untouched, `pickedFrom` included) are
+ * appended to `collected` in the order encountered.
+ */
+function removeMatchingRepos(
+  nodes: TeamSection[],
+  predicate: (g: RepoGroup) => boolean,
+  collected: RepoGroup[],
+): TeamSection[] {
+  return nodes
+    .map((node) => {
+      const kept: RepoGroup[] = [];
+      for (const g of node.groups) {
+        if (predicate(g)) collected.push(g);
+        else kept.push(g);
+      }
+      const children = node.children
+        ? removeMatchingRepos(node.children, predicate, collected)
+        : undefined;
+      return { ...node, groups: kept, ...(children ? { children } : {}) };
+    })
+    .filter((node) => node.groups.length > 0 || (node.children?.length ?? 0) > 0);
+}
+
+/** Strips `pickedFrom` from a repo (pure — returns a new object). */
+function stripPickedFrom(g: RepoGroup): RepoGroup {
+  const { pickedFrom: _p, ...rest } = g;
+  void _p;
+  return rest as RepoGroup;
+}
+
+/**
+ * Tree-aware equivalent of `applyTeamPick`: reassigns the ENTIRE subtree of
+ * the combined section identified by `combinedPath` (e.g.
+ * `["gamme-client", "squad-a + squad-b"]`) — its own `groups` *and* any
+ * nested `children` (e.g. it was already subdivided by a further chain
+ * level) — to a sibling section named `chosenTeam` at that same depth
+ * (merged into it if it already exists, otherwise created in its place).
+ * Every repo in the moved subtree (own groups and every descendant) is
+ * tagged with `pickedFrom = combinedPath.join(" > ")` so
+ * `undoSectionPickInTree` can find all of them later.
+ *
+ * No-op (returns `sections` unchanged) if any segment of `combinedPath` does
+ * not resolve to an existing node. Pure — does not mutate `sections`.
+ */
+export function applyTeamPickInTree(
+  sections: TeamSection[],
+  combinedPath: string[],
+  chosenTeam: string,
+): TeamSection[] {
+  if (combinedPath.length === 0) return sections;
+  const parentPath = combinedPath.slice(0, -1);
+  const combinedLabel = combinedPath[combinedPath.length - 1];
+  const pathKey = combinedPath.join(PATH_SEPARATOR);
+
+  return updateSiblingsAtPath(sections, parentPath, (siblings) => {
+    const idx = siblings.findIndex((s) => s.label === combinedLabel);
+    if (idx === -1) return siblings;
+
+    const picked = tagPickedFrom(siblings[idx], pathKey);
+    const remaining = siblings.filter((_, i) => i !== idx);
+
+    const targetIdx = remaining.findIndex((s) => s.label === chosenTeam);
+    if (targetIdx !== -1) {
+      return remaining.map((s, i) =>
+        i === targetIdx
+          ? {
+              ...s,
+              groups: [...s.groups, ...picked.groups],
+              ...(picked.children && picked.children.length > 0
+                ? { children: [...(s.children ?? []), ...picked.children] }
+                : {}),
+            }
+          : s,
+      );
+    }
+
+    const newSection: TeamSection = {
+      label: chosenTeam,
+      groups: picked.groups,
+      level: siblings[idx].level,
+      ...(picked.children && picked.children.length > 0 ? { children: picked.children } : {}),
+    };
+    const result = [...remaining];
+    result.splice(idx, 0, newSection);
+    return result;
+  });
+}
+
+/**
+ * Recursively tags every repo in `node` (its own `groups` and every
+ * descendant's, through `children`) with `pickedFrom`, preserving the
+ * subtree's shape. Pure — returns a new tree, does not mutate `node`.
+ */
+function tagPickedFrom(node: TeamSection, pathKey: string): TeamSection {
+  return {
+    ...node,
+    groups: node.groups.map((g) => ({ ...g, pickedFrom: pathKey })),
+    ...(node.children ? { children: node.children.map((c) => tagPickedFrom(c, pathKey)) } : {}),
+  };
+}
+
+/**
+ * Tree-aware equivalent of `undoSectionPick`: restores every repo anywhere in
+ * the tree whose `pickedFrom` matches `combinedPathString` (the joined path
+ * produced by `applyTeamPickInTree`) back to the section at that path,
+ * recreating it if it no longer exists. `pickedFrom` is stripped from
+ * restored repos. Sections left empty after the removal are dropped.
+ *
+ * No-op (returns `sections` unchanged) if no repo has a matching `pickedFrom`.
+ * Pure — does not mutate `sections`.
+ */
+export function undoSectionPickInTree(
+  sections: TeamSection[],
+  combinedPathString: string,
+): TeamSection[] {
+  const collected: RepoGroup[] = [];
+  const stripped = removeMatchingRepos(
+    sections,
+    (g) => g.pickedFrom === combinedPathString,
+    collected,
+  );
+  if (collected.length === 0) return sections;
+
+  const combinedPath = combinedPathString.split(PATH_SEPARATOR);
+  const parentPath = combinedPath.slice(0, -1);
+  const combinedLabel = combinedPath[combinedPath.length - 1];
+  return mergeOrCreateAtPath(stripped, parentPath, combinedLabel, collected.map(stripPickedFrom));
+}
+
+/**
+ * Tree-aware equivalent of `moveRepoToSection`: moves the repo identified by
+ * `repoFullName` (wherever it currently sits in the tree) to a sibling named
+ * `targetTeam` under `parentPath` (created in place if absent). The repo's
+ * `pickedFrom` is preserved so a later undo can still restore it.
+ *
+ * No-op (returns `sections` unchanged) if the repo isn't found in the tree.
+ * Pure — does not mutate `sections`.
+ */
+export function moveRepoToSectionInTree(
+  sections: TeamSection[],
+  repoFullName: string,
+  parentPath: string[],
+  targetTeam: string,
+): TeamSection[] {
+  const collected: RepoGroup[] = [];
+  const stripped = removeMatchingRepos(sections, (g) => g.repoFullName === repoFullName, collected);
+  if (collected.length === 0) return sections;
+  return mergeOrCreateAtPath(stripped, parentPath, targetTeam, collected);
+}
+
+/**
+ * Tree-aware equivalent of `undoPickedRepo`: restores a single previously
+ * picked repo (identified by `repoFullName`) back to its original combined
+ * section (read from its own `pickedFrom`), recreating that section if it no
+ * longer exists. `pickedFrom` is stripped from the restored repo.
+ *
+ * No-op (returns `sections` unchanged) if the repo isn't found or has no
+ * `pickedFrom`. Pure — does not mutate `sections`.
+ */
+export function undoPickedRepoInTree(sections: TeamSection[], repoFullName: string): TeamSection[] {
+  const collected: RepoGroup[] = [];
+  const stripped = removeMatchingRepos(
+    sections,
+    (g) => g.repoFullName === repoFullName && g.pickedFrom !== undefined,
+    collected,
+  );
+  if (collected.length === 0) return sections;
+
+  const combinedPathString = collected[0].pickedFrom!;
+  const combinedPath = combinedPathString.split(PATH_SEPARATOR);
+  const parentPath = combinedPath.slice(0, -1);
+  const combinedLabel = combinedPath[combinedPath.length - 1];
+  return mergeOrCreateAtPath(stripped, parentPath, combinedLabel, collected.map(stripPickedFrom));
+}
+
+/**
+ * Returns the full path (ancestor labels, root first) of every combined
+ * (`"a + b"`) section anywhere in the tree — used to resolve an unqualified
+ * `--pick-team` label (auto-pick when exactly one match) or report the
+ * available candidates when it's ambiguous or not found.
+ */
+export function findCombinedSectionPaths(sections: TeamSection[]): string[][] {
+  const paths: string[][] = [];
+
+  function visit(nodes: TeamSection[], ancestors: string[]): void {
+    for (const node of nodes) {
+      const path = [...ancestors, node.label];
+      if (node.label.includes(" + ")) paths.push(path);
+      if (node.children) visit(node.children, path);
+    }
+  }
+
+  visit(sections, []);
+  return paths;
+}
+
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
 /**
