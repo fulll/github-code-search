@@ -39,21 +39,56 @@ export function buildRows(
 ): Row[] {
   const rows: Row[] = [];
 
+  // Section-heading tracking shared by both filter modes below: carries
+  // pending sectionLabel/sectionPath transitions across filtered-out repos
+  // so a heading is never lost when the repo that first carried it is
+  // hidden by the active filter (mirrors the equivalent fix in output.ts).
+  let pendingSectionLabel: string | undefined;
+  let lastEmittedSectionLabel: string | undefined;
+  let pendingSectionPath: NonNullable<RepoGroup["sectionPath"]> = [];
+  let lastEmittedSectionPath: NonNullable<RepoGroup["sectionPath"]> = [];
+
+  function trackPending(group: RepoGroup): void {
+    if (group.sectionLabel !== undefined) pendingSectionLabel = group.sectionLabel;
+    if (group.sectionPath !== undefined && group.sectionPath.length > 0) {
+      pendingSectionPath = [
+        ...pendingSectionPath.slice(0, group.sectionPath[0].level),
+        ...group.sectionPath,
+      ];
+    }
+  }
+
+  /** Emits one "section" row per new heading transition (flat `sectionLabel`
+   *  is a single level-0 row; hierarchical `sectionPath` emits only the
+   *  entries that changed since the last heading actually shown). */
+  function emitPendingSections(group: RepoGroup): void {
+    const sectionToEmit = group.sectionLabel ?? pendingSectionLabel;
+    if (sectionToEmit !== undefined && sectionToEmit !== lastEmittedSectionLabel) {
+      rows.push({ type: "section", repoIndex: -1, sectionLabel: sectionToEmit, sectionLevel: 0 });
+      lastEmittedSectionLabel = sectionToEmit;
+      return;
+    }
+    if (pendingSectionPath.length === 0) return;
+    const divergeAt = firstDivergingPathIndex(lastEmittedSectionPath, pendingSectionPath);
+    if (divergeAt >= pendingSectionPath.length) return; // already fully shown
+    for (const heading of pendingSectionPath.slice(divergeAt)) {
+      rows.push({
+        type: "section",
+        repoIndex: -1,
+        sectionLabel: heading.label,
+        sectionLevel: heading.level,
+      });
+    }
+    lastEmittedSectionPath = pendingSectionPath;
+  }
+
   if (filterTarget === "repo") {
     const repoMatcher = makeRepoMatcher(filterPath, filterRegex);
-    let pendingSectionLabel: string | undefined;
-    let lastEmittedSectionLabel: string | undefined;
     for (let ri = 0; ri < groups.length; ri++) {
       const group = groups[ri];
-      // Track the most recent section boundary so we can emit it even when the
-      // first repo of a section is filtered out.
-      if (group.sectionLabel !== undefined) pendingSectionLabel = group.sectionLabel;
+      trackPending(group);
       if (!repoMatcher(group)) continue;
-      const sectionToEmit = group.sectionLabel ?? pendingSectionLabel;
-      if (sectionToEmit !== undefined && sectionToEmit !== lastEmittedSectionLabel) {
-        rows.push({ type: "section", repoIndex: -1, sectionLabel: sectionToEmit });
-        lastEmittedSectionLabel = sectionToEmit;
-      }
+      emitPendingSections(group);
       rows.push({ type: "repo", repoIndex: ri });
       if (!group.folded) {
         group.matches.forEach((_, ei) => {
@@ -69,21 +104,15 @@ export function buildRows(
     filterTarget as Exclude<FilterTarget, "repo">,
     filterRegex,
   );
-  let pendingSectionLabel: string | undefined;
-  let lastEmittedSectionLabel: string | undefined;
   for (let ri = 0; ri < groups.length; ri++) {
     const group = groups[ri];
-    if (group.sectionLabel !== undefined) pendingSectionLabel = group.sectionLabel;
+    trackPending(group);
     const visibleExtractIndices = group.matches
       .map((m, i) => (extractMatcher(m) ? i : -1))
       .filter((i) => i !== -1);
     if (filterPath && visibleExtractIndices.length === 0) continue;
 
-    const sectionToEmit = group.sectionLabel ?? pendingSectionLabel;
-    if (sectionToEmit !== undefined && sectionToEmit !== lastEmittedSectionLabel) {
-      rows.push({ type: "section", repoIndex: -1, sectionLabel: sectionToEmit });
-      lastEmittedSectionLabel = sectionToEmit;
-    }
+    emitPendingSections(group);
     rows.push({ type: "repo", repoIndex: ri });
     if (!group.folded) {
       for (const ei of visibleExtractIndices) {
@@ -92,6 +121,17 @@ export function buildRows(
     }
   }
   return rows;
+}
+
+function firstDivergingPathIndex(
+  a: NonNullable<RepoGroup["sectionPath"]>,
+  b: NonNullable<RepoGroup["sectionPath"]>,
+): number {
+  let i = 0;
+  while (i < a.length && i < b.length && a[i].label === b[i].label && a[i].level === b[i].level) {
+    i++;
+  }
+  return i;
 }
 
 /**
