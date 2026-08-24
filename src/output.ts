@@ -35,6 +35,9 @@ export interface ReplayOptions {
   includeArchived?: boolean;
   excludeTemplates?: boolean;
   groupByTeamPrefix?: string;
+  /** Mirrors `--group-by-team-prefix-consolidate` — collapses single-branch
+   *  nesting chains into one heading (see `consolidateTeamHierarchy`). */
+  consolidateTeamSections?: boolean;
   /** When set, appends `--regex-hint <term>` to the replay command so the
    *  result set from a regex query can be reproduced exactly. */
   regexHint?: string;
@@ -59,6 +62,7 @@ export function buildReplayCommand(
     includeArchived,
     excludeTemplates,
     groupByTeamPrefix,
+    consolidateTeamSections,
     regexHint,
     pickTeams,
   } = options;
@@ -109,6 +113,9 @@ export function buildReplayCommand(
   }
   if (groupByTeamPrefix) {
     parts.push(`--group-by-team-prefix ${shellQuote(groupByTeamPrefix)}`);
+  }
+  if (consolidateTeamSections) {
+    parts.push("--group-by-team-prefix-consolidate");
   }
   if (regexHint) {
     parts.push(`--regex-hint ${shellQuote(regexHint)}`);
@@ -230,16 +237,44 @@ export function buildMarkdownOutput(
   lines.push(buildSelectionSummary(groups));
   lines.push("");
 
+  // Track section markers across ALL groups (not just visible ones) so a
+  // heading is never lost when the repo that first carried it gets filtered
+  // out below (deselected, or with no selected matches) — see review on #187.
+  let pendingSectionLabel: string | undefined;
+  let pendingSectionPath: NonNullable<RepoGroup["sectionPath"]> = [];
+
   for (const group of groups) {
+    if (group.sectionLabel !== undefined) {
+      pendingSectionLabel = group.sectionLabel;
+    }
+    if (group.sectionPath !== undefined && group.sectionPath.length > 0) {
+      pendingSectionPath = [
+        ...pendingSectionPath.slice(0, group.sectionPath[0].level),
+        ...group.sectionPath,
+      ];
+    }
+
     if (!group.repoSelected) continue;
     const matches = selectedMatches(group);
     if (matches.length === 0) continue;
 
-    // Section header (emitted before the first repo in a new team section)
-    if (group.sectionLabel !== undefined) {
+    // Section header(s), emitted before the first *visible* repo of a new
+    // section. `sectionLabel` is the flat single-level marker
+    // (`groupByTeamPrefix`); `sectionPath` is the hierarchical marker
+    // (`groupByTeamHierarchy`) — only one of the two is ever set at a time.
+    if (pendingSectionLabel !== undefined) {
       lines.push("");
-      lines.push(`## ${group.sectionLabel}`);
+      lines.push(`## ${pendingSectionLabel}`);
       lines.push("");
+      pendingSectionLabel = undefined;
+    } else if (pendingSectionPath.length > 0) {
+      lines.push("");
+      // Markdown has no heading deeper than H6 — cap depth there.
+      for (const heading of pendingSectionPath) {
+        lines.push(`${"#".repeat(Math.min(2 + heading.level, 6))} ${heading.label}`);
+      }
+      lines.push("");
+      pendingSectionPath = [];
     }
 
     const matchCount = selectedMatches(group).length;
@@ -279,10 +314,30 @@ export function buildJsonOutput(
   outputType: OutputType = "repo-and-matches",
   options: ReplayOptions = {},
 ): string {
+  // Reconstruct each group's full hierarchy path (root→leaf labels) from the
+  // flattened `sectionPath` diff markers (`groupByTeamHierarchy` +
+  // `flattenTeamHierarchy`). Tracked across ALL groups (not just selected
+  // ones) so a heading transition on a filtered-out repo still advances the
+  // cursor correctly for the next selected repo.
+  let cursor: { label: string; level: number }[] = [];
+  const fullPaths = new Map<RepoGroup, string[]>();
+  for (const group of groups) {
+    if (group.sectionPath !== undefined && group.sectionPath.length > 0) {
+      cursor = [...cursor.slice(0, group.sectionPath[0].level), ...group.sectionPath];
+    }
+    if (cursor.length > 0)
+      fullPaths.set(
+        group,
+        cursor.map((p) => p.label),
+      );
+  }
+
   const results = groups
     .filter((g) => g.repoSelected)
     .map((group) => {
-      const base = { repo: group.repoFullName };
+      const base: { repo: string; section?: string[] } = { repo: group.repoFullName };
+      const path = fullPaths.get(group);
+      if (path !== undefined) base.section = path;
       if (outputType === "repo-only") return base;
       const matches = selectedMatches(group).map((m) => {
         const seg = m.textMatches[0]?.matches[0];
@@ -342,7 +397,12 @@ export function buildOutput(
   outputType: OutputType = "repo-and-matches",
   extraOptions: Pick<
     ReplayOptions,
-    "includeArchived" | "excludeTemplates" | "groupByTeamPrefix" | "regexHint" | "pickTeams"
+    | "includeArchived"
+    | "excludeTemplates"
+    | "groupByTeamPrefix"
+    | "consolidateTeamSections"
+    | "regexHint"
+    | "pickTeams"
   > = {},
 ): string {
   const options: ReplayOptions = { format, outputType, ...extraOptions };

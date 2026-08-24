@@ -377,6 +377,68 @@ export function flattenTeamSections(sections: TeamSection[]): RepoGroup[] {
   return result;
 }
 
+/** One heading transition: a label at a given nesting depth. */
+type PathEntry = { label: string; level: number };
+
+/**
+ * Flattens a `groupByTeamHierarchy` tree into a plain `RepoGroup[]`, tagging
+ * the first repo of each leaf section with `sectionPath` — the list of
+ * heading transitions (root-to-leaf labels, each with its `level`) that are
+ * *new* since the previous leaf. Siblings under an unchanged ancestor don't
+ * repeat that ancestor's heading, mirroring how nested markdown headings are
+ * only printed once per transition.
+ *
+ * Consumers that need the full current path for every repo (e.g. JSON
+ * output) should maintain a running cursor and, whenever `sectionPath` is
+ * set, replace `cursor.slice(0, sectionPath[0].level)` with `sectionPath`.
+ *
+ * Note: the original `RepoGroup` objects are not mutated; new objects with
+ * the `sectionPath` field added are returned.
+ */
+export function flattenTeamHierarchy(sections: TeamSection[]): RepoGroup[] {
+  const result: RepoGroup[] = [];
+  let previousPath: PathEntry[] = [];
+
+  function emitLeafGroups(groups: RepoGroup[], path: PathEntry[]): void {
+    for (let i = 0; i < groups.length; i++) {
+      const g = groups[i];
+      if (i === 0) {
+        const divergeAt = firstDivergingIndex(previousPath, path);
+        const newHeadings = path.slice(divergeAt);
+        result.push(newHeadings.length > 0 ? { ...g, sectionPath: newHeadings } : { ...g });
+        previousPath = path;
+      } else {
+        // Remove any pre-existing sectionPath from non-first entries
+        const { sectionPath: _removed, ...rest } = g;
+        void _removed;
+        result.push(rest as RepoGroup);
+      }
+    }
+  }
+
+  function visit(node: TeamSection, ancestors: PathEntry[]): void {
+    const path = [...ancestors, { label: node.label, level: node.level ?? 0 }];
+    // A node can own repos directly *and* have nested children at once (see
+    // `TeamSection`) — emit its own groups under its own heading first, then
+    // descend into children so none of its repos are dropped.
+    if (node.groups.length > 0) emitLeafGroups(node.groups, path);
+    if (node.children) {
+      for (const child of node.children) visit(child, path);
+    }
+  }
+
+  for (const section of sections) visit(section, []);
+  return result;
+}
+
+function firstDivergingIndex(a: PathEntry[], b: PathEntry[]): number {
+  let i = 0;
+  while (i < a.length && i < b.length && a[i].label === b[i].label && a[i].level === b[i].level) {
+    i++;
+  }
+  return i;
+}
+
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
 /**

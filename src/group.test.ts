@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   applyTeamPick,
   consolidateTeamHierarchy,
+  flattenTeamHierarchy,
   flattenTeamSections,
   groupByTeamHierarchy,
   groupByTeamPrefix,
@@ -419,6 +420,77 @@ describe("consolidateTeamHierarchy", () => {
     const before = JSON.stringify(sections);
     consolidateTeamHierarchy(sections);
     expect(JSON.stringify(sections)).toBe(before);
+  });
+});
+
+// ─── flattenTeamHierarchy ─────────────────────────────────────────────────────
+
+describe("flattenTeamHierarchy", () => {
+  it("tags the first repo of a 2-level leaf with both ancestor headings", () => {
+    const groups = [
+      makeGroup("org/a", ["gamme-client", "squad-dashboard"]),
+      makeGroup("org/b", ["gamme-client", "squad-dashboard"]),
+    ];
+    const sections = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const flat = flattenTeamHierarchy(sections);
+    expect(flat).toHaveLength(2);
+    expect(flat[0].sectionPath).toEqual([
+      { label: "gamme-client", level: 0 },
+      { label: "squad-dashboard", level: 1 },
+    ]);
+    expect(flat[1].sectionPath).toBeUndefined();
+  });
+
+  it("does not repeat an unchanged ancestor heading for a sibling leaf", () => {
+    const groups = [
+      makeGroup("org/a", ["gamme-client", "squad-dashboard"]),
+      makeGroup("org/b", ["gamme-client", "squad-billing"]),
+    ];
+    const sections = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const flat = flattenTeamHierarchy(sections);
+    // First leaf (alphabetically squad-billing comes first) gets both headings
+    expect(flat[0].sectionPath).toEqual([
+      { label: "gamme-client", level: 0 },
+      { label: "squad-billing", level: 1 },
+    ]);
+    // Second leaf shares the "gamme-client" ancestor — only the new heading is listed
+    expect(flat[1].sectionPath).toEqual([{ label: "squad-dashboard", level: 1 }]);
+  });
+
+  it("emits a full new path when moving to an unrelated top-level chain", () => {
+    const groups = [
+      makeGroup("org/a", ["gamme-client", "squad-dashboard"]),
+      makeGroup("org/b", ["chapter-backend"]),
+    ];
+    const sections = groupByTeamHierarchy(groups, [["gamme-", "squad-"], ["chapter-"]]);
+    const flat = flattenTeamHierarchy(sections);
+    expect(flat[1].sectionPath).toEqual([{ label: "chapter-backend", level: 0 }]);
+  });
+
+  it("includes a parent's own repos even when it also has nested overlap children", () => {
+    // "gamme-lead-client" owns org/a directly AND has an overlap-nested
+    // child "gamme-lead-client-p1" owning org/b — both must appear.
+    const groups = [
+      makeGroup("org/a", ["gamme-lead-client"]),
+      makeGroup("org/b", ["gamme-lead-client-p1"]),
+    ];
+    const sections = groupByTeamHierarchy(groups, [["gamme-"]]);
+    const flat = flattenTeamHierarchy(sections);
+    expect(flat.map((g) => g.repoFullName)).toEqual(["org/a", "org/b"]);
+    expect(flat[0].sectionPath).toEqual([{ label: "gamme-lead-client", level: 0 }]);
+    expect(flat[1].sectionPath).toEqual([{ label: "gamme-lead-client-p1", level: 1 }]);
+  });
+
+  it("does not mutate the input tree", () => {
+    const groups = [makeGroup("org/a", ["gamme-client", "squad-dashboard"])];
+    const sections = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const before = JSON.stringify(sections);
+    flattenTeamHierarchy(sections);
+    expect(JSON.stringify(sections)).toBe(before);
+  });
+
+  it("returns an empty array for an empty tree", () => {
+    expect(flattenTeamHierarchy([])).toEqual([]);
   });
 });
 
