@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   applyTeamPick,
+  consolidateTeamHierarchy,
   flattenTeamSections,
   groupByTeamHierarchy,
   groupByTeamPrefix,
@@ -320,6 +321,104 @@ describe("groupByTeamHierarchy — auto-nesting of overlapping team names", () =
     expect(p1.children).toHaveLength(1);
     expect(p1.children![0].label).toBe("squad-mobile");
     expect(p1.children![0].groups.map((g) => g.repoFullName)).toEqual(["org/b"]);
+  });
+});
+
+// ─── consolidateTeamHierarchy ─────────────────────────────────────────────────
+
+describe("consolidateTeamHierarchy", () => {
+  it("collapses a single-branch chain into one heading with an 'including' suffix", () => {
+    const groups = [makeGroup("org/a", ["gamme-client", "squad-dashboard"])];
+    const sections = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const consolidated = consolidateTeamHierarchy(sections);
+    expect(consolidated).toHaveLength(1);
+    expect(consolidated[0].label).toBe("gamme-client (including squad-dashboard)");
+    expect(consolidated[0].level).toBe(0);
+    expect(consolidated[0].children ?? []).toHaveLength(0);
+    expect(consolidated[0].groups.map((g) => g.repoFullName)).toEqual(["org/a"]);
+  });
+
+  it("collapses a 3-level single-branch chain into one heading", () => {
+    const groups = [makeGroup("org/a", ["gamme-client", "squad-dashboard", "chapter-fe"])];
+    const sections = groupByTeamHierarchy(groups, [["gamme-", "squad-", "chapter-"]]);
+    const consolidated = consolidateTeamHierarchy(sections);
+    expect(consolidated[0].label).toBe("gamme-client (including squad-dashboard, chapter-fe)");
+    expect(consolidated[0].children ?? []).toHaveLength(0);
+  });
+
+  it("reads a nested 'other' bucket as 'unset' in the suffix", () => {
+    const groups = [makeGroup("org/a", ["gamme-client"])]; // no squad- team → nested "other"
+    const sections = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const consolidated = consolidateTeamHierarchy(sections);
+    expect(consolidated[0].label).toBe("gamme-client (including unset)");
+  });
+
+  it("does NOT collapse a level where a node has 2+ children", () => {
+    const groups = [
+      makeGroup("org/a", ["gamme-client", "squad-dashboard"]),
+      makeGroup("org/b", ["gamme-client", "squad-billing"]),
+    ];
+    const sections = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const consolidated = consolidateTeamHierarchy(sections);
+    expect(consolidated[0].label).toBe("gamme-client");
+    const childLabels = (consolidated[0].children ?? []).map((c) => c.label).toSorted();
+    expect(childLabels).toEqual(["squad-billing", "squad-dashboard"]);
+    expect(consolidated[0].children!.every((c) => c.level === 1)).toBe(true);
+  });
+
+  it("leaves a leaf section (no children) unchanged", () => {
+    const groups = [makeGroup("org/a", ["squad-front"])];
+    const sections = groupByTeamHierarchy(groups, [["squad-"]]);
+    const consolidated = consolidateTeamHierarchy(sections);
+    expect(consolidated[0].label).toBe("squad-front");
+    expect(consolidated[0].level).toBe(0);
+  });
+
+  it("stops collapsing before a child that itself forks into 2+ children", () => {
+    const groups = [
+      makeGroup("org/a", ["gamme-x"]),
+      makeGroup("org/b", ["gamme-x-y"]),
+      makeGroup("org/c", ["gamme-x-y-c1"]),
+      makeGroup("org/d", ["gamme-x-y-c2"]),
+    ];
+    const sections = groupByTeamHierarchy(groups, [["gamme-"]]);
+    const consolidated = consolidateTeamHierarchy(sections);
+    expect(consolidated).toHaveLength(1);
+    // "gamme-x-y" is the fork point (2 children) — it must remain its own
+    // heading rather than being absorbed into "gamme-x"'s suffix.
+    expect(consolidated[0].label).toBe("gamme-x");
+    expect(consolidated[0].groups.map((g) => g.repoFullName)).toEqual(["org/a"]);
+    expect(consolidated[0].children).toHaveLength(1);
+    const fork = consolidated[0].children![0];
+    expect(fork.label).toBe("gamme-x-y");
+    expect(fork.groups.map((g) => g.repoFullName)).toEqual(["org/b"]);
+    const forkChildLabels = (fork.children ?? []).map((c) => c.label).toSorted();
+    expect(forkChildLabels).toEqual(["gamme-x-y-c1", "gamme-x-y-c2"]);
+  });
+
+  it("accumulates groups from every merged node, not just the deepest one", () => {
+    const groups = [
+      makeGroup("org/a", ["gamme-x"]),
+      makeGroup("org/b", ["gamme-x-y"]),
+      makeGroup("org/c", ["gamme-x-y-z"]),
+    ];
+    const sections = groupByTeamHierarchy(groups, [["gamme-"]]);
+    const consolidated = consolidateTeamHierarchy(sections);
+    expect(consolidated[0].label).toBe("gamme-x (including gamme-x-y, gamme-x-y-z)");
+    expect(consolidated[0].groups.map((g) => g.repoFullName).toSorted()).toEqual([
+      "org/a",
+      "org/b",
+      "org/c",
+    ]);
+    expect(consolidated[0].children ?? []).toHaveLength(0);
+  });
+
+  it("is a pure function — does not mutate the input tree", () => {
+    const groups = [makeGroup("org/a", ["gamme-client", "squad-dashboard"])];
+    const sections = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const before = JSON.stringify(sections);
+    consolidateTeamHierarchy(sections);
+    expect(JSON.stringify(sections)).toBe(before);
   });
 });
 
