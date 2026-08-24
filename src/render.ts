@@ -1,4 +1,4 @@
-import pc from "picocolors";
+import * as style from "./style.ts";
 import type { FilterTarget, RepoGroup, Row, TextMatchSegment } from "./types.ts";
 import { highlightFragment } from "./render/highlight.ts";
 import { buildFilterStats, type FilterStats } from "./render/filter.ts";
@@ -64,65 +64,69 @@ export function renderHelpOverlay(): string {
   };
 
   const top = `╭${"─".repeat(INNER)}╮`;
-  const sep = `│ ${pc.dim("─".repeat(CONTENT))} │`;
+  const sep = `│ ${style.dim("─".repeat(CONTENT))} │`;
   const bot = `╰${"─".repeat(INNER)}╯`;
 
   const row = (s: string) => `│ ${pad(s)} │`;
 
   const rows = [
     top,
-    row(`  ${pc.bold("Key bindings")}`),
+    row(`  ${style.bold("Key bindings")}`),
     sep,
     row(
-      `  ${pc.yellow("↑")} / ${pc.yellow("k")}       navigate up            ${pc.yellow("↓")} / ${pc.yellow("j")}       navigate down`,
+      `  ${style.yellow("↑")} / ${style.yellow("k")}       navigate up            ${style.yellow("↓")} / ${style.yellow("j")}       navigate down`,
     ),
     row(
-      `  ${pc.yellow("←")}           fold repo              ${pc.yellow("→")}           unfold repo`,
+      `  ${style.yellow("←")}           fold repo              ${style.yellow("→")}           unfold repo`,
     ),
-    row(`  ${pc.yellow("Z")}           fold / unfold all repos`),
+    row(`  ${style.yellow("Z")}           fold / unfold all repos`),
     row(
-      `  ${pc.yellow("gg")}          jump to top            ${pc.yellow("G")}           jump to bottom`,
-    ),
-    row(
-      `  ${pc.yellow("PgUp")} / ${pc.yellow("Ctrl+U")}  page up                ${pc.yellow("PgDn")} / ${pc.yellow("Ctrl+D")}  page down`,
+      `  ${style.yellow("gg")}          jump to top            ${style.yellow("G")}           jump to bottom`,
     ),
     row(
-      `  ${pc.yellow("Space")}       toggle selection       ${pc.yellow("Enter")}       confirm & output`,
+      `  ${style.yellow("PgUp")} / ${style.yellow("Ctrl+U")}  page up                ${style.yellow("PgDn")} / ${style.yellow("Ctrl+D")}  page down`,
     ),
     row(
-      `  ${pc.yellow("a")}           select all             ${pc.yellow("n")}           select none`,
-    ),
-    row(`                 ${pc.dim("(respects active filter)")}`),
-    row(
-      `  ${pc.yellow("o")}           open in browser        ${pc.dim("(repo row → page · extract row → file)")}`,
+      `  ${style.yellow("Space")}       toggle selection       ${style.yellow("Enter")}       confirm & output`,
     ),
     row(
-      `  ${pc.yellow("f")}           enter filter mode      ${pc.yellow("r")}           reset filter`,
+      `  ${style.yellow("a")}           select all             ${style.yellow("n")}           select none`,
+    ),
+    row(`                 ${style.dim("(respects active filter)")}`),
+    row(
+      `  ${style.yellow("o")}           open in browser        ${style.dim("(repo row → page · extract row → file)")}`,
     ),
     row(
-      `  ${pc.yellow("t")}           cycle filter target    ${pc.dim("(path → content → repo)")}`,
+      `  ${style.yellow("f")}           enter filter mode      ${style.yellow("r")}           reset filter`,
     ),
     row(
-      `  ${pc.yellow("p")}           pick team owner        ${pc.dim("(on a multi-team section header)")}`,
+      `  ${style.yellow("t")}           cycle filter target    ${style.dim("(path → content → repo)")}`,
     ),
     row(
-      `  ${pc.yellow("h")} / ${pc.yellow("?")}       toggle this help       ${pc.yellow("q")} / Ctrl+C  quit`,
+      `  ${style.yellow("p")}           pick team owner        ${style.dim("(on a multi-team section header)")}`,
+    ),
+    row(
+      `  ${style.yellow("h")} / ${style.yellow("?")}       toggle this help       ${style.yellow("q")} / Ctrl+C  quit`,
     ),
     sep,
-    row(`  ${pc.dim("Filter mode:")}`),
+    row(`  ${style.dim("Filter mode:")}`),
     row(
-      `    type to filter  ·  ${pc.yellow("←→")} cursor  ·  ${pc.yellow(`${optStr}←→`)} word jump  ·  ${pc.yellow(optBs)} del word`,
+      `    type to filter  ·  ${style.yellow("←→")} cursor  ·  ${style.yellow(`${optStr}←→`)} word jump  ·  ${style.yellow(optBs)} del word`,
     ),
     row(
-      `    ${pc.yellow("Tab")} regex  ·  ${pc.yellow("Shift+Tab")} target  ·  ${pc.yellow("↵")} confirm  ·  ${pc.yellow("Esc")} cancel`,
-    ),
-    sep,
-    row(`  ${pc.dim("Pick mode  (after pressing p on a multi-team section header):")}`),
-    row(
-      `    ${pc.yellow("←")} / ${pc.yellow("→")} move focus  ·  ${pc.yellow("↵")} confirm pick  ·  ${pc.yellow("Esc")} cancel`,
+      `    ${style.yellow("Tab")} regex  ·  ${style.yellow("Shift+Tab")} target  ·  ${style.yellow("↵")} confirm  ·  ${style.yellow("Esc")} cancel`,
     ),
     sep,
-    row(pc.dim(`  press ${pc.yellow("Esc")}, ${pc.yellow("h")} or ${pc.yellow("?")} to close`)),
+    row(`  ${style.dim("Pick mode  (after pressing p on a multi-team section header):")}`),
+    row(
+      `    ${style.yellow("←")} / ${style.yellow("→")} move focus  ·  ${style.yellow("↵")} confirm pick  ·  ${style.yellow("Esc")} cancel`,
+    ),
+    sep,
+    row(
+      style.dim(
+        `  press ${style.yellow("Esc")}, ${style.yellow("h")} or ${style.yellow("?")} to close`,
+      ),
+    ),
     bot,
   ];
   return rows.join("\n");
@@ -220,14 +224,14 @@ function makeTextHighlighter(
   filterTarget: FilterTarget,
   filterRegex: boolean,
 ): (text: string, target: FilterTarget, baseStyle: (s: string) => string) => string {
-  if (!pattern) return (_text, _target, style) => style(_text);
+  if (!pattern) return (_text, _target, baseStyle) => baseStyle(_text);
   let re: RegExp;
   try {
     re = filterRegex
       ? new RegExp(pattern, "gi")
       : new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
   } catch {
-    return (_text, _target, style) => style(_text);
+    return (_text, _target, baseStyle) => baseStyle(_text);
   }
   return (text, target, baseStyle) => {
     if (filterTarget !== target) return baseStyle(text);
@@ -237,7 +241,7 @@ function makeTextHighlighter(
     let m: RegExpExecArray | null;
     while ((m = re.exec(text)) !== null) {
       if (m.index > last) parts.push(baseStyle(text.slice(last, m.index)));
-      parts.push(pc.bold(pc.yellow(m[0])));
+      parts.push(style.style(["bold", "yellow"], m[0]));
       last = m.index + m[0].length;
       if (m[0].length === 0) re.lastIndex++; // guard zero-length match
     }
@@ -313,7 +317,7 @@ export function renderGroups(
 
   lines.push(
     clipToWidth(
-      `${pc.bgMagenta(pc.black(pc.bold(" github-code-search ")))} ${pc.bold(pc.cyan(query))} ${pc.dim("in")} ${pc.bold(pc.yellow(org))}`,
+      `${style.style(["bgMagenta", "black", "bold"], " github-code-search ")} ${style.style(["bold", "cyan"], query)} ${style.dim("in")} ${style.style(["bold", "yellow"], org)}`,
       termWidth,
     ),
   );
@@ -332,7 +336,7 @@ export function renderGroups(
 
   // Mode badge: always shown so the active target is always explicit — [path], [content], [repo],
   // [path·regex], [content·regex], [repo·regex].
-  const targetBadge = ` ${pc.dim("[")}${pc.yellow(filterTarget)}${filterRegex ? pc.dim("·") + pc.yellow("regex") : ""}${pc.dim("]")} `;
+  const targetBadge = ` ${style.dim("[")}${style.yellow(filterTarget)}${filterRegex ? style.dim("·") + style.yellow("regex") : ""}${style.dim("]")} `;
 
   let filterBarLines = 0;
   if (filterMode) {
@@ -355,10 +359,10 @@ export function renderGroups(
           `${f} file${f !== 1 ? "s" : ""}`,
           ...(m2 !== f ? [`${m2} match${m2 !== 1 ? "es" : ""}`] : []),
         ];
-        statsStr = pc.dim(parts.join(" \u00b7 "));
+        statsStr = style.dim(parts.join(" \u00b7 "));
         statsVisLen = visibleWidth(statsStr);
       } else {
-        statsStr = pc.dim("…");
+        statsStr = style.dim("…");
         statsVisLen = 1;
       }
     }
@@ -384,20 +388,20 @@ export function renderGroups(
     // under the first character of the typed filter input.
     const hintsIndent = " ".repeat(prefixVisLen);
     const hints = [
-      `${pc.yellow("←→")} move`,
-      `${pc.yellow(`${optStr}←→`)} word`,
-      `${pc.yellow(optBs)} del word`,
-      `${pc.yellow("Tab")} regex${filterRegex ? pc.green(" ✓") : ""}`,
-      `${pc.yellow("Shift+Tab")} target`,
-      `${pc.yellow("↵")} OK`,
-      `${pc.yellow("Esc")} cancel`,
+      `${style.yellow("←→")} move`,
+      `${style.yellow(`${optStr}←→`)} word`,
+      `${style.yellow(optBs)} del word`,
+      `${style.yellow("Tab")} regex${filterRegex ? style.green(" ✓") : ""}`,
+      `${style.yellow("Shift+Tab")} target`,
+      `${style.yellow("↵")} OK`,
+      `${style.yellow("Esc")} cancel`,
     ].join("  ·  ");
-    lines.push(pc.dim(`${hintsIndent}${hints}`));
+    lines.push(style.dim(`${hintsIndent}${hints}`));
 
     filterBarLines = 2;
   } else if (filterPath) {
     const stats = buildFilterStats(groups, filterPath, filterTarget, filterRegex);
-    const statsStr = pc.dim(
+    const statsStr = style.dim(
       `${stats.visibleMatches} match${stats.visibleMatches !== 1 ? "es" : ""} in ${
         stats.visibleRepos
       } repo${stats.visibleRepos !== 1 ? "s" : ""} shown · ${
@@ -407,14 +411,14 @@ export function renderGroups(
     // Fix: clip so the filter status line never wraps — see issue #105.
     lines.push(
       clipToWidth(
-        `🔍${targetBadge}${pc.bold("filter:")} ${pc.yellow(filterPath)}  ${statsStr}`,
+        `🔍${targetBadge}${style.bold("filter:")} ${style.yellow(filterPath)}  ${statsStr}`,
         termWidth,
       ),
     );
     filterBarLines = 1;
   } else if (filterTarget !== "path" || filterRegex) {
     // No active filter text, but non-default mode selected — remind the user.
-    lines.push(clipToWidth(`🔍${targetBadge}${pc.dim("f to filter")}`, termWidth));
+    lines.push(clipToWidth(`🔍${targetBadge}${style.dim("f to filter")}`, termWidth));
     filterBarLines = 1;
   }
 
@@ -436,18 +440,18 @@ export function renderGroups(
     // Pad between bar content and suffix to keep suffix right-aligned.
     // Use visibleWidth to account for CJK and multi-code-point graphemes.
     const padLen = Math.max(0, barWidth - visibleWidth(barPlain));
-    const line = pc.dim(REPICK_PREFIX) + bar + " ".repeat(padLen) + pc.dim(REPICK_SUFFIX);
+    const line = style.dim(REPICK_PREFIX) + bar + " ".repeat(padLen) + style.dim(REPICK_SUFFIX);
     lines.push(clipToWidth(line, termWidth) + "\n");
   } else if (opts.teamPickMode?.active) {
     const PICK_HINTS = `Pick team: ← / → move focus  ↵ confirm  Esc cancel`;
     const clippedPick = PICK_HINTS.length > termWidth ? PICK_HINTS.slice(0, termWidth) : PICK_HINTS;
-    lines.push(pc.dim(`${clippedPick}\n`));
+    lines.push(style.dim(`${clippedPick}\n`));
   } else {
     const HINTS_TEXT =
       "← / → fold/unfold  Z fold-all  ↑ / ↓ navigate  gg/G top/bot  PgUp/Dn page  spc select  a all  n none  o open  f filter  t target/re-pick  p pick-team  h help  ↵ confirm  q quit";
     const clippedHints =
       HINTS_TEXT.length > termWidth ? HINTS_TEXT.slice(0, termWidth) : HINTS_TEXT;
-    lines.push(pc.dim(`${clippedHints}\n`));
+    lines.push(style.dim(`${clippedHints}\n`));
   }
 
   // ── Sticky current-repo ───────────────────────────────────────────────────
@@ -467,10 +471,12 @@ export function renderGroups(
     );
     if (repoRowIndex >= 0 && repoRowIndex < scrollOffset) {
       const g = groups[cursorRow.repoIndex];
-      const checkbox = g.repoSelected ? pc.green("✓") : pc.dim("✓");
+      const checkbox = g.repoSelected ? style.green("✓") : style.dim("✓");
       // Fix: clip to termWidth so the sticky line never wraps — see issue #105.
       stickyRepoLine = clipToWidth(
-        pc.dim(`▲ ${checkbox} ${pc.bold(g.repoFullName)} ${pc.dim(buildMatchCountLabel(g))}`),
+        `${style.dim(`▲ ${checkbox} `)}${style.style(["dim", "bold"], `${g.repoFullName} `)}${style.dim(
+          buildMatchCountLabel(g),
+        )}`,
         termWidth,
       );
       lines.push(stickyRepoLine);
@@ -524,7 +530,7 @@ export function renderGroups(
       if (pickMode?.active && pickMode.sectionLabel === row.sectionLabel) {
         // Fix: clip pick bar to (termWidth - 3) so "── " + bar never wraps — see issue #121.
         const bar = renderTeamPickHeader(pickMode.candidates, pickMode.focusedIndex, termWidth - 3);
-        lines.push(`${pc.magenta(pc.bold("── "))}${bar}`);
+        lines.push(`${style.style(["magenta", "bold"], "── ")}${bar}`);
       } else if (isActiveSectionCursor) {
         const isMultiTeam = (row.sectionLabel ?? "").includes(" + ");
         if (isMultiTeam) {
@@ -549,12 +555,14 @@ export function renderGroups(
               hint = hintPlain.slice(0, remainingWidth - 1) + "…";
             }
           }
-          lines.push(`${pc.bgMagenta(pc.bold(`── ${activeLabel} `))}${hint ? pc.dim(hint) : ""}`);
+          lines.push(
+            `${style.style(["bgMagenta", "bold"], `── ${activeLabel} `)}${hint ? style.dim(hint) : ""}`,
+          );
         } else {
-          lines.push(pc.bgMagenta(pc.bold(`── ${label} `)));
+          lines.push(style.style(["bgMagenta", "bold"], `── ${label} `));
         }
       } else {
-        lines.push(pc.magenta(pc.bold(`── ${label} `)));
+        lines.push(style.style(["magenta", "bold"], `── ${label} `));
       }
       usedLines += sectionCost;
       if (usedLines >= viewportHeight) break;
@@ -569,20 +577,24 @@ export function renderGroups(
     const isCursor = i === cursor;
 
     if (row.type === "repo") {
-      const arrow = group.folded ? pc.magenta("▸") : pc.magenta("▾");
+      const arrow = group.folded ? style.magenta("▸") : style.magenta("▾");
       // Determine checkbox state: green if any extract is selected, dimmed if none are selected.
       // group.repoSelected is kept in sync with extracts via tui.ts and render/selection.ts,
       // so we can use it directly without recomputing.
-      const checkbox = group.repoSelected ? pc.green("✓") : pc.dim("✓");
+      const checkbox = group.repoSelected ? style.green("✓") : style.dim("✓");
       // On cursor rows, use bold+white for the repo name (dark bg applied
       // to the whole line via renderActiveLine; no inline bgMagenta needed).
       // On inactive rows, use bright purple (same as the bar) in bold.
       const repoName = isCursor
-        ? highlightText(group.repoFullName, "repo", (s) => pc.bold(pc.white(s)))
-        : highlightText(group.repoFullName, "repo", (s) => `\x1b[38;5;129m${pc.bold(s)}\x1b[39m`);
+        ? highlightText(group.repoFullName, "repo", (s) => style.style(["bold", "white"], s))
+        : highlightText(
+            group.repoFullName,
+            "repo",
+            (s) => `\x1b[38;5;129m${style.bold(s)}\x1b[39m`,
+          );
       // ◈ badge — signals the repo was moved from a combined section via pick.
       // Future split mode will use this to identify pickable repos and add a hint.
-      const pickedBadge = group.pickedFrom ? ` ${pc.dim("◈")}` : "";
+      const pickedBadge = group.pickedFrom ? ` ${style.dim("◈")}` : "";
       // Use muted purple for the match count (both active and inactive rows).
       const count = `\x1b[38;5;99m${buildMatchCountLabel(group)}\x1b[39m`;
       // Right-align the match count flush to the terminal edge.
@@ -608,12 +620,14 @@ export function renderGroups(
       const ei = row.extractIndex!;
       const match = group.matches[ei];
       const selected = group.extractSelected[ei];
-      const checkbox = selected ? pc.green("✓") : pc.dim("✓");
+      const checkbox = selected ? style.green("✓") : style.dim("✓");
       const seg = match.textMatches[0]?.matches[0];
       const locSuffix = seg ? `:${seg.line}:${seg.col}` : "";
       // Active extract row: locSuffix uses bold+white (same as path) for
       // visual homogeneity. Inactive: dim to de-emphasise the coordinates.
-      const styledLocSuffix = isCursor ? pc.bold(pc.white(locSuffix)) : pc.dim(locSuffix);
+      const styledLocSuffix = isCursor
+        ? style.style(["bold", "white"], locSuffix)
+        : style.dim(locSuffix);
       // Fix: clip the path to fit within termWidth — use the *actual* visible prefix
       // width for each render form rather than a shared PATH_INDENT constant.
       // Active:   ACTIVE_BAR_WIDTH (1) + "  " (2) + checkbox (1) + space (1) = 5
@@ -629,8 +643,8 @@ export function renderGroups(
       // reintroducing line wrapping — see review on #106).
       const maxPathVisible = Math.max(1, termWidth - prefixWidth - locSuffix.length);
       const rawPath = isCursor
-        ? `${highlightText(match.path, "path", (s) => pc.bold(pc.white(s)))}${styledLocSuffix}`
-        : `${highlightText(match.path, "path", pc.cyan)}${styledLocSuffix}`;
+        ? `${highlightText(match.path, "path", (s) => style.style(["bold", "white"], s))}${styledLocSuffix}`
+        : `${highlightText(match.path, "path", style.cyan)}${styledLocSuffix}`;
       const filePath =
         visibleWidth(rawPath) > maxPathVisible + locSuffix.length
           ? clipToWidth(rawPath, maxPathVisible + locSuffix.length)
@@ -681,7 +695,7 @@ export function renderGroups(
   // the indicator (the separator is the last padding blank when full, or an
   // explicit extra blank here when viewport is full).
   if (rows.length > 0) {
-    lines.push(pc.dim(`\n  ↕ row ${cursor + 1} of ${rows.length}`));
+    lines.push(style.dim(`\n  ↕ row ${cursor + 1} of ${rows.length}`));
   }
 
   return lines.join("\n");

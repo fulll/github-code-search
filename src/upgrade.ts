@@ -1,12 +1,12 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import pc from "picocolors";
+import * as style from "./style.ts";
 import { generateCompletion, getCompletionFilePath } from "./completions.ts";
 import type { Shell } from "./completions.ts";
 
 /** Renders a hyperlink in cyan+underline when stdout is a TTY, plain otherwise. */
 const upgradeLink = (url: string): string =>
-  process.stdout.isTTY ? pc.cyan(pc.underline(url)) : url;
+  process.stdout.isTTY ? style.style(["cyan", "underline"], url) : url;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

@@ -1,4 +1,4 @@
-import pc from "picocolors";
+import * as style from "../style.ts";
 import type { RepoGroup } from "../types.ts";
 
 // ─── Match count label ────────────────────────────────────────────────────────
@@ -48,7 +48,7 @@ export function buildSummary(groups: RepoGroup[]): string {
   const fileStr = `${fileCount} file${fileCount !== 1 ? "s" : ""}`;
   const matchStr = `${matchCount} match${matchCount !== 1 ? "es" : ""}`;
   // Only show the matches segment when files ≠ matches (cross-repo duplicates)
-  return pc.dim(
+  return style.dim(
     matchCount === fileCount ? `${repoStr} · ${fileStr}` : `${repoStr} · ${fileStr} · ${matchStr}`,
   );
 }
@@ -86,7 +86,7 @@ export function buildSummaryFull(groups: RepoGroup[]): string {
       : `${totalMatches} match${totalMatches !== 1 ? "es" : ""}`;
 
   // Only add the matches segment when it differs from files (cross-repo duplicates)
-  return pc.dim(
+  return style.dim(
     totalMatches === totalFiles
       ? `${repoStr} · ${fileStr}`
       : `${repoStr} · ${fileStr} · ${matchStr}`,

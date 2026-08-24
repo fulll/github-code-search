@@ -31,7 +31,7 @@ describe("renderTeamPickHeader — focused team rendering", () => {
     expect(result).toContain("squad-c");
   });
 
-  it("emits ANSI codes (picocolors active due to FORCE_COLOR=1 in test-setup)", () => {
+  it("emits ANSI codes (style.ts active due to FORCE_COLOR=1 in test-setup)", () => {
     const result = renderTeamPickHeader(["squad-frontend", "squad-mobile"], 0);
     // Focused team should have bold/colour codes; non-focused should have dim codes
     expect(result).toMatch(/\x1b\[/);

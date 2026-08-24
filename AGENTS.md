@@ -94,6 +94,9 @@ src/
   output.ts              # Text (markdown) and JSON output formatters
   upgrade.ts             # Auto-upgrade logic (fetch latest GitHub release, replace binary)
                          #   + refreshCompletions() — overwrites existing completion file
+  style.ts               # Sole call site for node:util's styleText — dim/bold/italic/
+                         #   underline/colors + style(names[], text) composer for combined
+                         #   styles — no I/O
 
   render/
     terminal.ts          # Bun 1.4+ native API wrappers (stringWidth, stripANSI, sliceAnsi)
@@ -121,6 +124,7 @@ src/
 - **Side effects are isolated.** API calls (`api.ts`, `api-utils.ts`), TTY interaction (`tui.ts`) and CLI parsing (`github-code-search.ts`) are the only side-effectful surfaces. `api-utils.ts` hosts shared retry/pagination helpers that perform network I/O and must not be used outside `api.ts`. `cache.ts` hosts disk-cache helpers that perform filesystem I/O and must not be used outside `api.ts`.
 - **`render.ts` is a façade.** It re-exports everything from `render/` and adds two top-level rendering functions. Consumers import from `render.ts`, not directly from sub-modules. Exceptions: `render/team-pick.ts`, `render/mouse.ts` and `render/mouse-hit.ts` are pure modules imported **directly** by their sole consumer (`render.ts` for `team-pick.ts`, `tui.ts` for the mouse modules) and are not re-exported publicly (knip would flag unused re-exports otherwise).
 - **`render/terminal.ts` is the sole Bun API call site.** All calls to `Bun.stringWidth()`, `Bun.stripANSI()`, and `Bun.sliceAnsi()` must go through the `terminal.ts` wrapper functions (`visibleWidth()`, `stripAnsi()`, `clipToWidth()`, `hasAnsi()`). This centralizes terminal handling logic and makes it easy to verify correct Unicode handling (graphemes, emoji, CJK, ZWJ sequences).
+- **`src/style.ts` is the sole call site for `node:util`'s `styleText`.** All ANSI styling across the codebase (`render.ts`, `render/highlight.ts`, `render/summary.ts`, `render/team-pick.ts`, `tui.ts`, `upgrade.ts`, `api.ts`, `github-code-search.ts`) goes through this facade instead of importing `styleText` directly or reintroducing a styling npm package. Multi-style compositions (e.g. bold+yellow) must use the `style(names[], text)` array form, not chained/nested calls — `bold` and `dim` share the same SGR reset code, so naive chaining can produce incorrect output when there is trailing content after a nested style.
 - **`types.ts` is the single source of truth** for all shared interfaces. Any new shared type must go there.
 - **No classes** — the codebase uses plain TypeScript interfaces and functions throughout.
 
@@ -266,7 +270,7 @@ For minor/major releases update `docs/blog/index.md` to add a row in the version
 - After a successful upgrade, `refreshCompletions()` (in `src/upgrade.ts`) silently overwrites the existing completion file if one is already present. It never creates a file from scratch — installation is the user's responsibility (via `install.sh` or the `completions` subcommand).
 - The `completions` subcommand (in `github-code-search.ts`) prints the completion script for the detected (or specified) shell to stdout. It is a thin wrapper around `generateCompletion()` in `src/completions.ts`.
 - Shell-integration tests for `install.sh` live in `install.test.bats` and require `bats-core`. Run them with `bun run test:bats`. The CI runs them in a dedicated `test-bats` job using `bats-core/bats-action`.
-- `picocolors` is the only styling dependency; do not add `chalk` or similar.
+- `src/style.ts` is the sole call site for `node:util`'s `styleText` and the only styling dependency-free abstraction in the codebase; do not import `styleText` directly elsewhere, and do not add `chalk`/`picocolors`/or similar external styling packages.
 - Keep `knip` clean: every exported symbol must be used; every import must resolve.
 - The `--pick-team` option is repeatable (Commander collect function); each assignment resolves one combined section label to a single team. A warning is emitted on stderr when a label is not found.
 - `src/render/team-pick.ts` is a pure module (no I/O) and must be consumed only via the `src/render.ts` façade — it is imported **directly** inside `render.ts` for internal use but is not re-exported publicly (knip would flag it).

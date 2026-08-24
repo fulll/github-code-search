@@ -488,12 +488,12 @@ describe("PHP tokenizer", () => {
   // Strict detection test: keyword must produce magenta (\x1b[35m), not just dim
   it("detects PHP for .php extension (not default dim)", () => {
     const phpOut = highlightFragment("function", [], "f.php").join("");
-    expect(phpOut).toContain("\x1b[35m"); // pc.magenta for keywords
+    expect(phpOut).toContain("\x1b[35m"); // style.magenta for keywords
   });
 
   it("detects PHP for .phtml extension (not default dim)", () => {
     const out = highlightFragment("class", [], "view.phtml").join("");
-    expect(out).toContain("\x1b[35m"); // pc.magenta for keywords
+    expect(out).toContain("\x1b[35m"); // style.magenta for keywords
   });
 
   it("colorizes PHP keywords in magenta", () => {
@@ -505,7 +505,7 @@ describe("PHP tokenizer", () => {
 
   it("colorizes PHP variable ($var) in cyan", () => {
     const out = highlightFragment("$myVar", [], "f.php").join("");
-    expect(out).toContain("\x1b[36m"); // pc.cyan for $variables
+    expect(out).toContain("\x1b[36m"); // style.cyan for $variables
     expect(strip(out)).toBe("$myVar");
   });
 
@@ -554,23 +554,23 @@ describe("PHP tokenizer", () => {
 describe("C/C++ tokenizer", () => {
   it("detects C for .c extension (not default dim)", () => {
     const out = highlightFragment("int", [], "main.c").join("");
-    expect(out).toContain("\x1b[35m"); // pc.magenta for keywords
+    expect(out).toContain("\x1b[35m"); // style.magenta for keywords
   });
 
   it("detects C for .h extension (not default dim)", () => {
     const out = highlightFragment("void", [], "header.h").join("");
-    expect(out).toContain("\x1b[35m"); // pc.magenta for keywords
+    expect(out).toContain("\x1b[35m"); // style.magenta for keywords
   });
 
   it("detects C++ for .cpp extension (not default dim)", () => {
     const out = highlightFragment("class", [], "foo.cpp").join("");
-    expect(out).toContain("\x1b[35m"); // pc.magenta for keywords
+    expect(out).toContain("\x1b[35m"); // style.magenta for keywords
   });
 
   it("detects C++ for .cc/.cxx/.hpp/.hxx extensions (not default dim)", () => {
     for (const ext of ["cc", "cxx", "hpp", "hxx"]) {
       const out = highlightFragment("int", [], `f.${ext}`).join("");
-      expect(out).toContain("\x1b[35m"); // pc.magenta for keywords
+      expect(out).toContain("\x1b[35m"); // style.magenta for keywords
     }
   });
 
@@ -583,7 +583,7 @@ describe("C/C++ tokenizer", () => {
 
   it("colorizes preprocessor directives in cyan", () => {
     const out = highlightFragment("#include <stdio.h>", [], "f.c").join("");
-    expect(out).toContain("\x1b[36m"); // pc.cyan for preprocessor
+    expect(out).toContain("\x1b[36m"); // style.cyan for preprocessor
     expect(strip(out)).toBe("#include <stdio.h>");
   });
 
@@ -616,7 +616,7 @@ describe("C/C++ tokenizer", () => {
 describe("Swift tokenizer", () => {
   it("detects Swift for .swift extension (not default dim)", () => {
     const out = highlightFragment("var", [], "App.swift").join("");
-    expect(out).toContain("\x1b[35m"); // pc.magenta for keywords
+    expect(out).toContain("\x1b[35m"); // style.magenta for keywords
   });
 
   it("colorizes Swift keywords in magenta", () => {
@@ -660,12 +660,12 @@ describe("Swift tokenizer", () => {
 describe("Terraform/HCL tokenizer", () => {
   it("detects Terraform for .tf extension (not default dim)", () => {
     const out = highlightFragment("resource", [], "main.tf").join("");
-    expect(out).toContain("\x1b[35m"); // pc.magenta for block keywords
+    expect(out).toContain("\x1b[35m"); // style.magenta for block keywords
   });
 
   it("detects Terraform for .hcl extension (not default dim)", () => {
     const out = highlightFragment("variable", [], "vars.hcl").join("");
-    expect(out).toContain("\x1b[35m"); // pc.magenta for block keywords
+    expect(out).toContain("\x1b[35m"); // style.magenta for block keywords
   });
 
   it("colorizes Terraform block keywords in magenta", () => {
@@ -705,17 +705,17 @@ describe("Terraform/HCL tokenizer", () => {
 describe("Dockerfile tokenizer", () => {
   it("detects Dockerfile for filename 'Dockerfile' (not default dim)", () => {
     const out = highlightFragment("FROM", [], "Dockerfile").join("");
-    expect(out).toContain("\x1b[35m"); // pc.magenta for instructions
+    expect(out).toContain("\x1b[35m"); // style.magenta for instructions
   });
 
   it("detects Dockerfile for 'dockerfile' (lowercase, not default dim)", () => {
     const out = highlightFragment("RUN", [], "dockerfile").join("");
-    expect(out).toContain("\x1b[35m"); // pc.magenta for instructions
+    expect(out).toContain("\x1b[35m"); // style.magenta for instructions
   });
 
   it("detects Dockerfile for 'Dockerfile.prod' (prefixed, not default dim)", () => {
     const out = highlightFragment("FROM", [], "Dockerfile.prod").join("");
-    expect(out).toContain("\x1b[35m"); // pc.magenta for instructions
+    expect(out).toContain("\x1b[35m"); // style.magenta for instructions
   });
 
   it("does NOT mis-detect 'Dockerfile.ts' as Dockerfile — extension wins", () => {
@@ -758,13 +758,13 @@ describe("Dockerfile tokenizer", () => {
 
   it("colorizes $ENV_VAR references in cyan", () => {
     const out = highlightFragment("$BUILD_VERSION", [], "Dockerfile").join("");
-    expect(out).toContain("\x1b[36m"); // pc.cyan for $VAR refs
+    expect(out).toContain("\x1b[36m"); // style.cyan for $VAR refs
     expect(strip(out)).toBe("$BUILD_VERSION");
   });
 
   it("colorizes ${VAR} references in cyan", () => {
     const out = highlightFragment("${IMAGE_TAG}", [], "Dockerfile").join("");
-    expect(out).toContain("\x1b[36m"); // pc.cyan for ${VAR} refs
+    expect(out).toContain("\x1b[36m"); // style.cyan for ${VAR} refs
     expect(strip(out)).toBe("${IMAGE_TAG}");
   });
 

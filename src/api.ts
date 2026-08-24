@@ -1,4 +1,4 @@
-import pc from "picocolors";
+import * as style from "./style.ts";
 import type { CodeMatch } from "./types.ts";
 import { concurrentMap, fetchWithRetry, formatRetryWait, paginatedFetch } from "./api-utils.ts";
 import { getCacheKey, readCache, writeCache } from "./cache.ts";
@@ -214,7 +214,7 @@ export async function fetchAllResults(
   keepFileContent = false,
 ): Promise<CodeMatch[]> {
   // Write the initial progress line (no newline — will be overwritten by \r).
-  process.stderr.write(pc.dim("  Fetching results from GitHub…"));
+  process.stderr.write(style.dim("  Fetching results from GitHub…"));
   let totalPages = 0;
   // GitHub code search is capped at 1000 results; paginatedFetch stops naturally
   // when a page returns fewer than 100 items. When total_count is an exact
@@ -339,7 +339,7 @@ export async function fetchRepoTeams(
   if (useCache) {
     const cached = readCache<[string, string[]][]>(cacheKey);
     if (cached !== null) {
-      process.stderr.write(pc.dim("Using cached team data (— use --no-cache to refresh)\n"));
+      process.stderr.write(style.dim("Using cached team data (— use --no-cache to refresh)\n"));
       return new Map(cached);
     }
   }
@@ -375,7 +375,7 @@ export async function fetchRepoTeams(
   }
 
   process.stderr.write(
-    pc.dim(
+    style.dim(
       `Fetching repos for ${matchingTeamSlugs.length} team${matchingTeamSlugs.length !== 1 ? "s" : ""} matching prefix${prefixes.length !== 1 ? "es" : ""} [${prefixes.join(", ")}]…\n`,
     ),
   );

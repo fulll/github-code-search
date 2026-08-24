@@ -15,7 +15,7 @@
 import { Command, program } from "commander";
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import pc from "picocolors";
+import * as style from "./src/style.ts";
 import { aggregate, normaliseExtractRef, normaliseRepo } from "./src/aggregate.ts";
 import { fetchAllResults, fetchRepoTeams } from "./src/api.ts";
 import { formatRetryWait } from "./src/api-utils.ts";
@@ -62,19 +62,20 @@ function colorDesc(s: string): string {
     .split("\n")
     .map((line) => {
       const docsMatch = line.match(/^(\s*Docs:\s*)(https?:\/\/\S+)$/);
-      if (docsMatch) return pc.dim(docsMatch[1]) + pc.cyan(pc.underline(docsMatch[2]));
+      if (docsMatch)
+        return style.dim(docsMatch[1]) + style.style(["cyan", "underline"], docsMatch[2]);
       const exampleMatch = line.match(/^(\s*Example:\s*)(.+)$/);
-      if (exampleMatch) return pc.dim(exampleMatch[1]) + pc.italic(exampleMatch[2]);
-      if (/^\s+(e\.g\.|repoA|myorg\/|squad-|chapter-)/.test(line)) return pc.dim(line);
+      if (exampleMatch) return style.dim(exampleMatch[1]) + style.italic(exampleMatch[2]);
+      if (/^\s+(e\.g\.|repoA|myorg\/|squad-|chapter-)/.test(line)) return style.dim(line);
       // Colorize any remaining bare URL (http/https) anywhere in the line
-      return line.replace(/(https?:\/\/\S+)/g, (url) => pc.cyan(pc.underline(url)));
+      return line.replace(/(https?:\/\/\S+)/g, (url) => style.style(["cyan", "underline"], url));
     })
     .join("\n");
 }
 
 /** Colored hyperlink (cyan + underline), falls back to plain when not a TTY. */
 function helpLink(url: string): string {
-  return HAS_COLOR ? pc.cyan(pc.underline(url)) : url;
+  return HAS_COLOR ? style.style(["cyan", "underline"], url) : url;
 }
 
 /**
@@ -82,7 +83,7 @@ function helpLink(url: string): string {
  * The label is bold when color is supported.
  */
 function helpSection(label: string, url: string): string {
-  const t = HAS_COLOR ? pc.bold(label) : label;
+  const t = HAS_COLOR ? style.bold(label) : label;
   return `\n${t}\n  ${helpLink(url)}`;
 }
 
@@ -92,21 +93,21 @@ function helpSection(label: string, url: string): string {
  */
 const helpFormatConfig = {
   // Section headings: "Usage:", "Options:", "Commands:" …
-  styleTitle: (s: string) => (HAS_COLOR ? pc.bold(pc.yellow(s)) : s),
+  styleTitle: (s: string) => (HAS_COLOR ? style.style(["bold", "yellow"], s) : s),
   // Command name in the usage line
-  styleCommandText: (s: string) => (HAS_COLOR ? pc.bold(s) : s),
+  styleCommandText: (s: string) => (HAS_COLOR ? style.bold(s) : s),
   // Subcommand names in the command listing
-  styleSubcommandText: (s: string) => (HAS_COLOR ? pc.cyan(s) : s),
+  styleSubcommandText: (s: string) => (HAS_COLOR ? style.cyan(s) : s),
   // Argument placeholders (<query>)
-  styleArgumentText: (s: string) => (HAS_COLOR ? pc.yellow(s) : s),
+  styleArgumentText: (s: string) => (HAS_COLOR ? style.yellow(s) : s),
   // Option flags in the usage line (--org, --format …)
-  styleOptionText: (s: string) => (HAS_COLOR ? pc.green(s) : s),
+  styleOptionText: (s: string) => (HAS_COLOR ? style.green(s) : s),
   // Option terms in the options table
-  styleOptionTerm: (s: string) => (HAS_COLOR ? pc.green(s) : s),
+  styleOptionTerm: (s: string) => (HAS_COLOR ? style.green(s) : s),
   // Subcommand terms in the commands table
-  styleSubcommandTerm: (s: string) => (HAS_COLOR ? pc.cyan(s) : s),
+  styleSubcommandTerm: (s: string) => (HAS_COLOR ? style.cyan(s) : s),
   // Argument terms in the arguments table
-  styleArgumentTerm: (s: string) => (HAS_COLOR ? pc.yellow(s) : s),
+  styleArgumentTerm: (s: string) => (HAS_COLOR ? style.yellow(s) : s),
   // Descriptions — color "Docs:", "Example:" and code-example lines
   styleOptionDescription: colorDesc,
   styleSubcommandDescription: colorDesc,
@@ -231,14 +232,14 @@ async function searchAction(
   // ─── GitHub API token ───────────────────────────────────────────────────────
   const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
   if (!GITHUB_TOKEN) {
-    console.error(pc.red("Error: GITHUB_TOKEN environment variable is not set."));
+    console.error(style.red("Error: GITHUB_TOKEN environment variable is not set."));
     process.exit(1);
   }
 
   // Fail fast on unbalanced quotes rather than surfacing a raw GitHub 422 — see issue #149
   const quoteError = validateQuoteBalance(query);
   if (quoteError) {
-    console.error(pc.red(`Error: ${quoteError}`));
+    console.error(style.red(`Error: ${quoteError}`));
     process.exit(1);
   }
 
@@ -290,12 +291,12 @@ async function searchAction(
         const remaining = cooldownUntil - Date.now();
         if (remaining <= 0) break;
         process.stderr.write(
-          `\r  ${pc.yellow("Rate limited")} — resuming in ${formatRetryWait(remaining)}\u2026${" ".repeat(10)}`,
+          `\r  ${style.yellow("Rate limited")} — resuming in ${formatRetryWait(remaining)}\u2026${" ".repeat(10)}`,
         );
         await new Promise((r) => setTimeout(r, 1_000));
       }
       // Leave cursor at line start; the next \r progress update will overwrite cleanly
-      process.stderr.write(`\r  ${pc.dim("Rate limited")} — resuming\u2026${" ".repeat(40)}`);
+      process.stderr.write(`\r  ${style.dim("Rate limited")} — resuming\u2026${" ".repeat(40)}`);
     })().finally(() => {
       activeCooldown = null;
       cooldownUntil = 0;
@@ -311,18 +312,18 @@ async function searchAction(
     if (rf === null) {
       // Compile error — always fatal, even if --regex-hint is provided,
       // because no local regex filter can be applied.
-      console.error(pc.yellow(`⚠  Regex mode — ${warn}`));
+      console.error(style.yellow(`⚠  Regex mode — ${warn}`));
       process.exit(1);
     }
     if (warn && !opts.regexHint) {
       // warn already contains the --regex-hint guidance; print it as-is.
-      console.error(pc.yellow(`⚠  Regex mode — ${warn}`));
+      console.error(style.yellow(`⚠  Regex mode — ${warn}`));
       process.exit(1);
     }
     effectiveQuery = opts.regexHint ?? apiQuery;
     regexFilter = rf ?? undefined;
     process.stderr.write(
-      pc.dim(`  ℹ  Regex mode — GitHub query: "${effectiveQuery}", local filter: ${query}\n`),
+      style.dim(`  ℹ  Regex mode — GitHub query: "${effectiveQuery}", local filter: ${query}\n`),
     );
   }
 
@@ -494,7 +495,7 @@ async function searchAction(
       const bottomBar = "─".repeat(totalWidth - 2);
       const pad = (s: string) => s + " ".repeat(Math.max(0, w - s.length));
       process.stderr.write(
-        pc.yellow(
+        style.yellow(
           [
             `${headerPrefix}${headerLabel}${headerDashes}╮`,
             `│ ${pad(`github-code-search ${VERSION} → ${latestTag}`)} │`,

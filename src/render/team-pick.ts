@@ -1,4 +1,4 @@
-import pc from "picocolors";
+import * as style from "../style.ts";
 import { visibleWidth, clipToWidth } from "./terminal.ts";
 
 const SEP = "  ";
@@ -53,7 +53,8 @@ export function renderTeamPickHeader(
     return texts
       .map(
         (text, i) =>
-          (i > 0 ? SEP : "") + (i === safeIndex ? pc.bold(pc.magenta(text)) : pc.dim(text)),
+          (i > 0 ? SEP : "") +
+          (i === safeIndex ? style.style(["bold", "magenta"], text) : style.dim(text)),
       )
       .join("");
   }
@@ -62,9 +63,9 @@ export function renderTeamPickHeader(
 
   // If the focused item alone is wider than maxWidth, clip it.
   if (widths[safeIndex] > maxWidth) {
-    const styledText = pc.bold(pc.magenta(texts[safeIndex]));
+    const styledText = style.style(["bold", "magenta"], texts[safeIndex]);
     const clipped = clipToWidth(styledText, maxWidth - 1);
-    const styledEllipsis = pc.bold(pc.magenta("…"));
+    const styledEllipsis = style.style(["bold", "magenta"], "…");
     return clipped + styledEllipsis;
   }
 
@@ -119,12 +120,12 @@ export function renderTeamPickHeader(
   const addRightEl = end < n - 1 && needed <= maxWidth;
 
   const parts: string[] = [];
-  if (addLeftEl) parts.push(pc.dim("…"));
+  if (addLeftEl) parts.push(style.dim("…"));
   for (let i = start; i <= end; i++) {
     if (i > start || addLeftEl) parts.push(SEP);
-    parts.push(i === safeIndex ? pc.bold(pc.magenta(texts[i])) : pc.dim(texts[i]));
+    parts.push(i === safeIndex ? style.style(["bold", "magenta"], texts[i]) : style.dim(texts[i]));
   }
-  if (addRightEl) parts.push(SEP + pc.dim("…"));
+  if (addRightEl) parts.push(SEP + style.dim("…"));
 
   return parts.join("");
 }
