@@ -143,6 +143,7 @@ export async function runInteractive(
   includeArchived = false,
   excludeTemplates = false,
   groupByTeamPrefix = "",
+  pickTeamAuto = false,
   regexHint = "",
   initialPickTeams: Record<string, string> = {},
 ): Promise<void> {
@@ -701,6 +702,7 @@ export async function runInteractive(
           includeArchived,
           excludeTemplates,
           groupByTeamPrefix,
+          pickTeamAuto,
           regexHint: regexHint || undefined,
           pickTeams: Object.keys(confirmedPicks).length > 0 ? confirmedPicks : undefined,
         }),

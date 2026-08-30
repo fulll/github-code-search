@@ -693,6 +693,43 @@ export function findCombinedSectionPaths(sections: TeamSection[]): string[][] {
   return paths;
 }
 
+/**
+ * Auto-resolves every combined (`"a + b"`) section whose candidate team names
+ * share a single common-prefix "parent" — one team name that is a literal
+ * string-prefix of every other team name in the combo (e.g. `"gamme-lead-
+ * client"` for `"gamme-lead-client + gamme-lead-client-p1"`) — applying the
+ * same tree update as an explicit `--pick-team` assignment. Combined sections
+ * with no such prefix relationship (e.g. `"squad-frontend + squad-mobile"`)
+ * are left combined and unresolved, same as today.
+ *
+ * Applies independently at every hierarchy depth. Pure — does not mutate
+ * `sections`.
+ */
+export function autoPickTeamsByCommonPrefix(sections: TeamSection[]): TeamSection[] {
+  let result = sections;
+
+  for (const path of findCombinedSectionPaths(sections)) {
+    const combinedLabel = path[path.length - 1];
+    const candidates = combinedLabel.split(" + ").map((c) => c.trim());
+    const winner = findCommonPrefixTeam(candidates);
+    if (winner === undefined) continue;
+
+    result = applyTeamPickInTree(result, path, winner);
+  }
+
+  return result;
+}
+
+/**
+ * Returns the one candidate that is a literal string-prefix of every other
+ * candidate (its common-prefix "parent"), or `undefined` when no single
+ * candidate satisfies that for all the others.
+ */
+function findCommonPrefixTeam(candidates: string[]): string | undefined {
+  const winners = candidates.filter((c) => candidates.every((other) => other.startsWith(c)));
+  return winners.length === 1 ? winners[0] : undefined;
+}
+
 /** Returns whether `path` (root-first ancestor labels) resolves to an actual node in the tree. */
 function pathExistsInTree(sections: TeamSection[], path: string[]): boolean {
   let level = sections;

@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   applyTeamPick,
   applyTeamPickInTree,
+  autoPickTeamsByCommonPrefix,
   findCombinedSectionPaths,
   flattenTeamHierarchy,
   flattenTeamSections,
@@ -714,6 +715,72 @@ describe("findCombinedSectionPaths", () => {
     // exercises two independent combined sections at the same nested depth.
     const paths = findCombinedSectionPaths(tree);
     expect(paths).toContainEqual(["gamme-x", "squad-a + squad-b"]);
+  });
+});
+
+// ─── autoPickTeamsByCommonPrefix ───────────────────────────────────────────────
+
+describe("autoPickTeamsByCommonPrefix", () => {
+  it("resolves a combined section to the team that is a prefix of the other", () => {
+    const groups = [makeGroup("org/a", ["gamme-lead-client", "gamme-lead-client-p1"])];
+    const tree = groupByTeamHierarchy(groups, [["gamme-"]]);
+    expect(findCombinedSectionPaths(tree)).toEqual([["gamme-lead-client + gamme-lead-client-p1"]]);
+
+    const resolved = autoPickTeamsByCommonPrefix(tree);
+    expect(findCombinedSectionPaths(resolved)).toEqual([]);
+    const winner = resolved.find((s) => s.label === "gamme-lead-client")!;
+    expect(winner.groups.map((g) => g.repoFullName)).toEqual(["org/a"]);
+  });
+
+  it("leaves a combined section unresolved when no team is a prefix of the others", () => {
+    const groups = [makeGroup("org/a", ["squad-frontend", "squad-mobile"])];
+    const tree = groupByTeamHierarchy(groups, [["squad-"]]);
+    const resolved = autoPickTeamsByCommonPrefix(tree);
+    expect(findCombinedSectionPaths(resolved)).toEqual([["squad-frontend + squad-mobile"]]);
+  });
+
+  it("picks the shortest common-prefix team among 3+ combined teams", () => {
+    const groups = [makeGroup("org/a", ["gamme-x", "gamme-x-y", "gamme-x-y-z"])];
+    const tree = groupByTeamHierarchy(groups, [["gamme-"]]);
+    const resolved = autoPickTeamsByCommonPrefix(tree);
+    expect(findCombinedSectionPaths(resolved)).toEqual([]);
+    expect(resolved.map((s) => s.label)).toEqual(["gamme-x"]);
+  });
+
+  it("resolves independently at a nested (non-top-level) depth", () => {
+    const groups = [
+      makeGroup("org/a", ["gamme-client", "squad-a", "squad-a-legacy"]),
+      makeGroup("org/b", ["gamme-client"]),
+    ];
+    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const resolved = autoPickTeamsByCommonPrefix(tree);
+    expect(findCombinedSectionPaths(resolved)).toEqual([]);
+    const gamme = resolved.find((s) => s.label === "gamme-client")!;
+    const child = (gamme.children ?? []).find((c) => c.label === "squad-a")!;
+    expect(child).toBeDefined();
+    expect(child.groups.map((g) => g.repoFullName)).toEqual(["org/a"]);
+  });
+
+  it("an explicit --pick-team resolution is left untouched (no longer combined) when auto-pick runs after", () => {
+    const groups = [makeGroup("org/a", ["squad-frontend", "squad-mobile"])];
+    const tree = groupByTeamHierarchy(groups, [["squad-"]]);
+    const picked = applyTeamPickInTree(tree, ["squad-frontend + squad-mobile"], "squad-frontend");
+    const resolved = autoPickTeamsByCommonPrefix(picked);
+    expect(resolved).toEqual(picked);
+  });
+
+  it("is a pure function — does not mutate the input tree", () => {
+    const groups = [makeGroup("org/a", ["gamme-lead-client", "gamme-lead-client-p1"])];
+    const tree = groupByTeamHierarchy(groups, [["gamme-"]]);
+    const before = JSON.stringify(tree);
+    autoPickTeamsByCommonPrefix(tree);
+    expect(JSON.stringify(tree)).toBe(before);
+  });
+
+  it("returns the tree unchanged when there is no combined section", () => {
+    const groups = [makeGroup("org/a", ["squad-front"])];
+    const tree = groupByTeamHierarchy(groups, [["squad-"]]);
+    expect(autoPickTeamsByCommonPrefix(tree)).toEqual(tree);
   });
 });
 

@@ -31,6 +31,10 @@ describe("generateCompletion", () => {
       expect(script).toContain("--regex-hint");
     });
 
+    it("contains --pick-team-auto", () => {
+      expect(generateCompletion("bash")).toContain("--pick-team-auto");
+    });
+
     it("contains format values (markdown, json)", () => {
       const script = generateCompletion("bash");
       expect(script).toContain("markdown");
@@ -75,6 +79,10 @@ describe("generateCompletion", () => {
       expect(script).toContain("--regex-hint");
     });
 
+    it("contains --pick-team-auto", () => {
+      expect(generateCompletion("zsh")).toContain("--pick-team-auto");
+    });
+
     it("contains a 'compdef' directive (zsh-style)", () => {
       const script = generateCompletion("zsh");
       expect(script).toContain("compdef ");
@@ -105,6 +113,10 @@ describe("generateCompletion", () => {
       expect(script).toContain("format");
       expect(script).toContain("output-type");
       expect(script).toContain("regex-hint");
+    });
+
+    it("contains pick-team-auto", () => {
+      expect(generateCompletion("fish")).toContain("pick-team-auto");
     });
 
     it("uses fish 'complete -c' syntax", () => {

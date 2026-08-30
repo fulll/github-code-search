@@ -52,6 +52,12 @@ const OPTIONS = [
     values: [],
   },
   {
+    flag: "pick-team-auto",
+    description: "Auto-resolve combined team sections by common prefix",
+    takesArg: false,
+    values: [],
+  },
+  {
     flag: "no-interactive",
     description: "Disable interactive mode",
     takesArg: false,
