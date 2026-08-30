@@ -35,9 +35,6 @@ export interface ReplayOptions {
   includeArchived?: boolean;
   excludeTemplates?: boolean;
   groupByTeamPrefix?: string;
-  /** Mirrors `--group-by-team-prefix-consolidate` — collapses single-branch
-   *  nesting chains into one heading (see `consolidateTeamHierarchy`). */
-  consolidateTeamSections?: boolean;
   /** When set, appends `--regex-hint <term>` to the replay command so the
    *  result set from a regex query can be reproduced exactly. */
   regexHint?: string;
@@ -62,7 +59,6 @@ export function buildReplayCommand(
     includeArchived,
     excludeTemplates,
     groupByTeamPrefix,
-    consolidateTeamSections,
     regexHint,
     pickTeams,
   } = options;
@@ -113,9 +109,6 @@ export function buildReplayCommand(
   }
   if (groupByTeamPrefix) {
     parts.push(`--group-by-team-prefix ${shellQuote(groupByTeamPrefix)}`);
-  }
-  if (consolidateTeamSections) {
-    parts.push("--group-by-team-prefix-consolidate");
   }
   if (regexHint) {
     parts.push(`--regex-hint ${shellQuote(regexHint)}`);
@@ -397,12 +390,7 @@ export function buildOutput(
   outputType: OutputType = "repo-and-matches",
   extraOptions: Pick<
     ReplayOptions,
-    | "includeArchived"
-    | "excludeTemplates"
-    | "groupByTeamPrefix"
-    | "consolidateTeamSections"
-    | "regexHint"
-    | "pickTeams"
+    "includeArchived" | "excludeTemplates" | "groupByTeamPrefix" | "regexHint" | "pickTeams"
   > = {},
 ): string {
   const options: ReplayOptions = { format, outputType, ...extraOptions };

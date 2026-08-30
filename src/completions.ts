@@ -46,12 +46,6 @@ const OPTIONS = [
     values: [],
   },
   {
-    flag: "group-by-team-prefix-consolidate",
-    description: "Collapse single-branch nesting chains into one heading",
-    takesArg: false,
-    values: [],
-  },
-  {
     flag: "pick-team",
     description: "Assign a combined team section to a single owner (repeatable)",
     takesArg: true,
