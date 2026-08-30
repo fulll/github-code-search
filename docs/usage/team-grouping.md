@@ -62,33 +62,6 @@ Within one level, if a team's name is a **prefix of another team's name** (e.g. 
 
 This cascades across any number of overlapping names, and applies independently at every depth of a chain.
 
-## Advanced: consolidated rendering
-
-Deeply nested hierarchies can produce a long run of single-child headings that don't carry much extra information on their own. `--group-by-team-prefix-consolidate` collapses any such **unambiguous single-branch chain** into one heading with an `(including …)` suffix:
-
-```bash
-github-code-search "useFeatureFlag" --org fulll \
-  --group-by-team-prefix gamme-/squad- \
-  --group-by-team-prefix-consolidate
-```
-
-```text
-## gamme-lead-client (including squad-dashboard)
-```
-
-instead of:
-
-```text
-## gamme-lead-client
-### squad-dashboard
-```
-
-A heading is only collapsed into its parent's suffix when the next level has **exactly one** child — a level with 2+ children (a genuine fork) always keeps its own heading, and the `other` bucket reads as `unset` in the suffix (e.g. `gamme-lead-client (including squad-dashboard, unset)`).
-
-::: warning JSON output ignores consolidation
-`--group-by-team-prefix-consolidate` only affects **markdown** output and the interactive TUI. `--format json` always emits the full, uncollapsed hierarchy in each result's `section` path — JSON is a data contract and consolidating it would lose information a downstream consumer might need. A warning is printed if you combine both flags.
-:::
-
 ## Non-interactive output
 
 ### Flat (single-level) output
@@ -149,7 +122,7 @@ Nested levels render as consecutive markdown headings (`##`, `###`, `####`, …,
 
 ### JSON output
 
-Each result carries its full hierarchy path (root first) in a `section` array, regardless of `--group-by-team-prefix-consolidate`:
+Each result carries its full hierarchy path (root first) in a `section` array:
 
 ```json
 {

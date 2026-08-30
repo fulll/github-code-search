@@ -214,22 +214,6 @@ describe("buildReplayCommand", () => {
     expect(cmd).not.toContain("--regex-hint");
   });
 
-  it("includes --group-by-team-prefix-consolidate when consolidateTeamSections is true", () => {
-    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
-    const opts: ReplayOptions = {
-      groupByTeamPrefix: "gamme-/squad-",
-      consolidateTeamSections: true,
-    };
-    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
-    expect(cmd).toContain("--group-by-team-prefix-consolidate");
-  });
-
-  it("does not include --group-by-team-prefix-consolidate when consolidateTeamSections is false (default)", () => {
-    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
-    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set());
-    expect(cmd).not.toContain("--group-by-team-prefix-consolidate");
-  });
-
   it("emits --pick-team for each entry in pickTeams", () => {
     const groups = [makeGroup("myorg/repoA", ["a.ts"])];
     const opts: ReplayOptions = {
@@ -868,15 +852,5 @@ describe("buildOutput", () => {
     });
     const parsed = JSON.parse(out);
     expect(parsed.replayCommand).toContain("--group-by-team-prefix 'squad-'");
-  });
-
-  it("threads consolidateTeamSections into the replay command", () => {
-    const groups = [makeGroup("myorg/repoA", ["src/foo.ts"])];
-    const out = buildOutput(groups, QUERY, ORG, new Set(), new Set(), "json", "repo-and-matches", {
-      groupByTeamPrefix: "gamme-/squad-",
-      consolidateTeamSections: true,
-    });
-    const parsed = JSON.parse(out);
-    expect(parsed.replayCommand).toContain("--group-by-team-prefix-consolidate");
   });
 });

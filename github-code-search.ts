@@ -22,7 +22,6 @@ import { formatRetryWait } from "./src/api-utils.ts";
 import { buildOutput } from "./src/output.ts";
 import {
   applyTeamPickInTree,
-  consolidateTeamHierarchy,
   findCombinedSectionPaths,
   flattenTeamHierarchy,
   groupByTeamHierarchy,
@@ -191,16 +190,6 @@ function addSearchOptions(cmd: Command): Command {
       "",
     )
     .option(
-      "--group-by-team-prefix-consolidate",
-      [
-        "Collapse unambiguous single-branch nesting chains into one heading",
-        'with an "(including ...)" suffix instead of one heading per level.',
-        "Only applies with --group-by-team-prefix.",
-        "Docs: https://fulll.github.io/github-code-search/usage/team-grouping",
-      ].join("\n"),
-      false,
-    )
-    .option(
       "--pick-team <assignment>",
       [
         "Assign a combined team section to a single owner.",
@@ -243,7 +232,6 @@ async function searchAction(
     includeArchived: boolean;
     excludeTemplateRepositories: boolean;
     groupByTeamPrefix: string;
-    groupByTeamPrefixConsolidate?: boolean;
     pickTeam: string[];
     cache: boolean;
     regexHint?: string;
@@ -366,10 +354,7 @@ async function searchAction(
   );
 
   // ─── Team-prefix grouping ─────────────────────────────────────────────────
-  const pickTeams: Record<string, string> = {}; // Whether consolidation was actually applied (requested AND not --format
-  // json, which always needs the full, uncollapsed hierarchy) — forwarded to
-  // the replay command and the TUI so they stay consistent with `groups`.
-  let consolidateApplied = false;
+  const pickTeams: Record<string, string> = {};
   if (!opts.groupByTeamPrefix && opts.pickTeam && opts.pickTeam.length > 0) {
     for (const assignment of opts.pickTeam) {
       process.stderr.write(
@@ -397,9 +382,6 @@ async function searchAction(
 
       let sections = groupByTeamHierarchy(groups, chains);
 
-      // Apply --pick-team assignments BEFORE consolidation: consolidating
-      // first would change (or erase) the identity of the combined sections
-      // --pick-team addresses, silently breaking resolution — see review on #190.
       for (const assignment of opts.pickTeam) {
         const resolution = resolvePickTeamAssignment(sections, assignment);
         if ("error" in resolution) {
@@ -422,21 +404,6 @@ async function searchAction(
         );
       }
 
-      // Consolidation is a display-only concern: JSON output is a data
-      // contract and must reflect the real, uncollapsed hierarchy (its
-      // `section` path per result), so skip it entirely for --format json —
-      // see review on #190.
-      consolidateApplied = Boolean(opts.groupByTeamPrefixConsolidate) && format !== "json";
-      if (opts.groupByTeamPrefixConsolidate && !consolidateApplied) {
-        process.stderr.write(
-          "warning: --group-by-team-prefix-consolidate is ignored with --format json " +
-            "(JSON output always reflects the full, uncollapsed hierarchy)\n",
-        );
-      }
-      if (consolidateApplied) {
-        sections = consolidateTeamHierarchy(sections);
-      }
-
       groups = flattenTeamHierarchy(sections);
     }
   }
@@ -447,7 +414,6 @@ async function searchAction(
         includeArchived,
         excludeTemplates,
         groupByTeamPrefix: opts.groupByTeamPrefix,
-        consolidateTeamSections: consolidateApplied,
         regexHint: opts.regexHint,
         pickTeams: Object.keys(pickTeams).length > 0 ? pickTeams : undefined,
       }),
@@ -508,7 +474,6 @@ async function searchAction(
       includeArchived,
       excludeTemplates,
       opts.groupByTeamPrefix,
-      consolidateApplied,
       opts.regexHint ?? "",
       Object.keys(pickTeams).length > 0 ? pickTeams : {},
     );
