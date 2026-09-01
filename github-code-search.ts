@@ -186,7 +186,7 @@ function addSearchOptions(cmd: Command): Command {
         "tribe-/squad-,chapter-",
         "Repos are first grouped by single-team match, then multi-team, then the next",
         "level. Repos matching no prefix go into 'other'. Team names that overlap",
-        "(e.g. squad-a and squad-a-legacy) are nested automatically.",
+        "(e.g. squad-a and squad-a-legacy) are combined automatically.",
         "Docs: https://fulll.github.io/github-code-search/usage/team-grouping",
       ].join("\n"),
       "",

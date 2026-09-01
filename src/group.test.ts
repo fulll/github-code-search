@@ -46,7 +46,7 @@ describe("excludeTeamsByPrefix", () => {
 
   it("supports multiple exclude prefixes", () => {
     const groups = [
-      makeGroup("org/a", ["chapter-secops", "chapter-validators-core", "chapter-architect-aix"]),
+      makeGroup("org/a", ["chapter-secops", "chapter-validators-core", "chapter-architect-a"]),
     ];
     const result = excludeTeamsByPrefix(groups, ["chapter-validators-", "chapter-architect-"]);
     expect(result[0].teams).toEqual(["chapter-secops"]);
@@ -156,6 +156,33 @@ describe("groupByTeamPrefix — multi-team repos", () => {
     expect(sections).toHaveLength(1);
     expect(sections[0].groups).toHaveLength(2);
   });
+
+  it("fix (#issue: chapter-architect mega-combo): drops redundant sub-teams from a matching-team set before forming the combo label", () => {
+    // Reported behaviour: a repo tagged with a broad team (chapter-architect)
+    // AND several of its own narrower variants (chapter-architect-a,
+    // chapter-architect-b, ...) used to form an unwieldy N-way combined
+    // section listing every variant. Since the broader team already implies
+    // membership in each narrower one for grouping purposes, the narrower
+    // ones are now dropped from the matching set, leaving only the genuinely
+    // unrelated team (chapter-head-of-frontend) alongside the broad one.
+    const groups = [
+      makeGroup("org/a", [
+        "chapter-architect",
+        "chapter-architect-a",
+        "chapter-architect-b",
+        "chapter-architect-c",
+        "chapter-architect-d",
+        "chapter-architect-mobile",
+        "chapter-architect-nodejs",
+        "chapter-architect-php",
+        "chapter-architect-python",
+        "chapter-head-of-frontend",
+      ]),
+    ];
+    const sections = groupByTeamPrefix(groups, ["chapter-"]);
+    expect(sections).toHaveLength(1);
+    expect(sections[0].label).toBe("chapter-architect + chapter-head-of-frontend");
+  });
 });
 
 describe("groupByTeamPrefix — multiple prefixes", () => {
@@ -212,17 +239,6 @@ describe("groupByTeamPrefix — multiple prefixes", () => {
 });
 
 // ─── groupByTeamHierarchy ─────────────────────────────────────────────────────
-
-/** Flattens a tree's labels (with indent per level) into a single array for
- *  easy assertions, depth-first, in the order sections are emitted. */
-function collectLabels(sections: TeamSection[]): string[] {
-  const out: string[] = [];
-  for (const s of sections) {
-    out.push(`${"  ".repeat(s.level ?? 0)}${s.label}`);
-    if (s.children) out.push(...collectLabels(s.children));
-  }
-  return out;
-}
 
 describe("groupByTeamHierarchy — single-level chain (parity with groupByTeamPrefix)", () => {
   it("behaves like groupByTeamPrefix for a single 1-level chain", () => {
@@ -302,17 +318,15 @@ describe("groupByTeamHierarchy — multiple independent chains", () => {
     expect(sections[2].groups[0].repoFullName).toBe("org/c");
   });
 
-  it("investigation (#issue: tribe-/squad-,chapter- precedence): a repo matching ONLY a 2nd-level prefix (squad-) with no 1st-level (tribe-) match is invisible to that chain and falls through to a later chain", () => {
+  it("fix (#issue: tribe-/squad-,chapter- precedence): a repo matching ONLY a 2nd-level prefix (squad-) is claimed by that level as a fallback, not left invisible to the chain", () => {
     // Reported behaviour: `fulll/demat-workers` (team squad-c, no tribe-
-    // team) ends up under a `chapter-` combined section instead of under
-    // `tribe-/squad-` as its `--group-by-team-prefix tribe-/squad-,chapter-`
-    // position would suggest. Root cause: a chain only claims a repo if it
-    // matches chain[0] (tribe-) FIRST — squad- is only ever applied to repos
-    // already captured under a tribe- section. A repo with a squad- team but
-    // no tribe- team is entirely invisible to the tribe-/squad- chain and
-    // falls through to the next chain (or "other") instead — chain
-    // precedence, as currently implemented, is NOT "any prefix anywhere in
-    // the chain", only "chain[0], in order".
+    // team) used to end up under a `chapter-` combined section instead of
+    // under `tribe-/squad-` as its `--group-by-team-prefix
+    // tribe-/squad-,chapter-` position would suggest — chain[0] (tribe-) was
+    // a hard requirement before squad- was even tried. Every level of a
+    // chain is now tried in order against what earlier levels of *that same
+    // chain* haven't claimed, so a squad--only repo is captured directly by
+    // that chain instead of falling through to a later chain or "other".
     const groups = [
       makeGroup("org/demat-workers", [
         "squad-c",
@@ -321,47 +335,57 @@ describe("groupByTeamHierarchy — multiple independent chains", () => {
       ]),
     ];
     const sections = groupByTeamHierarchy(groups, [["tribe-", "squad-"], ["chapter-"]]);
-    expect(sections.map((s) => s.label)).not.toContain("tribe-");
-    const chapterCombo = sections.find((s) => s.label.includes("chapter-validators"));
-    expect(chapterCombo).toBeDefined();
-    expect(chapterCombo!.groups.map((g) => g.repoFullName)).toEqual(["org/demat-workers"]);
+    const squadC = sections.find((s) => s.label === "squad-c");
+    expect(squadC).toBeDefined();
+    expect(squadC!.level).toBe(0);
+    expect(squadC!.groups.map((g) => g.repoFullName)).toEqual(["org/demat-workers"]);
+    expect(sections.map((s) => s.label)).not.toContain("other");
+    expect(sections.some((s) => s.label.includes("chapter-validators"))).toBe(false);
   });
 });
 
-describe("groupByTeamHierarchy — auto-nesting of overlapping team names", () => {
-  it("nests a longer team name under a shorter one that is its prefix", () => {
+describe("groupByTeamHierarchy — combining overlapping team names", () => {
+  it("combines a longer team name with a shorter one that is its prefix into one section", () => {
     const groups = [makeGroup("org/a", ["tribe-a"]), makeGroup("org/b", ["tribe-a-p1"])];
     const sections = groupByTeamHierarchy(groups, [["tribe-"]]);
     expect(sections).toHaveLength(1);
-    expect(sections[0].label).toBe("tribe-a");
+    expect(sections[0].label).toBe("tribe-a + tribe-a-p1");
     expect(sections[0].level).toBe(0);
-    expect(sections[0].children).toHaveLength(1);
-    expect(sections[0].children![0].label).toBe("tribe-a-p1");
-    expect(sections[0].children![0].level).toBe(1);
+    expect(sections[0].children).toBeUndefined();
+    expect(sections[0].groups.map((g) => g.repoFullName).toSorted()).toEqual(["org/a", "org/b"]);
   });
 
-  it("cascades nesting across 3 overlapping names", () => {
+  it("combines a cascading chain of 3 overlapping names into one section", () => {
     const groups = [
       makeGroup("org/a", ["tribe-a"]),
       makeGroup("org/b", ["tribe-a-p1"]),
       makeGroup("org/c", ["tribe-a-p1-x"]),
     ];
     const sections = groupByTeamHierarchy(groups, [["tribe-"]]);
-    expect(collectLabels(sections)).toEqual(["tribe-a", "  tribe-a-p1", "    tribe-a-p1-x"]);
+    expect(sections).toHaveLength(1);
+    expect(sections[0].label).toBe("tribe-a + tribe-a-p1 + tribe-a-p1-x");
+    expect(sections[0].groups.map((g) => g.repoFullName).toSorted()).toEqual([
+      "org/a",
+      "org/b",
+      "org/c",
+    ]);
   });
 
-  it("does not nest unrelated single-team labels as siblings", () => {
+  it("does not combine unrelated single-team labels", () => {
     const groups = [makeGroup("org/a", ["squad-front"]), makeGroup("org/b", ["squad-back"])];
     const sections = groupByTeamHierarchy(groups, [["squad-"]]);
-    expect(sections.every((s) => !s.children || s.children.length === 0)).toBe(true);
+    const labels = sections.map((s) => s.label);
+    expect(labels).toContain("squad-front");
+    expect(labels).toContain("squad-back");
   });
 
-  it("does not nest combined ('a + b') or 'other' sections", () => {
+  it("does not combine already-combined ('a + b') or 'other' sections into the overlap cluster", () => {
     const groups = [makeGroup("org/a", ["squad-front", "squad-back"]), makeGroup("org/b", [])];
     const sections = groupByTeamHierarchy(groups, [["squad-"]]);
-    const combined = sections.find((s) => s.label.includes(" + "));
+    const combined = sections.find((s) => s.label === "squad-back + squad-front");
     expect(combined).toBeDefined();
-    expect(combined!.children ?? []).toHaveLength(0);
+    const other = sections.find((s) => s.label === "other");
+    expect(other).toBeDefined();
   });
 
   it("omits the children field entirely on leaf sections instead of an empty array", () => {
@@ -370,14 +394,7 @@ describe("groupByTeamHierarchy — auto-nesting of overlapping team names", () =
     expect(sections[0].children).toBeUndefined();
   });
 
-  it("keeps a parent's own groups when it also has an overlap-nested child", () => {
-    const groups = [makeGroup("org/a", ["tribe-a"]), makeGroup("org/b", ["tribe-a-p1"])];
-    const sections = groupByTeamHierarchy(groups, [["tribe-"]]);
-    expect(sections[0].groups.map((g) => g.repoFullName)).toEqual(["org/a"]);
-    expect(sections[0].children).toHaveLength(1);
-  });
-
-  it("splits a parent's own groups by the next chain level even when it also has an overlap-nested child", () => {
+  it("splits a combined overlap section by the next chain level", () => {
     const groups = [
       makeGroup("org/a", ["tribe-a"]),
       makeGroup("org/b", ["tribe-a-p1", "squad-mobile"]),
@@ -386,41 +403,56 @@ describe("groupByTeamHierarchy — auto-nesting of overlapping team names", () =
     const sections = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
     expect(sections).toHaveLength(1);
     const parent = sections[0];
-    expect(parent.label).toBe("tribe-a");
-    // Fully subdivided — none of its own repos are left flat on the parent.
+    expect(parent.label).toBe("tribe-a + tribe-a-p1");
+    // Fully subdivided by the squad- level — none of its own repos are left flat.
     expect(parent.groups).toEqual([]);
     const childLabels = (parent.children ?? []).map((c) => c.label).toSorted();
-    expect(childLabels).toEqual(["other", "squad-b", "tribe-a-p1"]);
-    const squadBilling = parent.children!.find((c) => c.label === "squad-b")!;
-    expect(squadBilling.groups.map((g) => g.repoFullName)).toEqual(["org/c"]);
+    expect(childLabels).toEqual(["other", "squad-b", "squad-mobile"]);
+    const squadB = parent.children!.find((c) => c.label === "squad-b")!;
+    expect(squadB.groups.map((g) => g.repoFullName)).toEqual(["org/c"]);
+    const squadMobile = parent.children!.find((c) => c.label === "squad-mobile")!;
+    expect(squadMobile.groups.map((g) => g.repoFullName)).toEqual(["org/b"]);
     const other = parent.children!.find((c) => c.label === "other")!;
     expect(other.groups.map((g) => g.repoFullName)).toEqual(["org/a"]);
-    // The overlap-nested child was ALSO subdivided by the next chain level.
-    const p1 = parent.children!.find((c) => c.label === "tribe-a-p1")!;
-    expect(p1.children).toHaveLength(1);
-    expect(p1.children![0].label).toBe("squad-mobile");
-    expect(p1.children![0].groups.map((g) => g.repoFullName)).toEqual(["org/b"]);
   });
 
-  it("investigation (#issue: tribe-/squad- + overlapping name): auto-nesting inserts an EXTRA heading level beyond the declared chain depth", () => {
+  it("fix (#issue: tribe-/squad- + overlapping name): combining no longer inserts an EXTRA heading level beyond the declared chain depth", () => {
     // Reported behaviour: `--group-by-team-prefix tribe-/squad-` (a 2-level
-    // chain) renders 3 heading levels — `tribe-a` /
-    // `tribe-a-security-p1` / `squad-d` — instead of the
-    // 2 the chain declares. This documents that this is the INTENDED result
-    // of combining two separate, both-documented mechanisms: automatic
-    // overlap-nesting of single-team labels (this describe block) PLUS the
-    // chain's own `/squad-` depth — not a bug in either mechanism alone.
+    // chain) used to render 3 heading levels — `tribe-a` /
+    // `tribe-a-security-p1` / `squad-d` — instead of the 2 the chain
+    // declares. Overlapping single-team labels are now combined into one
+    // section instead of nested, so the chain's own `/squad-` depth is the
+    // only extra level that can appear.
     const groups = [
       makeGroup("org/parent-only", ["tribe-a"]),
       makeGroup("org/leaf", ["tribe-a-security-p1", "squad-d"]),
     ];
     const tree = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
-    expect(collectLabels(tree)).toEqual([
-      "tribe-a",
-      "  tribe-a-security-p1",
-      "    squad-d",
-      "  other",
-    ]);
+    expect(tree).toHaveLength(1);
+    expect(tree[0].label).toBe("tribe-a + tribe-a-security-p1");
+    expect(tree[0].level).toBe(0);
+    const childLabels = (tree[0].children ?? []).map((c) => c.label).toSorted();
+    expect(childLabels).toEqual(["other", "squad-d"]);
+    const squadD = tree[0].children!.find((c) => c.label === "squad-d")!;
+    expect(squadD.level).toBe(1);
+    expect(squadD.groups.map((g) => g.repoFullName)).toEqual(["org/leaf"]);
+    const other = tree[0].children!.find((c) => c.label === "other")!;
+    expect(other.groups.map((g) => g.repoFullName)).toEqual(["org/parent-only"]);
+  });
+
+  it("fix (#issue: tribe-/squad- + overlapping name): --pick-team-auto fully resolves the combined section to a single heading", () => {
+    // End-to-end confirmation: combining (this describe block) plus
+    // --pick-team-auto together produce exactly "## tribe-a", with no
+    // "## tribe-a-security-p1" heading at any level, as requested.
+    const groups = [
+      makeGroup("org/parent-only", ["tribe-a"]),
+      makeGroup("org/leaf", ["tribe-a-security-p1", "squad-d"]),
+    ];
+    const tree = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
+    const resolved = autoPickTeamsByCommonPrefix(tree);
+    expect(resolved).toHaveLength(1);
+    expect(resolved[0].label).toBe("tribe-a");
+    expect(findCombinedSectionPaths(resolved)).toEqual([]);
   });
 });
 
@@ -468,15 +500,15 @@ describe("flattenTeamHierarchy", () => {
     expect(flat[1].sectionPath).toEqual([{ label: "chapter-backend", level: 0 }]);
   });
 
-  it("includes a parent's own repos even when it also has nested overlap children", () => {
-    // "tribe-a" owns org/a directly AND has an overlap-nested
-    // child "tribe-a-p1" owning org/b — both must appear.
+  it("flattens a combined overlap section as a single heading for both constituent repos", () => {
+    // "tribe-a" and "tribe-a-p1" are combined into one "tribe-a + tribe-a-p1"
+    // section (see combining tests) — both repos share that single heading.
     const groups = [makeGroup("org/a", ["tribe-a"]), makeGroup("org/b", ["tribe-a-p1"])];
     const sections = groupByTeamHierarchy(groups, [["tribe-"]]);
     const flat = flattenTeamHierarchy(sections);
     expect(flat.map((g) => g.repoFullName)).toEqual(["org/a", "org/b"]);
-    expect(flat[0].sectionPath).toEqual([{ label: "tribe-a", level: 0 }]);
-    expect(flat[1].sectionPath).toEqual([{ label: "tribe-a-p1", level: 1 }]);
+    expect(flat[0].sectionPath).toEqual([{ label: "tribe-a + tribe-a-p1", level: 0 }]);
+    expect(flat[1].sectionPath).toBeUndefined();
   });
 
   it("does not mutate the input tree", () => {
@@ -587,23 +619,20 @@ describe("applyTeamPickInTree", () => {
   });
 
   it("preserves the picked section's own children (does not drop the subtree)", () => {
-    // Regression: a top-level combined section ("tribe-a + tribe-a-security-p1")
-    // that was already subdivided by the next chain level (squad-) must keep
-    // its nested children when picked — only its own (now empty) `groups`
-    // were carried over before the fix, silently dropping every repo nested
-    // underneath.
+    // Regression: a top-level combined section ("tribe-b + tribe-b-p1") that
+    // was already subdivided by the next chain level (squad-) must keep its
+    // nested children when picked — only its own (now empty) `groups` were
+    // carried over before the fix, silently dropping every repo nested
+    // underneath. Each repo has only ONE tribe- team (never both), so the
+    // combined section is formed by combineOverlappingLabels across the two
+    // repos, not collapsed away by the redundant-sub-team reduction.
     const groups = [
-      makeGroup("org/tools-mobile", [
-        "tribe-b",
-        "tribe-b-security-p1",
-        "squad-core",
-        "squad-mobile",
-      ]),
-      makeGroup("org/wizard-mobile", ["tribe-b", "tribe-b-security-p1"]),
+      makeGroup("org/a", ["tribe-b", "squad-core", "squad-mobile"]),
+      makeGroup("org/b", ["tribe-b-p1"]),
     ];
     const tree = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
     const combined = tree.find((s) => s.label.includes(" + "))!;
-    expect(combined.label).toBe("tribe-b + tribe-b-security-p1");
+    expect(combined.label).toBe("tribe-b + tribe-b-p1");
     expect(combined.groups).toEqual([]); // fully subdivided by squad- before the pick
     expect(combined.children).toHaveLength(2); // "squad-core + squad-mobile" and "other"
 
@@ -614,25 +643,12 @@ describe("applyTeamPickInTree", () => {
     expect(picked).toBeDefined();
     expect(picked.children).toHaveLength(2);
     const squadChild = picked.children!.find((c) => c.label === "squad-core + squad-mobile")!;
-    expect(squadChild.groups.map((g) => g.repoFullName)).toEqual(["org/tools-mobile"]);
+    expect(squadChild.groups.map((g) => g.repoFullName)).toEqual(["org/a"]);
     const otherChild = picked.children!.find((c) => c.label === "other")!;
-    expect(otherChild.groups.map((g) => g.repoFullName)).toEqual(["org/wizard-mobile"]);
+    expect(otherChild.groups.map((g) => g.repoFullName)).toEqual(["org/b"]);
     // Every repo in the moved subtree is tagged, not just the top node's own groups.
     expect(squadChild.groups[0].pickedFrom).toBe(combined.label);
     expect(otherChild.groups[0].pickedFrom).toBe(combined.label);
-  });
-
-  it("merges the picked subtree's children into an existing target section's children", () => {
-    const groups = [
-      makeGroup("org/existing", ["tribe-b", "squad-existing"]),
-      makeGroup("org/tools-mobile", ["tribe-b", "tribe-b-security-p1", "squad-core"]),
-    ];
-    const tree = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
-    const combined = tree.find((s) => s.label.includes(" + "))!;
-    const updated = applyTeamPickInTree(tree, [combined.label], "tribe-b");
-    const picked = updated.find((s) => s.label === "tribe-b")!;
-    const childLabels = picked.children!.map((c) => c.label).toSorted();
-    expect(childLabels).toEqual(["squad-core", "squad-existing"]);
   });
 
   it("returns sections unchanged for an empty combinedPath", () => {
@@ -803,14 +819,14 @@ describe("findCombinedSectionPaths", () => {
 
 describe("autoPickTeamsByCommonPrefix", () => {
   it("resolves a combined section to the team that is a prefix of the other", () => {
-    const groups = [makeGroup("org/a", ["tribe-a", "tribe-a-p1"])];
+    const groups = [makeGroup("org/a", ["tribe-a"]), makeGroup("org/b", ["tribe-a-p1"])];
     const tree = groupByTeamHierarchy(groups, [["tribe-"]]);
     expect(findCombinedSectionPaths(tree)).toEqual([["tribe-a + tribe-a-p1"]]);
 
     const resolved = autoPickTeamsByCommonPrefix(tree);
     expect(findCombinedSectionPaths(resolved)).toEqual([]);
     const winner = resolved.find((s) => s.label === "tribe-a")!;
-    expect(winner.groups.map((g) => g.repoFullName)).toEqual(["org/a"]);
+    expect(winner.groups.map((g) => g.repoFullName).toSorted()).toEqual(["org/a", "org/b"]);
   });
 
   it("leaves a combined section unresolved when no team is a prefix of the others", () => {
@@ -821,7 +837,11 @@ describe("autoPickTeamsByCommonPrefix", () => {
   });
 
   it("picks the shortest common-prefix team among 3+ combined teams", () => {
-    const groups = [makeGroup("org/a", ["tribe-x", "tribe-x-y", "tribe-x-y-z"])];
+    const groups = [
+      makeGroup("org/a", ["tribe-x"]),
+      makeGroup("org/b", ["tribe-x-y"]),
+      makeGroup("org/c", ["tribe-x-y-z"]),
+    ];
     const tree = groupByTeamHierarchy(groups, [["tribe-"]]);
     const resolved = autoPickTeamsByCommonPrefix(tree);
     expect(findCombinedSectionPaths(resolved)).toEqual([]);
@@ -830,8 +850,8 @@ describe("autoPickTeamsByCommonPrefix", () => {
 
   it("resolves independently at a nested (non-top-level) depth", () => {
     const groups = [
-      makeGroup("org/a", ["tribe-a", "squad-a", "squad-a-legacy"]),
-      makeGroup("org/b", ["tribe-a"]),
+      makeGroup("org/a", ["tribe-a", "squad-a"]),
+      makeGroup("org/b", ["tribe-a", "squad-a-legacy"]),
     ];
     const tree = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
     const resolved = autoPickTeamsByCommonPrefix(tree);
@@ -839,7 +859,7 @@ describe("autoPickTeamsByCommonPrefix", () => {
     const gamme = resolved.find((s) => s.label === "tribe-a")!;
     const child = (gamme.children ?? []).find((c) => c.label === "squad-a")!;
     expect(child).toBeDefined();
-    expect(child.groups.map((g) => g.repoFullName)).toEqual(["org/a"]);
+    expect(child.groups.map((g) => g.repoFullName).toSorted()).toEqual(["org/a", "org/b"]);
   });
 
   it("an explicit --pick-team resolution is left untouched (no longer combined) when auto-pick runs after", () => {
@@ -851,7 +871,7 @@ describe("autoPickTeamsByCommonPrefix", () => {
   });
 
   it("is a pure function — does not mutate the input tree", () => {
-    const groups = [makeGroup("org/a", ["tribe-a", "tribe-a-p1"])];
+    const groups = [makeGroup("org/a", ["tribe-a"]), makeGroup("org/b", ["tribe-a-p1"])];
     const tree = groupByTeamHierarchy(groups, [["tribe-"]]);
     const before = JSON.stringify(tree);
     autoPickTeamsByCommonPrefix(tree);
@@ -868,13 +888,16 @@ describe("autoPickTeamsByCommonPrefix", () => {
     // Reported expectation: "chapter-secops + chapter-validators-core",
     // "chapter-head-of-frontend + chapter-secops + chapter-validators-core"
     // and "chapter-secops + chapter-validators + chapter-validators-core"
-    // should all collapse under "chapter-secops". None of the 4 distinct
-    // team names here is a literal string-prefix of the others (secops vs
-    // validators-core vs validators vs head-of-frontend), so the current
-    // "one candidate is a prefix of all others" strategy correctly leaves
-    // all 3 combined and unresolved — merging them would require a
-    // different algorithm (cluster by shared team membership across
-    // combos), which is out of scope for this strategy.
+    // should all collapse under "chapter-secops". None of the distinct team
+    // names here is a literal string-prefix of every other one in its own
+    // combo (secops vs validators-core vs validators vs head-of-frontend), so
+    // the "one candidate is a prefix of all others" strategy correctly leaves
+    // them combined and unresolved — merging them further would require a
+    // different algorithm (cluster by shared team membership across combos),
+    // which is out of scope for this strategy. Note org/c's own combo is
+    // already reduced from 3-way to 2-way by dropRedundantSubTeams, since
+    // chapter-validators-core is a redundant sub-team of chapter-validators
+    // (both present on org/c) — a real improvement, just not full merging.
     const groups = [
       makeGroup("org/a", ["chapter-secops", "chapter-validators-core"]),
       makeGroup("org/b", ["chapter-head-of-frontend", "chapter-secops", "chapter-validators-core"]),
@@ -889,7 +912,7 @@ describe("autoPickTeamsByCommonPrefix", () => {
     ).toEqual(
       [
         "chapter-head-of-frontend + chapter-secops + chapter-validators-core",
-        "chapter-secops + chapter-validators + chapter-validators-core",
+        "chapter-secops + chapter-validators",
         "chapter-secops + chapter-validators-core",
       ].toSorted(),
     );
