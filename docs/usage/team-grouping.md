@@ -25,18 +25,18 @@ The value of `--group-by-team-prefix` is a small grammar:
 - `,` separates **independent chains** — each is grouped on its own, in order, against whatever repos the previous chains haven't already claimed.
 
 ```bash
-# One 2-level chain: group by gamme- first, then by squad- within each gamme
+# One 2-level chain: group by tribe- first, then by squad- within each gamme
 github-code-search "useFeatureFlag" --org fulll \
-  --group-by-team-prefix gamme-/squad-
+  --group-by-team-prefix tribe-/squad-
 ```
 
 ```bash
-# A 2-level chain (gamme-/squad-) plus an independent 1-level chain (chapter-)
+# A 2-level chain (tribe-/squad-) plus an independent 1-level chain (chapter-)
 github-code-search "useFeatureFlag" --org fulll \
-  --group-by-team-prefix gamme-/squad-,chapter-
+  --group-by-team-prefix tribe-/squad-,chapter-
 ```
 
-A chain can have as many levels as you need (`gamme-/squad-/chapter-`, …). Malformed segments (a stray leading/trailing/double `,` or `/`) are dropped with a warning on stderr rather than silently producing an empty prefix.
+A chain can have as many levels as you need (`tribe-/squad-/chapter-`, …). Malformed segments (a stray leading/trailing/double `,` or `/`) are dropped with a warning on stderr rather than silently producing an empty prefix.
 
 ## Grouping algorithm
 
@@ -53,11 +53,11 @@ Independent chains (separated by `,`) are processed in order, each consuming rep
 
 ### Automatic nesting of overlapping team names
 
-Within one level, if a team's name is a **prefix of another team's name** (e.g. `gamme-lead-client` and `gamme-lead-client-p1`), the tool nests the more specific team under the more general one automatically — instead of listing them as unrelated siblings:
+Within one level, if a team's name is a **prefix of another team's name** (e.g. `tribe-a` and `tribe-a-p1`), the tool nests the more specific team under the more general one automatically — instead of listing them as unrelated siblings:
 
 ```text
-## gamme-lead-client
-### gamme-lead-client-p1
+## tribe-a
+### tribe-a-p1
 ```
 
 This cascades across any number of overlapping names, and applies independently at every depth of a chain.
@@ -90,20 +90,20 @@ This cascades across any number of overlapping names, and applies independently 
   - [ ] [src/legacy.js:5:1](https://github.com/fulll/legacy-monolith/blob/main/src/legacy.js#L5)
 ```
 
-### Nested (`gamme-/squad-`) output
+### Nested (`tribe-/squad-`) output
 
 Nested levels render as consecutive markdown headings (`##`, `###`, `####`, …, capped at H6) — a sibling section that shares an ancestor with the previous one doesn't repeat that ancestor's heading:
 
 ```text
 7 repos · 7 files · 8 matches selected
 
-## gamme-lead-client
-### squad-bank
+## tribe-a
+### squad-a
 
 - **fulll/bank** (1 match)
   - [ ] [src/index.ts:3:14](https://github.com/fulll/bank/blob/main/src/index.ts#L3)
 
-## gamme-lead-mobile
+## tribe-b
 ### squad-core + squad-mobile
 
 - **fulll/tools-mobile** (1 match)
@@ -129,7 +129,7 @@ Each result carries its full hierarchy path (root first) in a `section` array:
   "results": [
     {
       "repo": "fulll/tools-mobile",
-      "section": ["gamme-lead-mobile", "squad-core + squad-mobile"],
+      "section": ["tribe-b", "squad-core + squad-mobile"],
       "matches": [{ "path": "src/index.ts", "url": "...", "line": 1, "col": 1 }]
     }
   ]
@@ -141,10 +141,10 @@ Each result carries its full hierarchy path (root first) in a `section` array:
 In the TUI, team sections appear as separator lines between repository rows, indented by 2 spaces per nesting level:
 
 ```text
-── gamme-lead-client
-  ── squad-bank
+── tribe-a
+  ── squad-a
 ▶ ◉  fulll/bank  (1 match)
-── gamme-lead-mobile
+── tribe-b
   ── squad-core + squad-mobile
 ▶ ◉  fulll/tools-mobile  (1 match)
   ── other
@@ -193,7 +193,7 @@ The combined label can be:
 - **A fully-qualified path**, joined with `>`, when the label is ambiguous or you'd rather be explicit:
 
   ```bash
-  --pick-team "gamme-lead-client > squad-a + squad-b"=squad-a
+  --pick-team "tribe-a > squad-a + squad-b"=squad-a
   ```
 
 The flag is repeatable — add one `--pick-team` per combined section to resolve. The replay command emits `--pick-team` automatically (with a fully-qualified path when the pick was made on a nested section) when a pick was confirmed in the TUI.
@@ -204,16 +204,16 @@ If the combined label or path is not found (typo, ambiguous, or the section was 
 
 ## Auto-pick by common prefix
 
-Many combined sections aren't actually ambiguous: when one of the team names is a literal prefix of every other team name in the combo (e.g. `gamme-lead-client` and `gamme-lead-client-p1`), the "parent" team is the obvious owner. `--pick-team-auto` resolves these automatically, without needing a manual `--pick-team`:
+Many combined sections aren't actually ambiguous: when one of the team names is a literal prefix of every other team name in the combo (e.g. `tribe-a` and `tribe-a-p1`), the "parent" team is the obvious owner. `--pick-team-auto` resolves these automatically, without needing a manual `--pick-team`:
 
 ```bash
 github-code-search query "useFeatureFlag" --org fulll \
-  --group-by-team-prefix gamme- \
+  --group-by-team-prefix tribe- \
   --pick-team-auto
 ```
 
 ```text
-## gamme-lead-client + gamme-lead-client-p1   →   ## gamme-lead-client
+## tribe-a + tribe-a-p1   →   ## tribe-a
 ```
 
 - Combos with **no common-prefix team** (e.g. `squad-frontend + squad-mobile` — neither is a prefix of the other) are left combined and unresolved, exactly like today.
