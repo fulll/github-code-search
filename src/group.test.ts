@@ -3,6 +3,7 @@ import {
   applyTeamPick,
   applyTeamPickInTree,
   autoPickTeamsByCommonPrefix,
+  excludeTeamsByPrefix,
   findCombinedSectionPaths,
   flattenTeamHierarchy,
   flattenTeamSections,
@@ -33,6 +34,60 @@ function makeGroup(repo: string, teams: string[] = []): RepoGroup {
     teams,
   };
 }
+
+// ─── excludeTeamsByPrefix ─────────────────────────────────────────────────────
+
+describe("excludeTeamsByPrefix", () => {
+  it("removes teams matching an excluded prefix, keeps the rest", () => {
+    const groups = [makeGroup("org/a", ["chapter-secops", "chapter-validators-core"])];
+    const result = excludeTeamsByPrefix(groups, ["chapter-validators-"]);
+    expect(result[0].teams).toEqual(["chapter-secops"]);
+  });
+
+  it("supports multiple exclude prefixes", () => {
+    const groups = [
+      makeGroup("org/a", ["chapter-secops", "chapter-validators-core", "chapter-architect-aix"]),
+    ];
+    const result = excludeTeamsByPrefix(groups, ["chapter-validators-", "chapter-architect-"]);
+    expect(result[0].teams).toEqual(["chapter-secops"]);
+  });
+
+  it("leaves teams unchanged when no team matches any exclude prefix", () => {
+    const groups = [makeGroup("org/a", ["chapter-secops"])];
+    const result = excludeTeamsByPrefix(groups, ["chapter-validators-"]);
+    expect(result[0].teams).toEqual(["chapter-secops"]);
+  });
+
+  it("returns a repo with an empty teams array when every team is excluded", () => {
+    const groups = [makeGroup("org/a", ["chapter-validators-core", "chapter-validators-client"])];
+    const result = excludeTeamsByPrefix(groups, ["chapter-validators-"]);
+    expect(result[0].teams).toEqual([]);
+  });
+
+  it("is a no-op (same reference) when excludePrefixes is empty", () => {
+    const groups = [makeGroup("org/a", ["chapter-secops"])];
+    expect(excludeTeamsByPrefix(groups, [])).toBe(groups);
+  });
+
+  it("does not mutate the input groups or their teams array", () => {
+    const groups = [makeGroup("org/a", ["chapter-secops", "chapter-validators-core"])];
+    const before = JSON.stringify(groups);
+    excludeTeamsByPrefix(groups, ["chapter-validators-"]);
+    expect(JSON.stringify(groups)).toBe(before);
+  });
+
+  it("reduces a combined section to a single-team section once ambiguity is removed", () => {
+    const groups = [
+      makeGroup("org/a", ["chapter-secops", "chapter-validators-core"]),
+      makeGroup("org/b", ["chapter-secops"]),
+    ];
+    const filtered = excludeTeamsByPrefix(groups, ["chapter-validators-"]);
+    const sections = groupByTeamPrefix(filtered, ["chapter-"]);
+    expect(sections).toHaveLength(1);
+    expect(sections[0].label).toBe("chapter-secops");
+    expect(sections[0].groups.map((g) => g.repoFullName).toSorted()).toEqual(["org/a", "org/b"]);
+  });
+});
 
 // ─── groupByTeamPrefix ────────────────────────────────────────────────────────
 

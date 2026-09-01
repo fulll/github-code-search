@@ -3,6 +3,30 @@ import type { RepoGroup, TeamSection } from "./types.ts";
 // ─── Team-prefix grouping ─────────────────────────────────────────────────────
 
 /**
+ * Removes any team whose name starts with one of `excludePrefixes` from every
+ * repo's `teams` list, before grouping runs. Lets noisy/overly granular team
+ * prefixes (e.g. many `chapter-validators-*` sub-teams) be excluded from
+ * consideration entirely, reducing ambiguous combined sections at the source
+ * rather than trying to resolve them after the fact.
+ *
+ * Matching is case-sensitive `startsWith`, same as `bucketSingleLevel`'s
+ * `--group-by-team-prefix` matching, for consistency. A repo left with no
+ * matching teams behaves exactly like a repo with no matching team today
+ * (falls into `"other"` once grouped).
+ *
+ * Pure — returns new `RepoGroup` objects; does not mutate `groups` or its
+ * elements. No-op (repos returned unchanged, but still copied) when
+ * `excludePrefixes` is empty.
+ */
+export function excludeTeamsByPrefix(groups: RepoGroup[], excludePrefixes: string[]): RepoGroup[] {
+  if (excludePrefixes.length === 0) return groups;
+  return groups.map((g) => ({
+    ...g,
+    teams: (g.teams ?? []).filter((t) => !excludePrefixes.some((p) => t.startsWith(p))),
+  }));
+}
+
+/**
  * Groups `RepoGroup[]` by GitHub team prefix(es).
  *
  * Algorithm (per prefix, in order):
