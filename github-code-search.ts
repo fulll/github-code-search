@@ -23,6 +23,7 @@ import { buildOutput } from "./src/output.ts";
 import {
   applyTeamPickInTree,
   autoPickTeamsByCommonPrefix,
+  excludeTeamsByPrefix,
   findCombinedSectionPaths,
   flattenTeamHierarchy,
   groupByTeamHierarchy,
@@ -78,7 +79,7 @@ function colorDesc(s: string): string {
       // would make Commander's Help.preformatted() (newline followed by
       // whitespace) treat the WHOLE description as already manually indented
       // and skip aligning continuation lines to the option column.
-      if (/^\s*(e\.g\.|repoA|myorg\/|squad-|chapter-|gamme-)/.test(line)) return style.dim(line);
+      if (/^\s*(e\.g\.|repoA|myorg\/|squad-|chapter-|tribe-)/.test(line)) return style.dim(line);
       // Colorize any remaining bare URL (http/https) anywhere in the line
       return line.replace(/(https?:\/\/\S+)/g, (url) => style.style(["cyan", "underline"], url));
     })
@@ -180,13 +181,26 @@ function addSearchOptions(cmd: Command): Command {
       "--group-by-team-prefix <prefixes>",
       [
         "Comma-separated team-name prefixes used to group result repos by GitHub team.",
-        "Use / within one entry to nest levels: gamme-/squad- groups by gamme- first,",
+        "Use / within one entry to nest levels: tribe-/squad- groups by tribe- first,",
         "then sub-groups each section by squad-. Combine independent chains with ,:",
-        "gamme-/squad-,chapter-",
+        "tribe-/squad-,chapter-",
         "Repos are first grouped by single-team match, then multi-team, then the next",
         "level. Repos matching no prefix go into 'other'. Team names that overlap",
-        "(e.g. squad-a and squad-a-legacy) are nested automatically.",
+        "(e.g. squad-a and squad-a-legacy) are combined automatically.",
         "Docs: https://fulll.github.io/github-code-search/usage/team-grouping",
+      ].join("\n"),
+      "",
+    )
+    .option(
+      "--exclude-team-prefixes <prefixes>",
+      [
+        "Comma-separated team-name prefixes to exclude from grouping entirely,",
+        "before combined sections are formed. Useful to filter out noisy/overly",
+        "granular team names (e.g. many chapter-validators-* sub-teams) that",
+        "would otherwise produce combined sections --pick-team-auto can't resolve.",
+        "A repo left with no matching team after exclusion falls into 'other'.",
+        "Only applies with --group-by-team-prefix.",
+        "Docs: https://fulll.github.io/github-code-search/usage/team-grouping#excluding-noisy-team-prefixes",
       ].join("\n"),
       "",
     )
@@ -197,7 +211,7 @@ function addSearchOptions(cmd: Command): Command {
         'Format: "combined label"=chosenTeam  (the = separator is required).',
         'Example: --pick-team "squad-frontend + squad-mobile"=squad-frontend',
         "The combined label may be unqualified (auto-resolved when unambiguous)",
-        'or a full path when nested / ambiguous: "gamme-client > squad-a + squad-b"=squad-a',
+        'or a full path when nested / ambiguous: "tribe-a > squad-a + squad-b"=squad-a',
         "Repeatable — one flag per combined section to resolve.",
         "Only applies with --group-by-team-prefix.",
         "Docs: https://fulll.github.io/github-code-search/usage/team-grouping#team-pick-mode",
@@ -209,8 +223,8 @@ function addSearchOptions(cmd: Command): Command {
       "--pick-team-auto",
       [
         "Auto-resolve combined team sections whose team names share a common",
-        'prefix (e.g. "gamme-lead-client + gamme-lead-client-p1" \u2192 auto-picks',
-        '"gamme-lead-client"), without needing an explicit --pick-team.',
+        'prefix (e.g. "tribe-a + tribe-a-p1" \u2192 auto-picks',
+        '"tribe-a"), without needing an explicit --pick-team.',
         "Combos with no common-prefix team (e.g. squad-a + squad-b) are left",
         "unresolved. An explicit --pick-team for the same section always wins.",
         "Applies at every hierarchy depth. Only applies with --group-by-team-prefix.",
@@ -246,6 +260,7 @@ async function searchAction(
     includeArchived: boolean;
     excludeTemplateRepositories: boolean;
     groupByTeamPrefix: string;
+    excludeTeamPrefixes?: string;
     pickTeam: string[];
     pickTeamAuto?: boolean;
     cache: boolean;
@@ -377,6 +392,11 @@ async function searchAction(
       );
     }
   }
+  if (!opts.groupByTeamPrefix && opts.excludeTeamPrefixes) {
+    process.stderr.write(
+      "warning: --exclude-team-prefixes requires --group-by-team-prefix; skipping\n",
+    );
+  }
   if (opts.groupByTeamPrefix) {
     const { chains, warnings: chainWarnings } = parseTeamPrefixChains(opts.groupByTeamPrefix);
     for (const w of chainWarnings) process.stderr.write(`warning: ${w}\n`);
@@ -393,6 +413,16 @@ async function searchAction(
       // Attach team lists to each group
       for (const g of groups) {
         g.teams = teamMap.get(g.repoFullName) ?? [];
+      }
+
+      const excludeTeamPrefixes = opts.excludeTeamPrefixes
+        ? opts.excludeTeamPrefixes
+            .split(",")
+            .map((p) => p.trim())
+            .filter((p) => p.length > 0)
+        : [];
+      if (excludeTeamPrefixes.length > 0) {
+        groups = excludeTeamsByPrefix(groups, excludeTeamPrefixes);
       }
 
       let sections = groupByTeamHierarchy(groups, chains);
@@ -436,6 +466,7 @@ async function searchAction(
         includeArchived,
         excludeTemplates,
         groupByTeamPrefix: opts.groupByTeamPrefix,
+        excludeTeamPrefixes: opts.excludeTeamPrefixes,
         pickTeamAuto: opts.pickTeamAuto,
         regexHint: opts.regexHint,
         pickTeams: Object.keys(pickTeams).length > 0 ? pickTeams : undefined,
@@ -497,6 +528,7 @@ async function searchAction(
       includeArchived,
       excludeTemplates,
       opts.groupByTeamPrefix,
+      opts.excludeTeamPrefixes ?? "",
       Boolean(opts.pickTeamAuto),
       opts.regexHint ?? "",
       Object.keys(pickTeams).length > 0 ? pickTeams : {},

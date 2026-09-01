@@ -1,6 +1,6 @@
 # Team grouping
 
-`--group-by-team-prefix` organises result repositories by their GitHub team membership, as a **hierarchy** of headings. It is especially useful in large organisations with multiple gammes, chapters or squads.
+`--group-by-team-prefix` organises result repositories by their GitHub team membership, as a **hierarchy** of headings. It is especially useful in large organisations with multiple tribes, chapters or squads.
 
 ## Prerequisites
 
@@ -25,18 +25,18 @@ The value of `--group-by-team-prefix` is a small grammar:
 - `,` separates **independent chains** — each is grouped on its own, in order, against whatever repos the previous chains haven't already claimed.
 
 ```bash
-# One 2-level chain: group by gamme- first, then by squad- within each gamme
+# One 2-level chain: group by tribe- first, then by squad- within each gamme
 github-code-search "useFeatureFlag" --org fulll \
-  --group-by-team-prefix gamme-/squad-
+  --group-by-team-prefix tribe-/squad-
 ```
 
 ```bash
-# A 2-level chain (gamme-/squad-) plus an independent 1-level chain (chapter-)
+# A 2-level chain (tribe-/squad-) plus an independent 1-level chain (chapter-)
 github-code-search "useFeatureFlag" --org fulll \
-  --group-by-team-prefix gamme-/squad-,chapter-
+  --group-by-team-prefix tribe-/squad-,chapter-
 ```
 
-A chain can have as many levels as you need (`gamme-/squad-/chapter-`, …). Malformed segments (a stray leading/trailing/double `,` or `/`) are dropped with a warning on stderr rather than silently producing an empty prefix.
+A chain can have as many levels as you need (`tribe-/squad-/chapter-`, …). Malformed segments (a stray leading/trailing/double `,` or `/`) are dropped with a warning on stderr rather than silently producing an empty prefix.
 
 ## Grouping algorithm
 
@@ -47,20 +47,23 @@ Within **one level** of a chain, repos are bucketed exactly the same way regardl
 3. Repos belonging to **3+** matching teams → same, in ascending combination-size order.
 4. Repos matching **no team** at this level → collected into an `other` section.
 
+Before bucketing, a team that is a prefix of another team **already matched by the same repo** is dropped from that repo's matching set (e.g. `chapter-architect-a` is redundant when `chapter-architect` is also present) — the broader team already implies the narrower one, so keeping both would only inflate the combined-section label.
+
 Then, for a chain with more levels, **every section produced above is recursively sub-grouped** by the next prefix — including its own `other` bucket, which becomes a nested `other` at the next depth.
+
+Every level of a chain is tried in order against whatever repos the _earlier levels of that same chain_ haven't already claimed — a repo that only matches `squad-` (not `tribe-`) in a `tribe-/squad-` chain still gets its own top-level section from `squad-`, instead of being invisible to the chain and falling through to a later chain or `other`.
 
 Independent chains (separated by `,`) are processed in order, each consuming repos from the pool not yet claimed by an earlier chain. Repos matched by no chain at all end up in a single top-level `other` section.
 
-### Automatic nesting of overlapping team names
+### Automatic combining of overlapping team names
 
-Within one level, if a team's name is a **prefix of another team's name** (e.g. `gamme-lead-client` and `gamme-lead-client-p1`), the tool nests the more specific team under the more general one automatically — instead of listing them as unrelated siblings:
+Within one level, if a team's name is a **prefix of another team's name** (e.g. `tribe-a` and `tribe-a-p1`), the tool combines them into one section automatically — instead of listing them as unrelated siblings or nesting one under the other:
 
 ```text
-## gamme-lead-client
-### gamme-lead-client-p1
+## tribe-a + tribe-a-p1
 ```
 
-This cascades across any number of overlapping names, and applies independently at every depth of a chain.
+This cascades across any number of overlapping names (all merging into one section), and applies independently at every depth of a chain. The combined section behaves exactly like a multi-team combo — `--pick-team` and [`--pick-team-auto`](#auto-pick-by-common-prefix) can resolve it the same way.
 
 ## Non-interactive output
 
@@ -90,20 +93,20 @@ This cascades across any number of overlapping names, and applies independently 
   - [ ] [src/legacy.js:5:1](https://github.com/fulll/legacy-monolith/blob/main/src/legacy.js#L5)
 ```
 
-### Nested (`gamme-/squad-`) output
+### Nested (`tribe-/squad-`) output
 
 Nested levels render as consecutive markdown headings (`##`, `###`, `####`, …, capped at H6) — a sibling section that shares an ancestor with the previous one doesn't repeat that ancestor's heading:
 
 ```text
 7 repos · 7 files · 8 matches selected
 
-## gamme-lead-client
-### squad-bank
+## tribe-a
+### squad-a
 
 - **fulll/bank** (1 match)
   - [ ] [src/index.ts:3:14](https://github.com/fulll/bank/blob/main/src/index.ts#L3)
 
-## gamme-lead-mobile
+## tribe-b
 ### squad-core + squad-mobile
 
 - **fulll/tools-mobile** (1 match)
@@ -129,7 +132,7 @@ Each result carries its full hierarchy path (root first) in a `section` array:
   "results": [
     {
       "repo": "fulll/tools-mobile",
-      "section": ["gamme-lead-mobile", "squad-core + squad-mobile"],
+      "section": ["tribe-b", "squad-core + squad-mobile"],
       "matches": [{ "path": "src/index.ts", "url": "...", "line": 1, "col": 1 }]
     }
   ]
@@ -141,10 +144,10 @@ Each result carries its full hierarchy path (root first) in a `section` array:
 In the TUI, team sections appear as separator lines between repository rows, indented by 2 spaces per nesting level:
 
 ```text
-── gamme-lead-client
-  ── squad-bank
+── tribe-a
+  ── squad-a
 ▶ ◉  fulll/bank  (1 match)
-── gamme-lead-mobile
+── tribe-b
   ── squad-core + squad-mobile
 ▶ ◉  fulll/tools-mobile  (1 match)
   ── other
@@ -193,7 +196,7 @@ The combined label can be:
 - **A fully-qualified path**, joined with `>`, when the label is ambiguous or you'd rather be explicit:
 
   ```bash
-  --pick-team "gamme-lead-client > squad-a + squad-b"=squad-a
+  --pick-team "tribe-a > squad-a + squad-b"=squad-a
   ```
 
 The flag is repeatable — add one `--pick-team` per combined section to resolve. The replay command emits `--pick-team` automatically (with a fully-qualified path when the pick was made on a nested section) when a pick was confirmed in the TUI.
@@ -204,22 +207,40 @@ If the combined label or path is not found (typo, ambiguous, or the section was 
 
 ## Auto-pick by common prefix
 
-Many combined sections aren't actually ambiguous: when one of the team names is a literal prefix of every other team name in the combo (e.g. `gamme-lead-client` and `gamme-lead-client-p1`), the "parent" team is the obvious owner. `--pick-team-auto` resolves these automatically, without needing a manual `--pick-team`:
+Many combined sections aren't actually ambiguous: when one of the team names is a literal prefix of every other team name in the combo (e.g. `tribe-a` and `tribe-a-p1`), the "parent" team is the obvious owner. `--pick-team-auto` resolves these automatically, without needing a manual `--pick-team`:
 
 ```bash
 github-code-search query "useFeatureFlag" --org fulll \
-  --group-by-team-prefix gamme- \
+  --group-by-team-prefix tribe- \
   --pick-team-auto
 ```
 
 ```text
-## gamme-lead-client + gamme-lead-client-p1   →   ## gamme-lead-client
+## tribe-a + tribe-a-p1   →   ## tribe-a
 ```
 
 - Combos with **no common-prefix team** (e.g. `squad-frontend + squad-mobile` — neither is a prefix of the other) are left combined and unresolved, exactly like today.
 - Applies independently **at every hierarchy depth**, not just the top level.
 - An explicit `--pick-team` for the same section always wins: run explicit picks first, then `--pick-team-auto` resolves whatever combined sections remain.
 - The replay command emits `--pick-team-auto` when it was used, so a session is reproduced exactly.
+
+## Excluding noisy team prefixes
+
+Some orgs have many closely related, deeply-overlapping team names under one prefix (e.g. `chapter-validators-core`, `chapter-validators-client`, `chapter-validators-frontend-client`, ...). When several of these co-occur on the same repos, `--group-by-team-prefix` produces many distinct combined sections that neither `--pick-team-auto` nor manual `--pick-team` can cleanly resolve, since no single team name is a common prefix of the others.
+
+`--exclude-team-prefixes` removes matching teams from consideration **before** grouping runs, reducing ambiguous combos at the source:
+
+```bash
+github-code-search query "useFeatureFlag" --org fulll \
+  --group-by-team-prefix chapter- \
+  --exclude-team-prefixes chapter-validators- \
+  --pick-team-auto
+```
+
+- Comma-separated, same syntax as `--exclude-repositories` / `--exclude-extracts`.
+- A repo left with **no matching team** after exclusion falls into `other`, exactly like a repo with no matching team today.
+- Only applies with `--group-by-team-prefix`; a warning is emitted (and the flag is a no-op) otherwise.
+- The replay command emits `--exclude-team-prefixes` when it was used, so a session is reproduced exactly.
 
 ## Re-pick & undo pick
 

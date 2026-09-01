@@ -35,6 +35,9 @@ export interface ReplayOptions {
   includeArchived?: boolean;
   excludeTemplates?: boolean;
   groupByTeamPrefix?: string;
+  /** Mirrors `--exclude-team-prefixes` — excludes matching teams from
+   *  consideration before grouping runs (see `excludeTeamsByPrefix`). */
+  excludeTeamPrefixes?: string;
   /** Mirrors `--pick-team-auto` — auto-resolves combined sections by common
    *  prefix (see `autoPickTeamsByCommonPrefix`). */
   pickTeamAuto?: boolean;
@@ -62,6 +65,7 @@ export function buildReplayCommand(
     includeArchived,
     excludeTemplates,
     groupByTeamPrefix,
+    excludeTeamPrefixes,
     pickTeamAuto,
     regexHint,
     pickTeams,
@@ -113,6 +117,9 @@ export function buildReplayCommand(
   }
   if (groupByTeamPrefix) {
     parts.push(`--group-by-team-prefix ${shellQuote(groupByTeamPrefix)}`);
+  }
+  if (excludeTeamPrefixes) {
+    parts.push(`--exclude-team-prefixes ${shellQuote(excludeTeamPrefixes)}`);
   }
   if (pickTeamAuto) {
     parts.push("--pick-team-auto");
@@ -400,6 +407,7 @@ export function buildOutput(
     | "includeArchived"
     | "excludeTemplates"
     | "groupByTeamPrefix"
+    | "excludeTeamPrefixes"
     | "pickTeamAuto"
     | "regexHint"
     | "pickTeams"

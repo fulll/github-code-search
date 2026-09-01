@@ -3,6 +3,30 @@ import type { RepoGroup, TeamSection } from "./types.ts";
 // ─── Team-prefix grouping ─────────────────────────────────────────────────────
 
 /**
+ * Removes any team whose name starts with one of `excludePrefixes` from every
+ * repo's `teams` list, before grouping runs. Lets noisy/overly granular team
+ * prefixes (e.g. many `chapter-validators-*` sub-teams) be excluded from
+ * consideration entirely, reducing ambiguous combined sections at the source
+ * rather than trying to resolve them after the fact.
+ *
+ * Matching is case-sensitive `startsWith`, same as `bucketSingleLevel`'s
+ * `--group-by-team-prefix` matching, for consistency. A repo left with no
+ * matching teams behaves exactly like a repo with no matching team today
+ * (falls into `"other"` once grouped).
+ *
+ * Pure — returns new `RepoGroup` objects; does not mutate `groups` or its
+ * elements. No-op (repos returned unchanged, but still copied) when
+ * `excludePrefixes` is empty.
+ */
+export function excludeTeamsByPrefix(groups: RepoGroup[], excludePrefixes: string[]): RepoGroup[] {
+  if (excludePrefixes.length === 0) return groups;
+  return groups.map((g) => ({
+    ...g,
+    teams: (g.teams ?? []).filter((t) => !excludePrefixes.some((p) => t.startsWith(p))),
+  }));
+}
+
+/**
  * Groups `RepoGroup[]` by GitHub team prefix(es).
  *
  * Algorithm (per prefix, in order):
@@ -57,7 +81,9 @@ function bucketSingleLevel(remaining: Set<RepoGroup>, prefix: string): TeamSecti
 
   const byCount = new Map<number, RepoGroup[]>();
   for (const g of matchingGroups) {
-    const matchingTeams = (g.teams ?? []).filter((t) => t.startsWith(prefix));
+    const matchingTeams = dropRedundantSubTeams(
+      (g.teams ?? []).filter((t) => t.startsWith(prefix)),
+    );
     const count = matchingTeams.length;
     if (!byCount.has(count)) byCount.set(count, []);
     byCount.get(count)!.push(g);
@@ -69,8 +95,9 @@ function bucketSingleLevel(remaining: Set<RepoGroup>, prefix: string): TeamSecti
 
     const byCombo = new Map<string, RepoGroup[]>();
     for (const g of groupsInBucket) {
-      const matchingTeams = (g.teams ?? [])
-        .filter((t) => t.startsWith(prefix))
+      const matchingTeams = dropRedundantSubTeams(
+        (g.teams ?? []).filter((t) => t.startsWith(prefix)),
+      )
         .toSorted()
         .join(" + ");
       if (!byCombo.has(matchingTeams)) byCombo.set(matchingTeams, []);
@@ -85,23 +112,42 @@ function bucketSingleLevel(remaining: Set<RepoGroup>, prefix: string): TeamSecti
   return sections;
 }
 
+/**
+ * Drops any team that is a proper prefix-extension of another team already
+ * present in `teams` (e.g. `chapter-architect-a` is dropped when
+ * `chapter-architect` is also present in the same repo's matching teams) —
+ * the broader team already implies the narrower one for grouping purposes,
+ * so keeping both only inflates combined-section labels with redundant
+ * information. Pure — returns a new array.
+ */
+function dropRedundantSubTeams(teams: string[]): string[] {
+  return teams.filter((t) => !teams.some((other) => other !== t && t.startsWith(other)));
+}
+
 // ─── Hierarchical (nested) team-prefix grouping ───────────────────────────────
 
 /**
  * Groups `RepoGroup[]` into a *tree* of `TeamSection`s from one or more
  * independent prefix chains. Each chain is an ordered list of prefixes, one
- * per nesting depth: `["gamme-", "squad-"]` groups repos by teams matching
- * `gamme-` first, then sub-groups each resulting section by teams matching
+ * per nesting depth: `["tribe-", "squad-"]` groups repos by teams matching
+ * `tribe-` first, then sub-groups each resulting section by teams matching
  * `squad-`. Multiple chains are processed independently and sequentially
  * (like `groupByTeamPrefix`'s multi-prefix list), each drawing from the pool
  * of repos not yet claimed by an earlier chain.
  *
- * On top of the explicit chain depth, this also auto-nests sections whose
+ * Within one chain, every level is tried in order against whatever the
+ * earlier levels of *that same chain* haven't already claimed: a repo
+ * matching only `chain[1]` (e.g. `squad-`) and not `chain[0]` (e.g.
+ * `tribe-`) still gets its own top-level section from `chain[1]`, instead of
+ * being invisible to the chain and falling through to a later chain or
+ * `"other"`.
+ *
+ * On top of the explicit chain depth, this also combines sections whose
  * single-team label is a prefix of another single-team label at the same
- * depth (e.g. `gamme-lead-client` becomes the parent of
- * `gamme-lead-client-p1`) instead of listing them as unrelated siblings.
- * Combined-label sections (`"a + b"`) and `"other"` sections are never
- * auto-nested.
+ * depth (e.g. `tribe-a` and `tribe-a-p1`) into one `"tribe-a + tribe-a-p1"`
+ * section, exactly like a multi-team combo — instead of nesting them into
+ * extra heading levels the declared chain didn't ask for. Combined-label
+ * sections (`"a + b"`) and `"other"` sections are left as-is.
  *
  * Repos matching no prefix at a given depth are collected into an `"other"`
  * child at that depth; repos matching no chain at all are collected into a
@@ -116,11 +162,13 @@ export function groupByTeamHierarchy(groups: RepoGroup[], chains: string[][]): T
   for (const chain of chains) {
     if (chain.length === 0) continue;
 
-    const siblings = bucketSingleLevel(remaining, chain[0]).map((s) => ({ ...s, level: 0 }));
-    if (siblings.length === 0) continue;
+    for (let i = 0; i < chain.length; i++) {
+      const siblings = bucketSingleLevel(remaining, chain[i]).map((s) => ({ ...s, level: 0 }));
+      if (siblings.length === 0) continue;
 
-    const nested = nestOverlappingLabels(siblings, 0);
-    sections.push(...nested.map((s) => applyChainDepth(s, chain, 1)));
+      const combined = combineOverlappingLabels(siblings, 0);
+      sections.push(...combined.map((s) => applyChainDepth(s, chain, i + 1)));
+    }
   }
 
   if (remaining.size > 0) {
@@ -132,18 +180,12 @@ export function groupByTeamHierarchy(groups: RepoGroup[], chains: string[][]): T
 
 /**
  * Recursively subdivides `node` by the next prefix in `chain` (at `depth`).
- * Any pre-existing overlap-nested `children` haven't consumed `chain[depth]`
- * yet either, so they're recursed into first (at the same `depth`); `node`'s
- * own `groups` (repos owned directly by this section, which can coexist with
- * overlap children — see `TeamSection`) are then split into *additional*
- * children. No-op once `depth` exceeds the chain or there is nothing left to
- * split at this node.
+ * No-op once `depth` exceeds the chain or there is nothing left to split at
+ * this node.
  */
 function applyChainDepth(node: TeamSection, chain: string[], depth: number): TeamSection {
-  const recursedChildren = (node.children ?? []).map((c) => applyChainDepth(c, chain, depth));
-
   if (depth >= chain.length || node.groups.length === 0) {
-    return recursedChildren.length > 0 ? { ...node, children: recursedChildren } : node;
+    return node;
   }
 
   const level = (node.level ?? 0) + 1;
@@ -153,65 +195,76 @@ function applyChainDepth(node: TeamSection, chain: string[], depth: number): Tea
     siblings.push({ label: "other", groups: [...localRemaining], level });
   }
 
-  const splitChildren = nestOverlappingLabels(siblings, level).map((c) =>
+  const children = combineOverlappingLabels(siblings, level).map((c) =>
     applyChainDepth(c, chain, depth + 1),
   );
 
-  return { ...node, groups: [], children: [...recursedChildren, ...splitChildren] };
+  return { ...node, groups: [], children };
 }
 
 /**
- * Nests sections whose single-team `label` is a proper prefix of another
- * single-team label at the same `level` (e.g. `gamme-lead-client` becomes the
- * parent of `gamme-lead-client-p1`), instead of leaving them as siblings.
- * Combined-label (`"a + b"`) and `"other"` sections are left untouched at
- * `level` and passed through unnested. When a chain of overlaps exists
- * (A prefix of B prefix of C), nesting cascades and `level` is incremented
- * once per hop from the shallowest ancestor.
+ * Combines sections whose single-team `label` is a proper prefix of another
+ * single-team label at the same `level` (e.g. `tribe-a` and `tribe-a-p1`)
+ * into one section labelled like a multi-team combo (`"tribe-a + tribe-a-p1"`,
+ * teams sorted and joined), merging their `groups` — instead of nesting them
+ * into extra heading levels. This lets `--pick-team` / `--pick-team-auto`
+ * resolve them exactly like any other combined section. Combined-label
+ * (`"a + b"`) and `"other"` sections are left untouched. Cascading overlaps
+ * (A prefix of B prefix of C) merge into a single combined section for the
+ * whole connected chain, since the string-prefix relation is transitive.
+ *
+ * Pure — returns a new flat array, no `children`/nesting introduced here.
  */
-function nestOverlappingLabels(sections: TeamSection[], level: number): TeamSection[] {
+function combineOverlappingLabels(sections: TeamSection[], level: number): TeamSection[] {
   const nestable = sections.filter((s) => s.label !== "other" && !s.label.includes(" + "));
   const rest = sections
     .filter((s) => s.label === "other" || s.label.includes(" + "))
     .map((s) => ({ ...s, level }));
 
-  const nodeByLabel = new Map<string, TeamSection & { children: TeamSection[] }>(
-    nestable.map((s) => [s.label, { ...s, level, children: [] }]),
-  );
+  const parent = new Map<string, string>();
+  const find = (label: string): string => {
+    let root = label;
+    while (parent.get(root) !== root) root = parent.get(root)!;
+    return root;
+  };
+  const union = (a: string, b: string): void => {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent.set(ra, rb);
+  };
 
-  const parentOf = new Map<string, string>();
-  for (const s of nestable) {
-    let bestParent: string | undefined;
-    for (const other of nestable) {
-      if (other.label === s.label) continue;
-      if (
-        s.label.startsWith(other.label) &&
-        (bestParent === undefined || other.label.length > bestParent.length)
-      ) {
-        bestParent = other.label;
-      }
+  for (const s of nestable) parent.set(s.label, s.label);
+  for (const a of nestable) {
+    for (const b of nestable) {
+      if (a.label !== b.label && a.label.startsWith(b.label)) union(a.label, b.label);
     }
-    if (bestParent !== undefined) parentOf.set(s.label, bestParent);
   }
 
-  for (const [child, parent] of parentOf) {
-    nodeByLabel.get(parent)!.children.push(nodeByLabel.get(child)!);
+  const clusters = new Map<string, TeamSection[]>();
+  for (const s of nestable) {
+    const root = find(s.label);
+    if (!clusters.has(root)) clusters.set(root, []);
+    clusters.get(root)!.push(s);
   }
 
-  const roots = nestable
-    .filter((s) => !parentOf.has(s.label))
-    .map((s) => assignLevels(nodeByLabel.get(s.label)!, level));
-
-  return [...roots, ...rest];
-}
-
-/** Sets `level` on `node` (and cascades +1 per depth into its children), mutating in place. */
-function assignLevels(node: TeamSection, lvl: number): TeamSection {
-  node.level = lvl;
-  if (node.children && node.children.length > 0) {
-    node.children = node.children.map((c) => assignLevels(c, lvl + 1));
+  const combined: TeamSection[] = [];
+  for (const members of clusters.values()) {
+    if (members.length === 1) {
+      combined.push({ ...members[0], level });
+      continue;
+    }
+    combined.push({
+      label: members
+        .map((m) => m.label)
+        .toSorted()
+        .join(" + "),
+      groups: members.flatMap((m) => m.groups),
+      level,
+    });
   }
-  return node;
+  combined.sort((a, b) => a.label.localeCompare(b.label));
+
+  return [...combined, ...rest];
 }
 
 /**
@@ -530,7 +583,7 @@ function stripPickedFrom(g: RepoGroup): RepoGroup {
 /**
  * Tree-aware equivalent of `applyTeamPick`: reassigns the ENTIRE subtree of
  * the combined section identified by `combinedPath` (e.g.
- * `["gamme-client", "squad-a + squad-b"]`) — its own `groups` *and* any
+ * `["tribe-a", "squad-a + squad-b"]`) — its own `groups` *and* any
  * nested `children` (e.g. it was already subdivided by a further chain
  * level) — to a sibling section named `chosenTeam` at that same depth
  * (merged into it if it already exists, otherwise created in its place).
@@ -696,8 +749,8 @@ export function findCombinedSectionPaths(sections: TeamSection[]): string[][] {
 /**
  * Auto-resolves every combined (`"a + b"`) section whose candidate team names
  * share a single common-prefix "parent" — one team name that is a literal
- * string-prefix of every other team name in the combo (e.g. `"gamme-lead-
- * client"` for `"gamme-lead-client + gamme-lead-client-p1"`) — applying the
+ * string-prefix of every other team name in the combo (e.g. `"tribe-lead-
+ * client"` for `"tribe-a + tribe-a-p1"`) — applying the
  * same tree update as an explicit `--pick-team` assignment. Combined sections
  * with no such prefix relationship (e.g. `"squad-frontend + squad-mobile"`)
  * are left combined and unresolved, same as today.
@@ -747,8 +800,8 @@ function pathExistsInTree(sections: TeamSection[], path: string[]): boolean {
 /**
  * Parses the `--group-by-team-prefix` value into one or more prefix chains
  * for `groupByTeamHierarchy`: `,` separates independent chains, `/` separates
- * nesting levels within one chain. E.g. `"gamme-/squad-,chapter-"` produces
- * `[["gamme-", "squad-"], ["chapter-"]]`.
+ * nesting levels within one chain. E.g. `"tribe-/squad-,chapter-"` produces
+ * `[["tribe-", "squad-"], ["chapter-"]]`.
  *
  * Malformed segments (empty chain from a stray/leading/trailing/double `,`,
  * or an empty level from a stray `/`) are dropped rather than propagated as
@@ -797,7 +850,7 @@ export interface ResolvedPickTeam {
  *    `findCombinedSectionPaths` — succeeds only when exactly one match
  *    exists anywhere in the tree;
  *  - a fully-qualified path joined with `" > "` (e.g.
- *    `"gamme-client > squad-a + squad-b"`), used as-is without validating
+ *    `"tribe-a > squad-a + squad-b"`), used as-is without validating
  *    against `findCombinedSectionPaths` (so it still resolves correctly
  *    right after an earlier assignment already changed the tree shape).
  *

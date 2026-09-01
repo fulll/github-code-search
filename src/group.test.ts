@@ -3,6 +3,7 @@ import {
   applyTeamPick,
   applyTeamPickInTree,
   autoPickTeamsByCommonPrefix,
+  excludeTeamsByPrefix,
   findCombinedSectionPaths,
   flattenTeamHierarchy,
   flattenTeamSections,
@@ -33,6 +34,60 @@ function makeGroup(repo: string, teams: string[] = []): RepoGroup {
     teams,
   };
 }
+
+// ─── excludeTeamsByPrefix ─────────────────────────────────────────────────────
+
+describe("excludeTeamsByPrefix", () => {
+  it("removes teams matching an excluded prefix, keeps the rest", () => {
+    const groups = [makeGroup("org/a", ["chapter-secops", "chapter-validators-core"])];
+    const result = excludeTeamsByPrefix(groups, ["chapter-validators-"]);
+    expect(result[0].teams).toEqual(["chapter-secops"]);
+  });
+
+  it("supports multiple exclude prefixes", () => {
+    const groups = [
+      makeGroup("org/a", ["chapter-secops", "chapter-validators-core", "chapter-architect-a"]),
+    ];
+    const result = excludeTeamsByPrefix(groups, ["chapter-validators-", "chapter-architect-"]);
+    expect(result[0].teams).toEqual(["chapter-secops"]);
+  });
+
+  it("leaves teams unchanged when no team matches any exclude prefix", () => {
+    const groups = [makeGroup("org/a", ["chapter-secops"])];
+    const result = excludeTeamsByPrefix(groups, ["chapter-validators-"]);
+    expect(result[0].teams).toEqual(["chapter-secops"]);
+  });
+
+  it("returns a repo with an empty teams array when every team is excluded", () => {
+    const groups = [makeGroup("org/a", ["chapter-validators-core", "chapter-validators-client"])];
+    const result = excludeTeamsByPrefix(groups, ["chapter-validators-"]);
+    expect(result[0].teams).toEqual([]);
+  });
+
+  it("is a no-op (same reference) when excludePrefixes is empty", () => {
+    const groups = [makeGroup("org/a", ["chapter-secops"])];
+    expect(excludeTeamsByPrefix(groups, [])).toBe(groups);
+  });
+
+  it("does not mutate the input groups or their teams array", () => {
+    const groups = [makeGroup("org/a", ["chapter-secops", "chapter-validators-core"])];
+    const before = JSON.stringify(groups);
+    excludeTeamsByPrefix(groups, ["chapter-validators-"]);
+    expect(JSON.stringify(groups)).toBe(before);
+  });
+
+  it("reduces a combined section to a single-team section once ambiguity is removed", () => {
+    const groups = [
+      makeGroup("org/a", ["chapter-secops", "chapter-validators-core"]),
+      makeGroup("org/b", ["chapter-secops"]),
+    ];
+    const filtered = excludeTeamsByPrefix(groups, ["chapter-validators-"]);
+    const sections = groupByTeamPrefix(filtered, ["chapter-"]);
+    expect(sections).toHaveLength(1);
+    expect(sections[0].label).toBe("chapter-secops");
+    expect(sections[0].groups.map((g) => g.repoFullName).toSorted()).toEqual(["org/a", "org/b"]);
+  });
+});
 
 // ─── groupByTeamPrefix ────────────────────────────────────────────────────────
 
@@ -101,6 +156,33 @@ describe("groupByTeamPrefix — multi-team repos", () => {
     expect(sections).toHaveLength(1);
     expect(sections[0].groups).toHaveLength(2);
   });
+
+  it("fix (#issue: chapter-architect mega-combo): drops redundant sub-teams from a matching-team set before forming the combo label", () => {
+    // Reported behaviour: a repo tagged with a broad team (chapter-architect)
+    // AND several of its own narrower variants (chapter-architect-a,
+    // chapter-architect-b, ...) used to form an unwieldy N-way combined
+    // section listing every variant. Since the broader team already implies
+    // membership in each narrower one for grouping purposes, the narrower
+    // ones are now dropped from the matching set, leaving only the genuinely
+    // unrelated team (chapter-head-of-frontend) alongside the broad one.
+    const groups = [
+      makeGroup("org/a", [
+        "chapter-architect",
+        "chapter-architect-a",
+        "chapter-architect-b",
+        "chapter-architect-c",
+        "chapter-architect-d",
+        "chapter-architect-mobile",
+        "chapter-architect-nodejs",
+        "chapter-architect-php",
+        "chapter-architect-python",
+        "chapter-head-of-frontend",
+      ]),
+    ];
+    const sections = groupByTeamPrefix(groups, ["chapter-"]);
+    expect(sections).toHaveLength(1);
+    expect(sections[0].label).toBe("chapter-architect + chapter-head-of-frontend");
+  });
 });
 
 describe("groupByTeamPrefix — multiple prefixes", () => {
@@ -158,17 +240,6 @@ describe("groupByTeamPrefix — multiple prefixes", () => {
 
 // ─── groupByTeamHierarchy ─────────────────────────────────────────────────────
 
-/** Flattens a tree's labels (with indent per level) into a single array for
- *  easy assertions, depth-first, in the order sections are emitted. */
-function collectLabels(sections: TeamSection[]): string[] {
-  const out: string[] = [];
-  for (const s of sections) {
-    out.push(`${"  ".repeat(s.level ?? 0)}${s.label}`);
-    if (s.children) out.push(...collectLabels(s.children));
-  }
-  return out;
-}
-
 describe("groupByTeamHierarchy — single-level chain (parity with groupByTeamPrefix)", () => {
   it("behaves like groupByTeamPrefix for a single 1-level chain", () => {
     const groups = [makeGroup("org/a", ["squad-frontend"]), makeGroup("org/b", ["squad-mobile"])];
@@ -196,24 +267,24 @@ describe("groupByTeamHierarchy — single-level chain (parity with groupByTeamPr
 describe("groupByTeamHierarchy — 2-level chain", () => {
   it("groups by the first prefix, then sub-groups each section by the second", () => {
     const groups = [
-      makeGroup("org/a", ["gamme-client", "squad-dashboard"]),
-      makeGroup("org/b", ["gamme-client", "squad-billing"]),
+      makeGroup("org/a", ["tribe-a", "squad-a"]),
+      makeGroup("org/b", ["tribe-a", "squad-b"]),
     ];
-    const sections = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const sections = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
     expect(sections).toHaveLength(1);
-    expect(sections[0].label).toBe("gamme-client");
+    expect(sections[0].label).toBe("tribe-a");
     expect(sections[0].level).toBe(0);
     expect(sections[0].groups).toEqual([]); // subdivided, not a leaf
     const childLabels = (sections[0].children ?? []).map((c) => c.label).toSorted();
-    expect(childLabels).toEqual(["squad-billing", "squad-dashboard"]);
+    expect(childLabels).toEqual(["squad-a", "squad-b"]);
     for (const child of sections[0].children ?? []) {
       expect(child.level).toBe(1);
     }
   });
 
   it("repos with no match at the second level fall into a nested 'other'", () => {
-    const groups = [makeGroup("org/a", ["gamme-client"])]; // no squad- team
-    const sections = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const groups = [makeGroup("org/a", ["tribe-a"])]; // no squad- team
+    const sections = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
     const child = sections[0].children ?? [];
     expect(child.map((c) => c.label)).toEqual(["other"]);
     expect(child[0].level).toBe(1);
@@ -221,13 +292,13 @@ describe("groupByTeamHierarchy — 2-level chain", () => {
   });
 
   it("supports a 3-level chain recursively", () => {
-    const groups = [makeGroup("org/a", ["gamme-client", "squad-dashboard", "chapter-fe"])];
-    const sections = groupByTeamHierarchy(groups, [["gamme-", "squad-", "chapter-"]]);
+    const groups = [makeGroup("org/a", ["tribe-a", "squad-a", "chapter-fe"])];
+    const sections = groupByTeamHierarchy(groups, [["tribe-", "squad-", "chapter-"]]);
     const l1 = sections[0];
     const l2 = l1.children![0];
     const l3 = l2.children![0];
-    expect(l1.label).toBe("gamme-client");
-    expect(l2.label).toBe("squad-dashboard");
+    expect(l1.label).toBe("tribe-a");
+    expect(l2.label).toBe("squad-a");
     expect(l3.label).toBe("chapter-fe");
     expect([l1.level, l2.level, l3.level]).toEqual([0, 1, 2]);
     expect(l3.groups.map((g) => g.repoFullName)).toEqual(["org/a"]);
@@ -237,83 +308,84 @@ describe("groupByTeamHierarchy — 2-level chain", () => {
 describe("groupByTeamHierarchy — multiple independent chains", () => {
   it("processes each chain sequentially against the remaining pool", () => {
     const groups = [
-      makeGroup("org/a", ["gamme-client", "squad-dashboard"]),
+      makeGroup("org/a", ["tribe-a", "squad-a"]),
       makeGroup("org/b", ["chapter-backend"]),
       makeGroup("org/c", []),
     ];
-    const sections = groupByTeamHierarchy(groups, [["gamme-", "squad-"], ["chapter-"]]);
+    const sections = groupByTeamHierarchy(groups, [["tribe-", "squad-"], ["chapter-"]]);
     const labels = sections.map((s) => s.label);
-    expect(labels).toEqual(["gamme-client", "chapter-backend", "other"]);
+    expect(labels).toEqual(["tribe-a", "chapter-backend", "other"]);
     expect(sections[2].groups[0].repoFullName).toBe("org/c");
   });
 
-  it("investigation (#issue: gamme-/squad-,chapter- precedence): a repo matching ONLY a 2nd-level prefix (squad-) with no 1st-level (gamme-) match is invisible to that chain and falls through to a later chain", () => {
-    // Reported behaviour: `fulll/demat-workers` (team squad-demat, no gamme-
-    // team) ends up under a `chapter-` combined section instead of under
-    // `gamme-/squad-` as its `--group-by-team-prefix gamme-/squad-,chapter-`
-    // position would suggest. Root cause: a chain only claims a repo if it
-    // matches chain[0] (gamme-) FIRST — squad- is only ever applied to repos
-    // already captured under a gamme- section. A repo with a squad- team but
-    // no gamme- team is entirely invisible to the gamme-/squad- chain and
-    // falls through to the next chain (or "other") instead — chain
-    // precedence, as currently implemented, is NOT "any prefix anywhere in
-    // the chain", only "chain[0], in order".
+  it("fix (#issue: tribe-/squad-,chapter- precedence): a repo matching ONLY a 2nd-level prefix (squad-) is claimed by that level as a fallback, not left invisible to the chain", () => {
+    // Reported behaviour: `fulll/demat-workers` (team squad-c, no tribe-
+    // team) used to end up under a `chapter-` combined section instead of
+    // under `tribe-/squad-` as its `--group-by-team-prefix
+    // tribe-/squad-,chapter-` position would suggest — chain[0] (tribe-) was
+    // a hard requirement before squad- was even tried. Every level of a
+    // chain is now tried in order against what earlier levels of *that same
+    // chain* haven't claimed, so a squad--only repo is captured directly by
+    // that chain instead of falling through to a later chain or "other".
     const groups = [
       makeGroup("org/demat-workers", [
-        "squad-demat",
+        "squad-c",
         "chapter-validators-client",
         "chapter-validators-core",
       ]),
     ];
-    const sections = groupByTeamHierarchy(groups, [["gamme-", "squad-"], ["chapter-"]]);
-    expect(sections.map((s) => s.label)).not.toContain("gamme-");
-    const chapterCombo = sections.find((s) => s.label.includes("chapter-validators"));
-    expect(chapterCombo).toBeDefined();
-    expect(chapterCombo!.groups.map((g) => g.repoFullName)).toEqual(["org/demat-workers"]);
+    const sections = groupByTeamHierarchy(groups, [["tribe-", "squad-"], ["chapter-"]]);
+    const squadC = sections.find((s) => s.label === "squad-c");
+    expect(squadC).toBeDefined();
+    expect(squadC!.level).toBe(0);
+    expect(squadC!.groups.map((g) => g.repoFullName)).toEqual(["org/demat-workers"]);
+    expect(sections.map((s) => s.label)).not.toContain("other");
+    expect(sections.some((s) => s.label.includes("chapter-validators"))).toBe(false);
   });
 });
 
-describe("groupByTeamHierarchy — auto-nesting of overlapping team names", () => {
-  it("nests a longer team name under a shorter one that is its prefix", () => {
-    const groups = [
-      makeGroup("org/a", ["gamme-lead-client"]),
-      makeGroup("org/b", ["gamme-lead-client-p1"]),
-    ];
-    const sections = groupByTeamHierarchy(groups, [["gamme-"]]);
+describe("groupByTeamHierarchy — combining overlapping team names", () => {
+  it("combines a longer team name with a shorter one that is its prefix into one section", () => {
+    const groups = [makeGroup("org/a", ["tribe-a"]), makeGroup("org/b", ["tribe-a-p1"])];
+    const sections = groupByTeamHierarchy(groups, [["tribe-"]]);
     expect(sections).toHaveLength(1);
-    expect(sections[0].label).toBe("gamme-lead-client");
+    expect(sections[0].label).toBe("tribe-a + tribe-a-p1");
     expect(sections[0].level).toBe(0);
-    expect(sections[0].children).toHaveLength(1);
-    expect(sections[0].children![0].label).toBe("gamme-lead-client-p1");
-    expect(sections[0].children![0].level).toBe(1);
+    expect(sections[0].children).toBeUndefined();
+    expect(sections[0].groups.map((g) => g.repoFullName).toSorted()).toEqual(["org/a", "org/b"]);
   });
 
-  it("cascades nesting across 3 overlapping names", () => {
+  it("combines a cascading chain of 3 overlapping names into one section", () => {
     const groups = [
-      makeGroup("org/a", ["gamme-lead-client"]),
-      makeGroup("org/b", ["gamme-lead-client-p1"]),
-      makeGroup("org/c", ["gamme-lead-client-p1-x"]),
+      makeGroup("org/a", ["tribe-a"]),
+      makeGroup("org/b", ["tribe-a-p1"]),
+      makeGroup("org/c", ["tribe-a-p1-x"]),
     ];
-    const sections = groupByTeamHierarchy(groups, [["gamme-"]]);
-    expect(collectLabels(sections)).toEqual([
-      "gamme-lead-client",
-      "  gamme-lead-client-p1",
-      "    gamme-lead-client-p1-x",
+    const sections = groupByTeamHierarchy(groups, [["tribe-"]]);
+    expect(sections).toHaveLength(1);
+    expect(sections[0].label).toBe("tribe-a + tribe-a-p1 + tribe-a-p1-x");
+    expect(sections[0].groups.map((g) => g.repoFullName).toSorted()).toEqual([
+      "org/a",
+      "org/b",
+      "org/c",
     ]);
   });
 
-  it("does not nest unrelated single-team labels as siblings", () => {
+  it("does not combine unrelated single-team labels", () => {
     const groups = [makeGroup("org/a", ["squad-front"]), makeGroup("org/b", ["squad-back"])];
     const sections = groupByTeamHierarchy(groups, [["squad-"]]);
-    expect(sections.every((s) => !s.children || s.children.length === 0)).toBe(true);
+    const labels = sections.map((s) => s.label);
+    expect(labels).toContain("squad-front");
+    expect(labels).toContain("squad-back");
   });
 
-  it("does not nest combined ('a + b') or 'other' sections", () => {
+  it("does not combine already-combined ('a + b') or 'other' sections into the overlap cluster", () => {
     const groups = [makeGroup("org/a", ["squad-front", "squad-back"]), makeGroup("org/b", [])];
     const sections = groupByTeamHierarchy(groups, [["squad-"]]);
-    const combined = sections.find((s) => s.label.includes(" + "));
+    const combined = sections.find((s) => s.label === "squad-back + squad-front");
     expect(combined).toBeDefined();
-    expect(combined!.children ?? []).toHaveLength(0);
+    const other = sections.find((s) => s.label === "other");
+    expect(other).toBeDefined();
   });
 
   it("omits the children field entirely on leaf sections instead of an empty array", () => {
@@ -322,60 +394,65 @@ describe("groupByTeamHierarchy — auto-nesting of overlapping team names", () =
     expect(sections[0].children).toBeUndefined();
   });
 
-  it("keeps a parent's own groups when it also has an overlap-nested child", () => {
+  it("splits a combined overlap section by the next chain level", () => {
     const groups = [
-      makeGroup("org/a", ["gamme-lead-client"]),
-      makeGroup("org/b", ["gamme-lead-client-p1"]),
+      makeGroup("org/a", ["tribe-a"]),
+      makeGroup("org/b", ["tribe-a-p1", "squad-mobile"]),
+      makeGroup("org/c", ["tribe-a", "squad-b"]),
     ];
-    const sections = groupByTeamHierarchy(groups, [["gamme-"]]);
-    expect(sections[0].groups.map((g) => g.repoFullName)).toEqual(["org/a"]);
-    expect(sections[0].children).toHaveLength(1);
-  });
-
-  it("splits a parent's own groups by the next chain level even when it also has an overlap-nested child", () => {
-    const groups = [
-      makeGroup("org/a", ["gamme-lead-client"]),
-      makeGroup("org/b", ["gamme-lead-client-p1", "squad-mobile"]),
-      makeGroup("org/c", ["gamme-lead-client", "squad-billing"]),
-    ];
-    const sections = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const sections = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
     expect(sections).toHaveLength(1);
     const parent = sections[0];
-    expect(parent.label).toBe("gamme-lead-client");
-    // Fully subdivided — none of its own repos are left flat on the parent.
+    expect(parent.label).toBe("tribe-a + tribe-a-p1");
+    // Fully subdivided by the squad- level — none of its own repos are left flat.
     expect(parent.groups).toEqual([]);
     const childLabels = (parent.children ?? []).map((c) => c.label).toSorted();
-    expect(childLabels).toEqual(["gamme-lead-client-p1", "other", "squad-billing"]);
-    const squadBilling = parent.children!.find((c) => c.label === "squad-billing")!;
-    expect(squadBilling.groups.map((g) => g.repoFullName)).toEqual(["org/c"]);
+    expect(childLabels).toEqual(["other", "squad-b", "squad-mobile"]);
+    const squadB = parent.children!.find((c) => c.label === "squad-b")!;
+    expect(squadB.groups.map((g) => g.repoFullName)).toEqual(["org/c"]);
+    const squadMobile = parent.children!.find((c) => c.label === "squad-mobile")!;
+    expect(squadMobile.groups.map((g) => g.repoFullName)).toEqual(["org/b"]);
     const other = parent.children!.find((c) => c.label === "other")!;
     expect(other.groups.map((g) => g.repoFullName)).toEqual(["org/a"]);
-    // The overlap-nested child was ALSO subdivided by the next chain level.
-    const p1 = parent.children!.find((c) => c.label === "gamme-lead-client-p1")!;
-    expect(p1.children).toHaveLength(1);
-    expect(p1.children![0].label).toBe("squad-mobile");
-    expect(p1.children![0].groups.map((g) => g.repoFullName)).toEqual(["org/b"]);
   });
 
-  it("investigation (#issue: gamme-/squad- + overlapping name): auto-nesting inserts an EXTRA heading level beyond the declared chain depth", () => {
-    // Reported behaviour: `--group-by-team-prefix gamme-/squad-` (a 2-level
-    // chain) renders 3 heading levels — `gamme-lead-client` /
-    // `gamme-lead-client-security-p1` / `squad-accounting` — instead of the
-    // 2 the chain declares. This documents that this is the INTENDED result
-    // of combining two separate, both-documented mechanisms: automatic
-    // overlap-nesting of single-team labels (this describe block) PLUS the
-    // chain's own `/squad-` depth — not a bug in either mechanism alone.
+  it("fix (#issue: tribe-/squad- + overlapping name): combining no longer inserts an EXTRA heading level beyond the declared chain depth", () => {
+    // Reported behaviour: `--group-by-team-prefix tribe-/squad-` (a 2-level
+    // chain) used to render 3 heading levels — `tribe-a` /
+    // `tribe-a-security-p1` / `squad-d` — instead of the 2 the chain
+    // declares. Overlapping single-team labels are now combined into one
+    // section instead of nested, so the chain's own `/squad-` depth is the
+    // only extra level that can appear.
     const groups = [
-      makeGroup("org/parent-only", ["gamme-lead-client"]),
-      makeGroup("org/leaf", ["gamme-lead-client-security-p1", "squad-accounting"]),
+      makeGroup("org/parent-only", ["tribe-a"]),
+      makeGroup("org/leaf", ["tribe-a-security-p1", "squad-d"]),
     ];
-    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
-    expect(collectLabels(tree)).toEqual([
-      "gamme-lead-client",
-      "  gamme-lead-client-security-p1",
-      "    squad-accounting",
-      "  other",
-    ]);
+    const tree = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
+    expect(tree).toHaveLength(1);
+    expect(tree[0].label).toBe("tribe-a + tribe-a-security-p1");
+    expect(tree[0].level).toBe(0);
+    const childLabels = (tree[0].children ?? []).map((c) => c.label).toSorted();
+    expect(childLabels).toEqual(["other", "squad-d"]);
+    const squadD = tree[0].children!.find((c) => c.label === "squad-d")!;
+    expect(squadD.level).toBe(1);
+    expect(squadD.groups.map((g) => g.repoFullName)).toEqual(["org/leaf"]);
+    const other = tree[0].children!.find((c) => c.label === "other")!;
+    expect(other.groups.map((g) => g.repoFullName)).toEqual(["org/parent-only"]);
+  });
+
+  it("fix (#issue: tribe-/squad- + overlapping name): --pick-team-auto fully resolves the combined section to a single heading", () => {
+    // End-to-end confirmation: combining (this describe block) plus
+    // --pick-team-auto together produce exactly "## tribe-a", with no
+    // "## tribe-a-security-p1" heading at any level, as requested.
+    const groups = [
+      makeGroup("org/parent-only", ["tribe-a"]),
+      makeGroup("org/leaf", ["tribe-a-security-p1", "squad-d"]),
+    ];
+    const tree = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
+    const resolved = autoPickTeamsByCommonPrefix(tree);
+    expect(resolved).toHaveLength(1);
+    expect(resolved[0].label).toBe("tribe-a");
+    expect(findCombinedSectionPaths(resolved)).toEqual([]);
   });
 });
 
@@ -384,62 +461,59 @@ describe("groupByTeamHierarchy — auto-nesting of overlapping team names", () =
 describe("flattenTeamHierarchy", () => {
   it("tags the first repo of a 2-level leaf with both ancestor headings", () => {
     const groups = [
-      makeGroup("org/a", ["gamme-client", "squad-dashboard"]),
-      makeGroup("org/b", ["gamme-client", "squad-dashboard"]),
+      makeGroup("org/a", ["tribe-a", "squad-a"]),
+      makeGroup("org/b", ["tribe-a", "squad-a"]),
     ];
-    const sections = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const sections = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
     const flat = flattenTeamHierarchy(sections);
     expect(flat).toHaveLength(2);
     expect(flat[0].sectionPath).toEqual([
-      { label: "gamme-client", level: 0 },
-      { label: "squad-dashboard", level: 1 },
+      { label: "tribe-a", level: 0 },
+      { label: "squad-a", level: 1 },
     ]);
     expect(flat[1].sectionPath).toBeUndefined();
   });
 
   it("does not repeat an unchanged ancestor heading for a sibling leaf", () => {
     const groups = [
-      makeGroup("org/a", ["gamme-client", "squad-dashboard"]),
-      makeGroup("org/b", ["gamme-client", "squad-billing"]),
+      makeGroup("org/a", ["tribe-a", "squad-a"]),
+      makeGroup("org/b", ["tribe-a", "squad-b"]),
     ];
-    const sections = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const sections = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
     const flat = flattenTeamHierarchy(sections);
-    // First leaf (alphabetically squad-billing comes first) gets both headings
+    // First leaf (alphabetically squad-a comes first) gets both headings
     expect(flat[0].sectionPath).toEqual([
-      { label: "gamme-client", level: 0 },
-      { label: "squad-billing", level: 1 },
+      { label: "tribe-a", level: 0 },
+      { label: "squad-a", level: 1 },
     ]);
-    // Second leaf shares the "gamme-client" ancestor — only the new heading is listed
-    expect(flat[1].sectionPath).toEqual([{ label: "squad-dashboard", level: 1 }]);
+    // Second leaf shares the "tribe-a" ancestor — only the new heading is listed
+    expect(flat[1].sectionPath).toEqual([{ label: "squad-b", level: 1 }]);
   });
 
   it("emits a full new path when moving to an unrelated top-level chain", () => {
     const groups = [
-      makeGroup("org/a", ["gamme-client", "squad-dashboard"]),
+      makeGroup("org/a", ["tribe-a", "squad-a"]),
       makeGroup("org/b", ["chapter-backend"]),
     ];
-    const sections = groupByTeamHierarchy(groups, [["gamme-", "squad-"], ["chapter-"]]);
+    const sections = groupByTeamHierarchy(groups, [["tribe-", "squad-"], ["chapter-"]]);
     const flat = flattenTeamHierarchy(sections);
     expect(flat[1].sectionPath).toEqual([{ label: "chapter-backend", level: 0 }]);
   });
 
-  it("includes a parent's own repos even when it also has nested overlap children", () => {
-    // "gamme-lead-client" owns org/a directly AND has an overlap-nested
-    // child "gamme-lead-client-p1" owning org/b — both must appear.
-    const groups = [
-      makeGroup("org/a", ["gamme-lead-client"]),
-      makeGroup("org/b", ["gamme-lead-client-p1"]),
-    ];
-    const sections = groupByTeamHierarchy(groups, [["gamme-"]]);
+  it("flattens a combined overlap section as a single heading for both constituent repos", () => {
+    // "tribe-a" and "tribe-a-p1" are combined into one "tribe-a + tribe-a-p1"
+    // section (see combining tests) — both repos share that single heading.
+    const groups = [makeGroup("org/a", ["tribe-a"]), makeGroup("org/b", ["tribe-a-p1"])];
+    const sections = groupByTeamHierarchy(groups, [["tribe-"]]);
     const flat = flattenTeamHierarchy(sections);
     expect(flat.map((g) => g.repoFullName)).toEqual(["org/a", "org/b"]);
-    expect(flat[0].sectionPath).toEqual([{ label: "gamme-lead-client", level: 0 }]);
-    expect(flat[1].sectionPath).toEqual([{ label: "gamme-lead-client-p1", level: 1 }]);
+    expect(flat[0].sectionPath).toEqual([{ label: "tribe-a + tribe-a-p1", level: 0 }]);
+    expect(flat[1].sectionPath).toBeUndefined();
   });
 
   it("does not mutate the input tree", () => {
-    const groups = [makeGroup("org/a", ["gamme-client", "squad-dashboard"])];
-    const sections = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const groups = [makeGroup("org/a", ["tribe-a", "squad-a"])];
+    const sections = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
     const before = JSON.stringify(sections);
     flattenTeamHierarchy(sections);
     expect(JSON.stringify(sections)).toBe(before);
@@ -455,31 +529,28 @@ describe("flattenTeamHierarchy", () => {
 describe("rebuildTeamHierarchy", () => {
   it("round-trips a 2-level tree through flattenTeamHierarchy", () => {
     const groups = [
-      makeGroup("org/a", ["gamme-client", "squad-dashboard"]),
-      makeGroup("org/b", ["gamme-client", "squad-billing"]),
+      makeGroup("org/a", ["tribe-a", "squad-a"]),
+      makeGroup("org/b", ["tribe-a", "squad-b"]),
     ];
-    const original = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const original = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
     const rebuilt = rebuildTeamHierarchy(flattenTeamHierarchy(original));
     expect(rebuilt).toEqual(original);
   });
 
   it("round-trips a tree where a node has both own groups and children (overlap parent)", () => {
-    const groups = [
-      makeGroup("org/a", ["gamme-lead-client"]),
-      makeGroup("org/b", ["gamme-lead-client-p1"]),
-    ];
-    const original = groupByTeamHierarchy(groups, [["gamme-"]]);
+    const groups = [makeGroup("org/a", ["tribe-a"]), makeGroup("org/b", ["tribe-a-p1"])];
+    const original = groupByTeamHierarchy(groups, [["tribe-"]]);
     const rebuilt = rebuildTeamHierarchy(flattenTeamHierarchy(original));
     expect(rebuilt).toEqual(original);
   });
 
   it("round-trips multiple independent top-level chains", () => {
     const groups = [
-      makeGroup("org/a", ["gamme-client", "squad-dashboard"]),
+      makeGroup("org/a", ["tribe-a", "squad-a"]),
       makeGroup("org/b", ["chapter-backend"]),
       makeGroup("org/c", []),
     ];
-    const original = groupByTeamHierarchy(groups, [["gamme-", "squad-"], ["chapter-"]]);
+    const original = groupByTeamHierarchy(groups, [["tribe-", "squad-"], ["chapter-"]]);
     const rebuilt = rebuildTeamHierarchy(flattenTeamHierarchy(original));
     expect(rebuilt).toEqual(original);
   });
@@ -511,12 +582,12 @@ describe("applyTeamPickInTree", () => {
 
   it("reassigns a nested combined section to a sibling at the same depth", () => {
     const groups = [
-      makeGroup("org/shared", ["gamme-client", "squad-a", "squad-b"]),
-      makeGroup("org/a", ["gamme-client", "squad-a"]),
+      makeGroup("org/shared", ["tribe-a", "squad-a", "squad-b"]),
+      makeGroup("org/a", ["tribe-a", "squad-a"]),
     ];
-    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
-    const updated = applyTeamPickInTree(tree, ["gamme-client", "squad-a + squad-b"], "squad-a");
-    const gamme = updated.find((s) => s.label === "gamme-client")!;
+    const tree = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
+    const updated = applyTeamPickInTree(tree, ["tribe-a", "squad-a + squad-b"], "squad-a");
+    const gamme = updated.find((s) => s.label === "tribe-a")!;
     const childLabels = (gamme.children ?? []).map((c) => c.label);
     expect(childLabels).not.toContain("squad-a + squad-b");
     const squadA = gamme.children!.find((c) => c.label === "squad-a")!;
@@ -524,80 +595,60 @@ describe("applyTeamPickInTree", () => {
   });
 
   it("tags moved repos with pickedFrom = joined path", () => {
-    const groups = [makeGroup("org/shared", ["gamme-client", "squad-a", "squad-b"])];
-    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
-    const updated = applyTeamPickInTree(tree, ["gamme-client", "squad-a + squad-b"], "squad-a");
-    const gamme = updated.find((s) => s.label === "gamme-client")!;
+    const groups = [makeGroup("org/shared", ["tribe-a", "squad-a", "squad-b"])];
+    const tree = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
+    const updated = applyTeamPickInTree(tree, ["tribe-a", "squad-a + squad-b"], "squad-a");
+    const gamme = updated.find((s) => s.label === "tribe-a")!;
     const squadA = gamme.children!.find((c) => c.label === "squad-a")!;
-    expect(squadA.groups[0].pickedFrom).toBe("gamme-client > squad-a + squad-b");
+    expect(squadA.groups[0].pickedFrom).toBe("tribe-a > squad-a + squad-b");
   });
 
   it("creates a new sibling section when the chosen team has none yet", () => {
-    const groups = [makeGroup("org/shared", ["gamme-client", "squad-a", "squad-b"])];
-    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
-    const updated = applyTeamPickInTree(tree, ["gamme-client", "squad-a + squad-b"], "squad-b");
-    const gamme = updated.find((s) => s.label === "gamme-client")!;
+    const groups = [makeGroup("org/shared", ["tribe-a", "squad-a", "squad-b"])];
+    const tree = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
+    const updated = applyTeamPickInTree(tree, ["tribe-a", "squad-a + squad-b"], "squad-b");
+    const gamme = updated.find((s) => s.label === "tribe-a")!;
     expect(gamme.children!.map((c) => c.label)).toContain("squad-b");
   });
 
   it("is a no-op when a path segment is not found", () => {
-    const groups = [makeGroup("org/shared", ["gamme-client", "squad-a", "squad-b"])];
-    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const groups = [makeGroup("org/shared", ["tribe-a", "squad-a", "squad-b"])];
+    const tree = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
     const result = applyTeamPickInTree(tree, ["nope", "squad-a + squad-b"], "squad-a");
     expect(result).toEqual(tree);
   });
 
   it("preserves the picked section's own children (does not drop the subtree)", () => {
-    // Regression: a top-level combined section ("gamme-a + gamme-a-security-p1")
-    // that was already subdivided by the next chain level (squad-) must keep
-    // its nested children when picked — only its own (now empty) `groups`
-    // were carried over before the fix, silently dropping every repo nested
-    // underneath.
+    // Regression: a top-level combined section ("tribe-b + tribe-b-p1") that
+    // was already subdivided by the next chain level (squad-) must keep its
+    // nested children when picked — only its own (now empty) `groups` were
+    // carried over before the fix, silently dropping every repo nested
+    // underneath. Each repo has only ONE tribe- team (never both), so the
+    // combined section is formed by combineOverlappingLabels across the two
+    // repos, not collapsed away by the redundant-sub-team reduction.
     const groups = [
-      makeGroup("org/tools-mobile", [
-        "gamme-lead-mobile",
-        "gamme-lead-mobile-security-p1",
-        "squad-core",
-        "squad-mobile",
-      ]),
-      makeGroup("org/wizard-mobile", ["gamme-lead-mobile", "gamme-lead-mobile-security-p1"]),
+      makeGroup("org/a", ["tribe-b", "squad-core", "squad-mobile"]),
+      makeGroup("org/b", ["tribe-b-p1"]),
     ];
-    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const tree = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
     const combined = tree.find((s) => s.label.includes(" + "))!;
-    expect(combined.label).toBe("gamme-lead-mobile + gamme-lead-mobile-security-p1");
+    expect(combined.label).toBe("tribe-b + tribe-b-p1");
     expect(combined.groups).toEqual([]); // fully subdivided by squad- before the pick
     expect(combined.children).toHaveLength(2); // "squad-core + squad-mobile" and "other"
 
-    const updated = applyTeamPickInTree(tree, [combined.label], "gamme-lead-mobile");
+    const updated = applyTeamPickInTree(tree, [combined.label], "tribe-b");
 
     expect(updated.map((s) => s.label)).not.toContain(combined.label);
-    const picked = updated.find((s) => s.label === "gamme-lead-mobile")!;
+    const picked = updated.find((s) => s.label === "tribe-b")!;
     expect(picked).toBeDefined();
     expect(picked.children).toHaveLength(2);
     const squadChild = picked.children!.find((c) => c.label === "squad-core + squad-mobile")!;
-    expect(squadChild.groups.map((g) => g.repoFullName)).toEqual(["org/tools-mobile"]);
+    expect(squadChild.groups.map((g) => g.repoFullName)).toEqual(["org/a"]);
     const otherChild = picked.children!.find((c) => c.label === "other")!;
-    expect(otherChild.groups.map((g) => g.repoFullName)).toEqual(["org/wizard-mobile"]);
+    expect(otherChild.groups.map((g) => g.repoFullName)).toEqual(["org/b"]);
     // Every repo in the moved subtree is tagged, not just the top node's own groups.
     expect(squadChild.groups[0].pickedFrom).toBe(combined.label);
     expect(otherChild.groups[0].pickedFrom).toBe(combined.label);
-  });
-
-  it("merges the picked subtree's children into an existing target section's children", () => {
-    const groups = [
-      makeGroup("org/existing", ["gamme-lead-mobile", "squad-existing"]),
-      makeGroup("org/tools-mobile", [
-        "gamme-lead-mobile",
-        "gamme-lead-mobile-security-p1",
-        "squad-core",
-      ]),
-    ];
-    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
-    const combined = tree.find((s) => s.label.includes(" + "))!;
-    const updated = applyTeamPickInTree(tree, [combined.label], "gamme-lead-mobile");
-    const picked = updated.find((s) => s.label === "gamme-lead-mobile")!;
-    const childLabels = picked.children!.map((c) => c.label).toSorted();
-    expect(childLabels).toEqual(["squad-core", "squad-existing"]);
   });
 
   it("returns sections unchanged for an empty combinedPath", () => {
@@ -612,13 +663,13 @@ describe("applyTeamPickInTree", () => {
 describe("undoSectionPickInTree", () => {
   it("restores every repo tagged with the matching pickedFrom back to the combined section", () => {
     const groups = [
-      makeGroup("org/shared", ["gamme-client", "squad-a", "squad-b"]),
-      makeGroup("org/a", ["gamme-client", "squad-a"]),
+      makeGroup("org/shared", ["tribe-a", "squad-a", "squad-b"]),
+      makeGroup("org/a", ["tribe-a", "squad-a"]),
     ];
-    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
-    const picked = applyTeamPickInTree(tree, ["gamme-client", "squad-a + squad-b"], "squad-a");
-    const restored = undoSectionPickInTree(picked, "gamme-client > squad-a + squad-b");
-    const gamme = restored.find((s) => s.label === "gamme-client")!;
+    const tree = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
+    const picked = applyTeamPickInTree(tree, ["tribe-a", "squad-a + squad-b"], "squad-a");
+    const restored = undoSectionPickInTree(picked, "tribe-a > squad-a + squad-b");
+    const gamme = restored.find((s) => s.label === "tribe-a")!;
     const childLabels = gamme.children!.map((c) => c.label).toSorted();
     expect(childLabels).toEqual(["squad-a", "squad-a + squad-b"]);
     const combined = gamme.children!.find((c) => c.label === "squad-a + squad-b")!;
@@ -627,11 +678,11 @@ describe("undoSectionPickInTree", () => {
   });
 
   it("drops a section left empty after the restore", () => {
-    const groups = [makeGroup("org/shared", ["gamme-client", "squad-a", "squad-b"])];
-    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
-    const picked = applyTeamPickInTree(tree, ["gamme-client", "squad-a + squad-b"], "squad-a");
-    const restored = undoSectionPickInTree(picked, "gamme-client > squad-a + squad-b");
-    const gamme = restored.find((s) => s.label === "gamme-client")!;
+    const groups = [makeGroup("org/shared", ["tribe-a", "squad-a", "squad-b"])];
+    const tree = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
+    const picked = applyTeamPickInTree(tree, ["tribe-a", "squad-a + squad-b"], "squad-a");
+    const restored = undoSectionPickInTree(picked, "tribe-a > squad-a + squad-b");
+    const gamme = restored.find((s) => s.label === "tribe-a")!;
     // squad-a only ever held the moved repo — it must be gone after the restore.
     expect(gamme.children!.map((c) => c.label)).not.toContain("squad-a");
   });
@@ -668,13 +719,13 @@ describe("undoSectionPickInTree", () => {
 describe("moveRepoToSectionInTree", () => {
   it("moves a repo to a sibling under the given parent path", () => {
     const groups = [
-      makeGroup("org/shared", ["gamme-client", "squad-a", "squad-b"]),
-      makeGroup("org/a", ["gamme-client", "squad-a"]),
+      makeGroup("org/shared", ["tribe-a", "squad-a", "squad-b"]),
+      makeGroup("org/a", ["tribe-a", "squad-a"]),
     ];
-    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
-    const picked = applyTeamPickInTree(tree, ["gamme-client", "squad-a + squad-b"], "squad-a");
-    const moved = moveRepoToSectionInTree(picked, "org/shared", ["gamme-client"], "squad-b");
-    const gamme = moved.find((s) => s.label === "gamme-client")!;
+    const tree = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
+    const picked = applyTeamPickInTree(tree, ["tribe-a", "squad-a + squad-b"], "squad-a");
+    const moved = moveRepoToSectionInTree(picked, "org/shared", ["tribe-a"], "squad-b");
+    const gamme = moved.find((s) => s.label === "tribe-a")!;
     const squadB = gamme.children!.find((c) => c.label === "squad-b")!;
     expect(squadB.groups.map((g) => g.repoFullName)).toEqual(["org/shared"]);
     const squadA = gamme.children!.find((c) => c.label === "squad-a")!;
@@ -682,11 +733,11 @@ describe("moveRepoToSectionInTree", () => {
   });
 
   it("creates the target section when it doesn't exist yet", () => {
-    const groups = [makeGroup("org/shared", ["gamme-client", "squad-a", "squad-b"])];
-    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
-    const picked = applyTeamPickInTree(tree, ["gamme-client", "squad-a + squad-b"], "squad-a");
-    const moved = moveRepoToSectionInTree(picked, "org/shared", ["gamme-client"], "squad-c");
-    const gamme = moved.find((s) => s.label === "gamme-client")!;
+    const groups = [makeGroup("org/shared", ["tribe-a", "squad-a", "squad-b"])];
+    const tree = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
+    const picked = applyTeamPickInTree(tree, ["tribe-a", "squad-a + squad-b"], "squad-a");
+    const moved = moveRepoToSectionInTree(picked, "org/shared", ["tribe-a"], "squad-c");
+    const gamme = moved.find((s) => s.label === "tribe-a")!;
     expect(gamme.children!.map((c) => c.label)).toContain("squad-c");
   });
 
@@ -702,13 +753,13 @@ describe("moveRepoToSectionInTree", () => {
 describe("undoPickedRepoInTree", () => {
   it("restores a single picked repo back to its original combined section", () => {
     const groups = [
-      makeGroup("org/shared", ["gamme-client", "squad-a", "squad-b"]),
-      makeGroup("org/a", ["gamme-client", "squad-a"]),
+      makeGroup("org/shared", ["tribe-a", "squad-a", "squad-b"]),
+      makeGroup("org/a", ["tribe-a", "squad-a"]),
     ];
-    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
-    const picked = applyTeamPickInTree(tree, ["gamme-client", "squad-a + squad-b"], "squad-a");
+    const tree = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
+    const picked = applyTeamPickInTree(tree, ["tribe-a", "squad-a + squad-b"], "squad-a");
     const restored = undoPickedRepoInTree(picked, "org/shared");
-    const gamme = restored.find((s) => s.label === "gamme-client")!;
+    const gamme = restored.find((s) => s.label === "tribe-a")!;
     const combined = gamme.children!.find((c) => c.label === "squad-a + squad-b")!;
     expect(combined.groups.map((g) => g.repoFullName)).toEqual(["org/shared"]);
     expect(combined.groups[0].pickedFrom).toBeUndefined();
@@ -740,9 +791,9 @@ describe("findCombinedSectionPaths", () => {
   });
 
   it("finds a nested combined section with its full ancestor path", () => {
-    const groups = [makeGroup("org/a", ["gamme-client", "squad-a", "squad-b"])];
-    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
-    expect(findCombinedSectionPaths(tree)).toEqual([["gamme-client", "squad-a + squad-b"]]);
+    const groups = [makeGroup("org/a", ["tribe-a", "squad-a", "squad-b"])];
+    const tree = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
+    expect(findCombinedSectionPaths(tree)).toEqual([["tribe-a", "squad-a + squad-b"]]);
   });
 
   it("returns an empty array when there is no combined section", () => {
@@ -753,14 +804,14 @@ describe("findCombinedSectionPaths", () => {
 
   it("finds multiple combined sections across different branches", () => {
     const groups = [
-      makeGroup("org/a", ["gamme-x", "squad-a", "squad-b"]),
-      makeGroup("org/b", ["gamme-y", "chapter-a", "chapter-b"]),
+      makeGroup("org/a", ["tribe-x", "squad-a", "squad-b"]),
+      makeGroup("org/b", ["tribe-y", "chapter-a", "chapter-b"]),
     ];
-    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"], ["gamme-"]]);
-    // Both repos start with a different top-level "gamme-" match, so this
+    const tree = groupByTeamHierarchy(groups, [["tribe-", "squad-"], ["tribe-"]]);
+    // Both repos start with a different top-level "tribe-" match, so this
     // exercises two independent combined sections at the same nested depth.
     const paths = findCombinedSectionPaths(tree);
-    expect(paths).toContainEqual(["gamme-x", "squad-a + squad-b"]);
+    expect(paths).toContainEqual(["tribe-x", "squad-a + squad-b"]);
   });
 });
 
@@ -768,14 +819,14 @@ describe("findCombinedSectionPaths", () => {
 
 describe("autoPickTeamsByCommonPrefix", () => {
   it("resolves a combined section to the team that is a prefix of the other", () => {
-    const groups = [makeGroup("org/a", ["gamme-lead-client", "gamme-lead-client-p1"])];
-    const tree = groupByTeamHierarchy(groups, [["gamme-"]]);
-    expect(findCombinedSectionPaths(tree)).toEqual([["gamme-lead-client + gamme-lead-client-p1"]]);
+    const groups = [makeGroup("org/a", ["tribe-a"]), makeGroup("org/b", ["tribe-a-p1"])];
+    const tree = groupByTeamHierarchy(groups, [["tribe-"]]);
+    expect(findCombinedSectionPaths(tree)).toEqual([["tribe-a + tribe-a-p1"]]);
 
     const resolved = autoPickTeamsByCommonPrefix(tree);
     expect(findCombinedSectionPaths(resolved)).toEqual([]);
-    const winner = resolved.find((s) => s.label === "gamme-lead-client")!;
-    expect(winner.groups.map((g) => g.repoFullName)).toEqual(["org/a"]);
+    const winner = resolved.find((s) => s.label === "tribe-a")!;
+    expect(winner.groups.map((g) => g.repoFullName).toSorted()).toEqual(["org/a", "org/b"]);
   });
 
   it("leaves a combined section unresolved when no team is a prefix of the others", () => {
@@ -786,25 +837,29 @@ describe("autoPickTeamsByCommonPrefix", () => {
   });
 
   it("picks the shortest common-prefix team among 3+ combined teams", () => {
-    const groups = [makeGroup("org/a", ["gamme-x", "gamme-x-y", "gamme-x-y-z"])];
-    const tree = groupByTeamHierarchy(groups, [["gamme-"]]);
+    const groups = [
+      makeGroup("org/a", ["tribe-x"]),
+      makeGroup("org/b", ["tribe-x-y"]),
+      makeGroup("org/c", ["tribe-x-y-z"]),
+    ];
+    const tree = groupByTeamHierarchy(groups, [["tribe-"]]);
     const resolved = autoPickTeamsByCommonPrefix(tree);
     expect(findCombinedSectionPaths(resolved)).toEqual([]);
-    expect(resolved.map((s) => s.label)).toEqual(["gamme-x"]);
+    expect(resolved.map((s) => s.label)).toEqual(["tribe-x"]);
   });
 
   it("resolves independently at a nested (non-top-level) depth", () => {
     const groups = [
-      makeGroup("org/a", ["gamme-client", "squad-a", "squad-a-legacy"]),
-      makeGroup("org/b", ["gamme-client"]),
+      makeGroup("org/a", ["tribe-a", "squad-a"]),
+      makeGroup("org/b", ["tribe-a", "squad-a-legacy"]),
     ];
-    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const tree = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
     const resolved = autoPickTeamsByCommonPrefix(tree);
     expect(findCombinedSectionPaths(resolved)).toEqual([]);
-    const gamme = resolved.find((s) => s.label === "gamme-client")!;
+    const gamme = resolved.find((s) => s.label === "tribe-a")!;
     const child = (gamme.children ?? []).find((c) => c.label === "squad-a")!;
     expect(child).toBeDefined();
-    expect(child.groups.map((g) => g.repoFullName)).toEqual(["org/a"]);
+    expect(child.groups.map((g) => g.repoFullName).toSorted()).toEqual(["org/a", "org/b"]);
   });
 
   it("an explicit --pick-team resolution is left untouched (no longer combined) when auto-pick runs after", () => {
@@ -816,8 +871,8 @@ describe("autoPickTeamsByCommonPrefix", () => {
   });
 
   it("is a pure function — does not mutate the input tree", () => {
-    const groups = [makeGroup("org/a", ["gamme-lead-client", "gamme-lead-client-p1"])];
-    const tree = groupByTeamHierarchy(groups, [["gamme-"]]);
+    const groups = [makeGroup("org/a", ["tribe-a"]), makeGroup("org/b", ["tribe-a-p1"])];
+    const tree = groupByTeamHierarchy(groups, [["tribe-"]]);
     const before = JSON.stringify(tree);
     autoPickTeamsByCommonPrefix(tree);
     expect(JSON.stringify(tree)).toBe(before);
@@ -833,13 +888,16 @@ describe("autoPickTeamsByCommonPrefix", () => {
     // Reported expectation: "chapter-secops + chapter-validators-core",
     // "chapter-head-of-frontend + chapter-secops + chapter-validators-core"
     // and "chapter-secops + chapter-validators + chapter-validators-core"
-    // should all collapse under "chapter-secops". None of the 4 distinct
-    // team names here is a literal string-prefix of the others (secops vs
-    // validators-core vs validators vs head-of-frontend), so the current
-    // "one candidate is a prefix of all others" strategy correctly leaves
-    // all 3 combined and unresolved — merging them would require a
-    // different algorithm (cluster by shared team membership across
-    // combos), which is out of scope for this strategy.
+    // should all collapse under "chapter-secops". None of the distinct team
+    // names here is a literal string-prefix of every other one in its own
+    // combo (secops vs validators-core vs validators vs head-of-frontend), so
+    // the "one candidate is a prefix of all others" strategy correctly leaves
+    // them combined and unresolved — merging them further would require a
+    // different algorithm (cluster by shared team membership across combos),
+    // which is out of scope for this strategy. Note org/c's own combo is
+    // already reduced from 3-way to 2-way by dropRedundantSubTeams, since
+    // chapter-validators-core is a redundant sub-team of chapter-validators
+    // (both present on org/c) — a real improvement, just not full merging.
     const groups = [
       makeGroup("org/a", ["chapter-secops", "chapter-validators-core"]),
       makeGroup("org/b", ["chapter-head-of-frontend", "chapter-secops", "chapter-validators-core"]),
@@ -854,7 +912,7 @@ describe("autoPickTeamsByCommonPrefix", () => {
     ).toEqual(
       [
         "chapter-head-of-frontend + chapter-secops + chapter-validators-core",
-        "chapter-secops + chapter-validators + chapter-validators-core",
+        "chapter-secops + chapter-validators",
         "chapter-secops + chapter-validators-core",
       ].toSorted(),
     );
@@ -1390,22 +1448,22 @@ describe("parseTeamPrefixChains", () => {
   });
 
   it("parses a slash-separated chain into a multi-level chain", () => {
-    expect(parseTeamPrefixChains("gamme-/squad-")).toEqual({
-      chains: [["gamme-", "squad-"]],
+    expect(parseTeamPrefixChains("tribe-/squad-")).toEqual({
+      chains: [["tribe-", "squad-"]],
       warnings: [],
     });
   });
 
   it("parses a mix of a 2-level chain and an independent 1-level chain", () => {
-    expect(parseTeamPrefixChains("gamme-/squad-,chapter-")).toEqual({
-      chains: [["gamme-", "squad-"], ["chapter-"]],
+    expect(parseTeamPrefixChains("tribe-/squad-,chapter-")).toEqual({
+      chains: [["tribe-", "squad-"], ["chapter-"]],
       warnings: [],
     });
   });
 
   it("trims whitespace around prefixes and levels", () => {
-    expect(parseTeamPrefixChains(" gamme- / squad- , chapter- ")).toEqual({
-      chains: [["gamme-", "squad-"], ["chapter-"]],
+    expect(parseTeamPrefixChains(" tribe- / squad- , chapter- ")).toEqual({
+      chains: [["tribe-", "squad-"], ["chapter-"]],
       warnings: [],
     });
   });
@@ -1418,8 +1476,8 @@ describe("parseTeamPrefixChains", () => {
   });
 
   it("drops an empty level from a leading, trailing, or double slash, with a warning", () => {
-    const { chains, warnings } = parseTeamPrefixChains("/gamme-//squad-/");
-    expect(chains).toEqual([["gamme-", "squad-"]]);
+    const { chains, warnings } = parseTeamPrefixChains("/tribe-//squad-/");
+    expect(chains).toEqual([["tribe-", "squad-"]]);
     expect(warnings.length).toBeGreaterThan(0);
     expect(warnings[0]).toContain("empty prefix level");
   });
@@ -1445,37 +1503,37 @@ describe("resolvePickTeamAssignment", () => {
   });
 
   it("resolves a nested bare label by finding it anywhere in the tree", () => {
-    const groups = [makeGroup("org/a", ["gamme-client", "squad-a", "squad-b"])];
-    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const groups = [makeGroup("org/a", ["tribe-a", "squad-a", "squad-b"])];
+    const tree = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
     const result = resolvePickTeamAssignment(tree, "squad-a + squad-b=squad-a");
-    expect(result).toEqual({ path: ["gamme-client", "squad-a + squad-b"], chosen: "squad-a" });
+    expect(result).toEqual({ path: ["tribe-a", "squad-a + squad-b"], chosen: "squad-a" });
   });
 
   it("accepts an explicit fully-qualified path (parent > combined)", () => {
-    const groups = [makeGroup("org/a", ["gamme-client", "squad-a", "squad-b"])];
-    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
-    const result = resolvePickTeamAssignment(tree, "gamme-client > squad-a + squad-b=squad-b");
-    expect(result).toEqual({ path: ["gamme-client", "squad-a + squad-b"], chosen: "squad-b" });
+    const groups = [makeGroup("org/a", ["tribe-a", "squad-a", "squad-b"])];
+    const tree = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
+    const result = resolvePickTeamAssignment(tree, "tribe-a > squad-a + squad-b=squad-b");
+    expect(result).toEqual({ path: ["tribe-a", "squad-a + squad-b"], chosen: "squad-b" });
   });
 
   it("rejects an explicit path whose parent segment doesn't exist in the tree", () => {
-    const groups = [makeGroup("org/a", ["gamme-client", "squad-a", "squad-b"])];
-    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const groups = [makeGroup("org/a", ["tribe-a", "squad-a", "squad-b"])];
+    const tree = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
     const result = resolvePickTeamAssignment(tree, "wrong-parent > squad-a + squad-b=squad-a");
     expect("error" in result).toBe(true);
     expect((result as { error: string }).error).toContain("no combined section found");
-    expect((result as { error: string }).error).toContain("gamme-client > squad-a + squad-b");
+    expect((result as { error: string }).error).toContain("tribe-a > squad-a + squad-b");
   });
 
   it("rejects an explicit path pointing at a section that no longer exists after an earlier pick", () => {
-    const groups = [makeGroup("org/a", ["gamme-client", "squad-a", "squad-b"])];
-    let tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const groups = [makeGroup("org/a", ["tribe-a", "squad-a", "squad-b"])];
+    let tree = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
     // First pick resolves (and removes) the only combined section.
-    const first = resolvePickTeamAssignment(tree, "gamme-client > squad-a + squad-b=squad-a");
+    const first = resolvePickTeamAssignment(tree, "tribe-a > squad-a + squad-b=squad-a");
     if ("error" in first) throw new Error("unexpected error in test setup");
     tree = applyTeamPickInTree(tree, first.path, first.chosen);
     // Re-using the same (now stale) explicit path must be rejected, not silently no-op.
-    const second = resolvePickTeamAssignment(tree, "gamme-client > squad-a + squad-b=squad-a");
+    const second = resolvePickTeamAssignment(tree, "tribe-a > squad-a + squad-b=squad-a");
     expect("error" in second).toBe(true);
   });
 
@@ -1502,20 +1560,20 @@ describe("resolvePickTeamAssignment", () => {
 
   it("errors when the bare label is ambiguous across multiple branches", () => {
     const groups = [
-      makeGroup("org/a", ["gamme-x", "squad-a", "squad-b"]),
-      makeGroup("org/b", ["gamme-y", "squad-a", "squad-b"]),
+      makeGroup("org/a", ["tribe-x", "squad-a", "squad-b"]),
+      makeGroup("org/b", ["tribe-y", "squad-a", "squad-b"]),
     ];
-    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"], ["gamme-"]]);
+    const tree = groupByTeamHierarchy(groups, [["tribe-", "squad-"], ["tribe-"]]);
     const result = resolvePickTeamAssignment(tree, "squad-a + squad-b=squad-a");
     expect("error" in result).toBe(true);
     expect((result as { error: string }).error).toContain("ambiguous");
   });
 
   it("errors when the combined label is not a multi-team section", () => {
-    const groups = [makeGroup("org/a", ["gamme-client", "squad-a"])];
-    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const groups = [makeGroup("org/a", ["tribe-a", "squad-a"])];
+    const tree = groupByTeamHierarchy(groups, [["tribe-", "squad-"]]);
     // Explicit path pointing at a genuine (non-combined) section.
-    const result = resolvePickTeamAssignment(tree, "gamme-client > squad-a=squad-a");
+    const result = resolvePickTeamAssignment(tree, "tribe-a > squad-a=squad-a");
     expect("error" in result).toBe(true);
     expect((result as { error: string }).error).toContain("not a multi-team section");
   });
