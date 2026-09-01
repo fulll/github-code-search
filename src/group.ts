@@ -114,16 +114,16 @@ function bucketSingleLevel(remaining: Set<RepoGroup>, prefix: string): TeamSecti
 /**
  * Groups `RepoGroup[]` into a *tree* of `TeamSection`s from one or more
  * independent prefix chains. Each chain is an ordered list of prefixes, one
- * per nesting depth: `["gamme-", "squad-"]` groups repos by teams matching
- * `gamme-` first, then sub-groups each resulting section by teams matching
+ * per nesting depth: `["tribe-", "squad-"]` groups repos by teams matching
+ * `tribe-` first, then sub-groups each resulting section by teams matching
  * `squad-`. Multiple chains are processed independently and sequentially
  * (like `groupByTeamPrefix`'s multi-prefix list), each drawing from the pool
  * of repos not yet claimed by an earlier chain.
  *
  * On top of the explicit chain depth, this also auto-nests sections whose
  * single-team label is a prefix of another single-team label at the same
- * depth (e.g. `gamme-lead-client` becomes the parent of
- * `gamme-lead-client-p1`) instead of listing them as unrelated siblings.
+ * depth (e.g. `tribe-a` becomes the parent of
+ * `tribe-a-p1`) instead of listing them as unrelated siblings.
  * Combined-label sections (`"a + b"`) and `"other"` sections are never
  * auto-nested.
  *
@@ -186,8 +186,8 @@ function applyChainDepth(node: TeamSection, chain: string[], depth: number): Tea
 
 /**
  * Nests sections whose single-team `label` is a proper prefix of another
- * single-team label at the same `level` (e.g. `gamme-lead-client` becomes the
- * parent of `gamme-lead-client-p1`), instead of leaving them as siblings.
+ * single-team label at the same `level` (e.g. `tribe-a` becomes the
+ * parent of `tribe-a-p1`), instead of leaving them as siblings.
  * Combined-label (`"a + b"`) and `"other"` sections are left untouched at
  * `level` and passed through unnested. When a chain of overlaps exists
  * (A prefix of B prefix of C), nesting cascades and `level` is incremented
@@ -554,7 +554,7 @@ function stripPickedFrom(g: RepoGroup): RepoGroup {
 /**
  * Tree-aware equivalent of `applyTeamPick`: reassigns the ENTIRE subtree of
  * the combined section identified by `combinedPath` (e.g.
- * `["gamme-client", "squad-a + squad-b"]`) — its own `groups` *and* any
+ * `["tribe-a", "squad-a + squad-b"]`) — its own `groups` *and* any
  * nested `children` (e.g. it was already subdivided by a further chain
  * level) — to a sibling section named `chosenTeam` at that same depth
  * (merged into it if it already exists, otherwise created in its place).
@@ -720,8 +720,8 @@ export function findCombinedSectionPaths(sections: TeamSection[]): string[][] {
 /**
  * Auto-resolves every combined (`"a + b"`) section whose candidate team names
  * share a single common-prefix "parent" — one team name that is a literal
- * string-prefix of every other team name in the combo (e.g. `"gamme-lead-
- * client"` for `"gamme-lead-client + gamme-lead-client-p1"`) — applying the
+ * string-prefix of every other team name in the combo (e.g. `"tribe-lead-
+ * client"` for `"tribe-a + tribe-a-p1"`) — applying the
  * same tree update as an explicit `--pick-team` assignment. Combined sections
  * with no such prefix relationship (e.g. `"squad-frontend + squad-mobile"`)
  * are left combined and unresolved, same as today.
@@ -771,8 +771,8 @@ function pathExistsInTree(sections: TeamSection[], path: string[]): boolean {
 /**
  * Parses the `--group-by-team-prefix` value into one or more prefix chains
  * for `groupByTeamHierarchy`: `,` separates independent chains, `/` separates
- * nesting levels within one chain. E.g. `"gamme-/squad-,chapter-"` produces
- * `[["gamme-", "squad-"], ["chapter-"]]`.
+ * nesting levels within one chain. E.g. `"tribe-/squad-,chapter-"` produces
+ * `[["tribe-", "squad-"], ["chapter-"]]`.
  *
  * Malformed segments (empty chain from a stray/leading/trailing/double `,`,
  * or an empty level from a stray `/`) are dropped rather than propagated as
@@ -821,7 +821,7 @@ export interface ResolvedPickTeam {
  *    `findCombinedSectionPaths` — succeeds only when exactly one match
  *    exists anywhere in the tree;
  *  - a fully-qualified path joined with `" > "` (e.g.
- *    `"gamme-client > squad-a + squad-b"`), used as-is without validating
+ *    `"tribe-a > squad-a + squad-b"`), used as-is without validating
  *    against `findCombinedSectionPaths` (so it still resolves correctly
  *    right after an earlier assignment already changed the tree shape).
  *

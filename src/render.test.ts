@@ -403,20 +403,20 @@ describe("buildRows", () => {
     const g1 = {
       ...makeGroup("org/repoA", ["a.ts"], true),
       sectionPath: [
-        { label: "gamme-client", level: 0 },
-        { label: "squad-dashboard", level: 1 },
+        { label: "tribe-a", level: 0 },
+        { label: "squad-a", level: 1 },
       ],
     };
     const rows = buildRows([g1]);
     expect(rows).toHaveLength(3); // 2 section rows + 1 repo row
     expect(rows[0]).toMatchObject({
       type: "section",
-      sectionLabel: "gamme-client",
+      sectionLabel: "tribe-a",
       sectionLevel: 0,
     });
     expect(rows[1]).toMatchObject({
       type: "section",
-      sectionLabel: "squad-dashboard",
+      sectionLabel: "squad-a",
       sectionLevel: 1,
     });
     expect(rows[2]).toMatchObject({ type: "repo", repoIndex: 0 });
@@ -426,34 +426,34 @@ describe("buildRows", () => {
     const g1 = {
       ...makeGroup("org/repoA", ["a.ts"], true),
       sectionPath: [
-        { label: "gamme-client", level: 0 },
-        { label: "squad-billing", level: 1 },
+        { label: "tribe-a", level: 0 },
+        { label: "squad-b", level: 1 },
       ],
     };
     const g2 = {
       ...makeGroup("org/repoB", ["b.ts"], true),
-      sectionPath: [{ label: "squad-dashboard", level: 1 }],
+      sectionPath: [{ label: "squad-a", level: 1 }],
     };
     const rows = buildRows([g1, g2]);
     const sectionRows = rows.filter((r) => r.type === "section");
     expect(sectionRows.map((r) => `${r.sectionLevel}:${r.sectionLabel}`)).toEqual([
-      "0:gamme-client",
-      "1:squad-billing",
-      "1:squad-dashboard",
+      "0:tribe-a",
+      "1:squad-b",
+      "1:squad-a",
     ]);
   });
 
   it("keeps a pending hierarchical heading across a filtered-out first repo", () => {
     const g1 = {
       ...makeGroup("org/repoA", ["a.ts"], true),
-      sectionPath: [{ label: "gamme-client", level: 0 }],
+      sectionPath: [{ label: "tribe-a", level: 0 }],
     };
     const g2 = makeGroup("org/repoB", ["b.ts"], true); // same leaf, filtered out below
     // Filter by path so that repoA (path "a.ts") is hidden but repoB is not.
     const rows = buildRows([g1, g2], "b.ts", "path", false);
     expect(rows[0]).toMatchObject({
       type: "section",
-      sectionLabel: "gamme-client",
+      sectionLabel: "tribe-a",
       sectionLevel: 0,
     });
     expect(rows[1]).toMatchObject({ type: "repo", repoIndex: 1 });
@@ -2063,14 +2063,14 @@ describe("renderGroups — hierarchical section headings (sectionLevel)", () => 
     const groups = [
       {
         ...makeGroup("org/repoA", ["a.ts"], true),
-        sectionPath: [{ label: "gamme-client", level: 0 }],
+        sectionPath: [{ label: "tribe-a", level: 0 }],
       },
     ];
     const rows = buildRows(groups);
     const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", { termWidth: 80 });
     const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
-    expect(stripped).toContain("── gamme-client");
-    expect(stripped).not.toContain("  ── gamme-client");
+    expect(stripped).toContain("── tribe-a");
+    expect(stripped).not.toContain("  ── tribe-a");
   });
 
   it("indents a level-1 heading by 2 spaces relative to the dashes", () => {
@@ -2078,15 +2078,15 @@ describe("renderGroups — hierarchical section headings (sectionLevel)", () => 
       {
         ...makeGroup("org/repoA", ["a.ts"], true),
         sectionPath: [
-          { label: "gamme-client", level: 0 },
-          { label: "squad-dashboard", level: 1 },
+          { label: "tribe-a", level: 0 },
+          { label: "squad-a", level: 1 },
         ],
       },
     ];
     const rows = buildRows(groups);
     const out = renderGroups(groups, 0, rows, 40, 0, "q", "org", { termWidth: 80 });
     const stripped = out.replace(/\x1b\[[0-9;]*m/g, "");
-    expect(stripped).toContain("  ── squad-dashboard");
+    expect(stripped).toContain("  ── squad-a");
   });
 
   it("increases indentation progressively for each nesting level", () => {
@@ -2137,7 +2137,7 @@ describe("renderGroups — team pick mode section bar", () => {
       {
         ...makeGroup("org/repoA", ["a.ts"], true),
         sectionPath: [
-          { label: "gamme-client", level: 0 },
+          { label: "tribe-a", level: 0 },
           { label: "squad-a + squad-b", level: 1 },
         ],
       },
@@ -2148,7 +2148,7 @@ describe("renderGroups — team pick mode section bar", () => {
       teamPickMode: {
         active: true,
         sectionLabel: "squad-a + squad-b",
-        sectionPath: ["gamme-client", "squad-a + squad-b"],
+        sectionPath: ["tribe-a", "squad-a + squad-b"],
         candidates: ["squad-a", "squad-b"],
         focusedIndex: 0,
       },
@@ -2162,7 +2162,7 @@ describe("renderGroups — team pick mode section bar", () => {
       {
         ...makeGroup("org/repoA", ["a.ts"], true),
         sectionPath: [
-          { label: "gamme-other", level: 0 },
+          { label: "tribe-other", level: 0 },
           { label: "squad-a + squad-b", level: 1 },
         ],
       },
@@ -2174,7 +2174,7 @@ describe("renderGroups — team pick mode section bar", () => {
         active: true,
         sectionLabel: "squad-a + squad-b",
         // Targets a DIFFERENT parent than the one actually rendered above.
-        sectionPath: ["gamme-client", "squad-a + squad-b"],
+        sectionPath: ["tribe-a", "squad-a + squad-b"],
         candidates: ["squad-a", "squad-b"],
         focusedIndex: 0,
       },
