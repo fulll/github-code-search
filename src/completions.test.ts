@@ -35,6 +35,10 @@ describe("generateCompletion", () => {
       expect(generateCompletion("bash")).toContain("--pick-team-auto");
     });
 
+    it("contains --exclude-team-prefixes", () => {
+      expect(generateCompletion("bash")).toContain("--exclude-team-prefixes");
+    });
+
     it("contains format values (markdown, json)", () => {
       const script = generateCompletion("bash");
       expect(script).toContain("markdown");
@@ -83,6 +87,10 @@ describe("generateCompletion", () => {
       expect(generateCompletion("zsh")).toContain("--pick-team-auto");
     });
 
+    it("contains --exclude-team-prefixes", () => {
+      expect(generateCompletion("zsh")).toContain("--exclude-team-prefixes");
+    });
+
     it("contains a 'compdef' directive (zsh-style)", () => {
       const script = generateCompletion("zsh");
       expect(script).toContain("compdef ");
@@ -117,6 +125,10 @@ describe("generateCompletion", () => {
 
     it("contains pick-team-auto", () => {
       expect(generateCompletion("fish")).toContain("pick-team-auto");
+    });
+
+    it("contains exclude-team-prefixes", () => {
+      expect(generateCompletion("fish")).toContain("exclude-team-prefixes");
     });
 
     it("uses fish 'complete -c' syntax", () => {

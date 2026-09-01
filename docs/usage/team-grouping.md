@@ -221,6 +221,24 @@ github-code-search query "useFeatureFlag" --org fulll \
 - An explicit `--pick-team` for the same section always wins: run explicit picks first, then `--pick-team-auto` resolves whatever combined sections remain.
 - The replay command emits `--pick-team-auto` when it was used, so a session is reproduced exactly.
 
+## Excluding noisy team prefixes
+
+Some orgs have many closely related, deeply-overlapping team names under one prefix (e.g. `chapter-validators-core`, `chapter-validators-client`, `chapter-validators-frontend-client`, ...). When several of these co-occur on the same repos, `--group-by-team-prefix` produces many distinct combined sections that neither `--pick-team-auto` nor manual `--pick-team` can cleanly resolve, since no single team name is a common prefix of the others.
+
+`--exclude-team-prefixes` removes matching teams from consideration **before** grouping runs, reducing ambiguous combos at the source:
+
+```bash
+github-code-search query "useFeatureFlag" --org fulll \
+  --group-by-team-prefix chapter- \
+  --exclude-team-prefixes chapter-validators- \
+  --pick-team-auto
+```
+
+- Comma-separated, same syntax as `--exclude-repositories` / `--exclude-extracts`.
+- A repo left with **no matching team** after exclusion falls into `other`, exactly like a repo with no matching team today.
+- Only applies with `--group-by-team-prefix`; a warning is emitted (and the flag is a no-op) otherwise.
+- The replay command emits `--exclude-team-prefixes` when it was used, so a session is reproduced exactly.
+
 ## Re-pick & undo pick
 
 After using `--pick-team` (or the interactive `p` shortcut) to assign a combined section to a team, individual repos marked `◈` can be re-assigned or restored to their original combined section at any time — regardless of how deeply nested the original section was.

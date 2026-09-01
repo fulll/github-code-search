@@ -198,6 +198,22 @@ describe("buildReplayCommand", () => {
     expect(cmd).not.toContain("--group-by-team-prefix");
   });
 
+  it("includes --exclude-team-prefixes when set", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const opts: ReplayOptions = {
+      groupByTeamPrefix: "chapter-",
+      excludeTeamPrefixes: "chapter-validators-",
+    };
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
+    expect(cmd).toContain("--exclude-team-prefixes 'chapter-validators-'");
+  });
+
+  it("does not include --exclude-team-prefixes when unset (default)", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set());
+    expect(cmd).not.toContain("--exclude-team-prefixes");
+  });
+
   it("includes --pick-team-auto when pickTeamAuto is true", () => {
     const groups = [makeGroup("myorg/repoA", ["a.ts"])];
     const opts: ReplayOptions = { groupByTeamPrefix: "gamme-/squad-", pickTeamAuto: true };
@@ -865,6 +881,16 @@ describe("buildOutput", () => {
     });
     const parsed = JSON.parse(out);
     expect(parsed.replayCommand).toContain("--pick-team-auto");
+  });
+
+  it("threads excludeTeamPrefixes into the replay command", () => {
+    const groups = [makeGroup("myorg/repoA", ["src/foo.ts"])];
+    const out = buildOutput(groups, QUERY, ORG, new Set(), new Set(), "json", "repo-and-matches", {
+      groupByTeamPrefix: "chapter-",
+      excludeTeamPrefixes: "chapter-validators-",
+    });
+    const parsed = JSON.parse(out);
+    expect(parsed.replayCommand).toContain("--exclude-team-prefixes 'chapter-validators-'");
   });
 
   it("threads --group-by-team-prefix into json replay command", () => {
