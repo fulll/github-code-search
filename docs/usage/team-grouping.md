@@ -1,6 +1,6 @@
 # Team grouping
 
-`--group-by-team-prefix` organises result repositories by their GitHub team membership, as a **hierarchy** of headings. It is especially useful in large organisations with multiple gammes, chapters or squads.
+`--group-by-team-prefix` organises result repositories by their GitHub team membership, as a **hierarchy** of headings. It is especially useful in large organisations with multiple tribes, chapters or squads.
 
 ## Prerequisites
 
@@ -47,20 +47,23 @@ Within **one level** of a chain, repos are bucketed exactly the same way regardl
 3. Repos belonging to **3+** matching teams → same, in ascending combination-size order.
 4. Repos matching **no team** at this level → collected into an `other` section.
 
+Before bucketing, a team that is a prefix of another team **already matched by the same repo** is dropped from that repo's matching set (e.g. `chapter-architect-a` is redundant when `chapter-architect` is also present) — the broader team already implies the narrower one, so keeping both would only inflate the combined-section label.
+
 Then, for a chain with more levels, **every section produced above is recursively sub-grouped** by the next prefix — including its own `other` bucket, which becomes a nested `other` at the next depth.
+
+Every level of a chain is tried in order against whatever repos the _earlier levels of that same chain_ haven't already claimed — a repo that only matches `squad-` (not `tribe-`) in a `tribe-/squad-` chain still gets its own top-level section from `squad-`, instead of being invisible to the chain and falling through to a later chain or `other`.
 
 Independent chains (separated by `,`) are processed in order, each consuming repos from the pool not yet claimed by an earlier chain. Repos matched by no chain at all end up in a single top-level `other` section.
 
-### Automatic nesting of overlapping team names
+### Automatic combining of overlapping team names
 
-Within one level, if a team's name is a **prefix of another team's name** (e.g. `tribe-a` and `tribe-a-p1`), the tool nests the more specific team under the more general one automatically — instead of listing them as unrelated siblings:
+Within one level, if a team's name is a **prefix of another team's name** (e.g. `tribe-a` and `tribe-a-p1`), the tool combines them into one section automatically — instead of listing them as unrelated siblings or nesting one under the other:
 
 ```text
-## tribe-a
-### tribe-a-p1
+## tribe-a + tribe-a-p1
 ```
 
-This cascades across any number of overlapping names, and applies independently at every depth of a chain.
+This cascades across any number of overlapping names (all merging into one section), and applies independently at every depth of a chain. The combined section behaves exactly like a multi-team combo — `--pick-team` and [`--pick-team-auto`](#auto-pick-by-common-prefix) can resolve it the same way.
 
 ## Non-interactive output
 
