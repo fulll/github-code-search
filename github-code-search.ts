@@ -22,6 +22,7 @@ import { formatRetryWait } from "./src/api-utils.ts";
 import { buildOutput } from "./src/output.ts";
 import {
   applyTeamPickInTree,
+  autoPickTeamsByCommonPrefix,
   findCombinedSectionPaths,
   flattenTeamHierarchy,
   groupByTeamHierarchy,
@@ -205,6 +206,19 @@ function addSearchOptions(cmd: Command): Command {
       [] as string[],
     )
     .option(
+      "--pick-team-auto",
+      [
+        "Auto-resolve combined team sections whose team names share a common",
+        'prefix (e.g. "gamme-lead-client + gamme-lead-client-p1" \u2192 auto-picks',
+        '"gamme-lead-client"), without needing an explicit --pick-team.',
+        "Combos with no common-prefix team (e.g. squad-a + squad-b) are left",
+        "unresolved. An explicit --pick-team for the same section always wins.",
+        "Applies at every hierarchy depth. Only applies with --group-by-team-prefix.",
+        "Docs: https://fulll.github.io/github-code-search/usage/team-grouping#auto-pick-by-common-prefix",
+      ].join("\n"),
+      false,
+    )
+    .option(
       "--no-cache",
       "Bypass the 24 h team-list cache and re-fetch teams from GitHub (only applies with --group-by-team-prefix).",
     )
@@ -233,6 +247,7 @@ async function searchAction(
     excludeTemplateRepositories: boolean;
     groupByTeamPrefix: string;
     pickTeam: string[];
+    pickTeamAuto?: boolean;
     cache: boolean;
     regexHint?: string;
   },
@@ -392,10 +407,17 @@ async function searchAction(
         pickTeams[resolution.path.join(" > ")] = resolution.chosen;
       }
 
+      // --pick-team-auto runs AFTER explicit assignments so an explicit --pick-team
+      // for the same section always wins (it no longer exists as a combined section
+      // by the time auto-pick runs, so auto-pick naturally skips it).
+      if (opts.pickTeamAuto) {
+        sections = autoPickTeamsByCommonPrefix(sections);
+      }
+
       // Warn about combined sections that still have no pick assigned, so the user
       // knows which labels to add to the next replay command or interactive session.
       const unresolved = findCombinedSectionPaths(sections);
-      if (unresolved.length > 0 && opts.pickTeam.length > 0) {
+      if (unresolved.length > 0 && (opts.pickTeam.length > 0 || opts.pickTeamAuto)) {
         process.stderr.write(
           `note: ${unresolved.length} combined section${unresolved.length !== 1 ? "s" : ""} still unresolved ` +
             `(press "p" in TUI or use --pick-team to assign):\n` +
@@ -414,6 +436,7 @@ async function searchAction(
         includeArchived,
         excludeTemplates,
         groupByTeamPrefix: opts.groupByTeamPrefix,
+        pickTeamAuto: opts.pickTeamAuto,
         regexHint: opts.regexHint,
         pickTeams: Object.keys(pickTeams).length > 0 ? pickTeams : undefined,
       }),
@@ -474,6 +497,7 @@ async function searchAction(
       includeArchived,
       excludeTemplates,
       opts.groupByTeamPrefix,
+      Boolean(opts.pickTeamAuto),
       opts.regexHint ?? "",
       Object.keys(pickTeams).length > 0 ? pickTeams : {},
     );

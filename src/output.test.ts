@@ -198,6 +198,19 @@ describe("buildReplayCommand", () => {
     expect(cmd).not.toContain("--group-by-team-prefix");
   });
 
+  it("includes --pick-team-auto when pickTeamAuto is true", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const opts: ReplayOptions = { groupByTeamPrefix: "gamme-/squad-", pickTeamAuto: true };
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
+    expect(cmd).toContain("--pick-team-auto");
+  });
+
+  it("does not include --pick-team-auto when pickTeamAuto is false (default)", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set());
+    expect(cmd).not.toContain("--pick-team-auto");
+  });
+
   it("includes --regex-hint when regexHint is set", () => {
     const groups = [makeGroup("myorg/repoA", ["a.ts"])];
     const opts: ReplayOptions = { regexHint: '"axios"' };
@@ -842,6 +855,16 @@ describe("buildOutput", () => {
       { includeArchived: true, groupByTeamPrefix: "" },
     );
     expect(out).toContain("--include-archived");
+  });
+
+  it("threads pickTeamAuto into the replay command", () => {
+    const groups = [makeGroup("myorg/repoA", ["src/foo.ts"])];
+    const out = buildOutput(groups, QUERY, ORG, new Set(), new Set(), "json", "repo-and-matches", {
+      groupByTeamPrefix: "gamme-/squad-",
+      pickTeamAuto: true,
+    });
+    const parsed = JSON.parse(out);
+    expect(parsed.replayCommand).toContain("--pick-team-auto");
   });
 
   it("threads --group-by-team-prefix into json replay command", () => {

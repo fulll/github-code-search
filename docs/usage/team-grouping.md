@@ -202,6 +202,25 @@ The flag is repeatable — add one `--pick-team` per combined section to resolve
 
 If the combined label or path is not found (typo, ambiguous, or the section was not formed), a warning is emitted on stderr listing the available combined sections — the run continues without error.
 
+## Auto-pick by common prefix
+
+Many combined sections aren't actually ambiguous: when one of the team names is a literal prefix of every other team name in the combo (e.g. `gamme-lead-client` and `gamme-lead-client-p1`), the "parent" team is the obvious owner. `--pick-team-auto` resolves these automatically, without needing a manual `--pick-team`:
+
+```bash
+github-code-search query "useFeatureFlag" --org fulll \
+  --group-by-team-prefix gamme- \
+  --pick-team-auto
+```
+
+```text
+## gamme-lead-client + gamme-lead-client-p1   →   ## gamme-lead-client
+```
+
+- Combos with **no common-prefix team** (e.g. `squad-frontend + squad-mobile` — neither is a prefix of the other) are left combined and unresolved, exactly like today.
+- Applies independently **at every hierarchy depth**, not just the top level.
+- An explicit `--pick-team` for the same section always wins: run explicit picks first, then `--pick-team-auto` resolves whatever combined sections remain.
+- The replay command emits `--pick-team-auto` when it was used, so a session is reproduced exactly.
+
 ## Re-pick & undo pick
 
 After using `--pick-team` (or the interactive `p` shortcut) to assign a combined section to a team, individual repos marked `◈` can be re-assigned or restored to their original combined section at any time — regardless of how deeply nested the original section was.

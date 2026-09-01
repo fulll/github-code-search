@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   applyTeamPick,
   applyTeamPickInTree,
+  autoPickTeamsByCommonPrefix,
   findCombinedSectionPaths,
   flattenTeamHierarchy,
   flattenTeamSections,
@@ -245,6 +246,31 @@ describe("groupByTeamHierarchy — multiple independent chains", () => {
     expect(labels).toEqual(["gamme-client", "chapter-backend", "other"]);
     expect(sections[2].groups[0].repoFullName).toBe("org/c");
   });
+
+  it("investigation (#issue: gamme-/squad-,chapter- precedence): a repo matching ONLY a 2nd-level prefix (squad-) with no 1st-level (gamme-) match is invisible to that chain and falls through to a later chain", () => {
+    // Reported behaviour: `fulll/demat-workers` (team squad-demat, no gamme-
+    // team) ends up under a `chapter-` combined section instead of under
+    // `gamme-/squad-` as its `--group-by-team-prefix gamme-/squad-,chapter-`
+    // position would suggest. Root cause: a chain only claims a repo if it
+    // matches chain[0] (gamme-) FIRST — squad- is only ever applied to repos
+    // already captured under a gamme- section. A repo with a squad- team but
+    // no gamme- team is entirely invisible to the gamme-/squad- chain and
+    // falls through to the next chain (or "other") instead — chain
+    // precedence, as currently implemented, is NOT "any prefix anywhere in
+    // the chain", only "chain[0], in order".
+    const groups = [
+      makeGroup("org/demat-workers", [
+        "squad-demat",
+        "chapter-validators-client",
+        "chapter-validators-core",
+      ]),
+    ];
+    const sections = groupByTeamHierarchy(groups, [["gamme-", "squad-"], ["chapter-"]]);
+    expect(sections.map((s) => s.label)).not.toContain("gamme-");
+    const chapterCombo = sections.find((s) => s.label.includes("chapter-validators"));
+    expect(chapterCombo).toBeDefined();
+    expect(chapterCombo!.groups.map((g) => g.repoFullName)).toEqual(["org/demat-workers"]);
+  });
 });
 
 describe("groupByTeamHierarchy — auto-nesting of overlapping team names", () => {
@@ -329,6 +355,27 @@ describe("groupByTeamHierarchy — auto-nesting of overlapping team names", () =
     expect(p1.children).toHaveLength(1);
     expect(p1.children![0].label).toBe("squad-mobile");
     expect(p1.children![0].groups.map((g) => g.repoFullName)).toEqual(["org/b"]);
+  });
+
+  it("investigation (#issue: gamme-/squad- + overlapping name): auto-nesting inserts an EXTRA heading level beyond the declared chain depth", () => {
+    // Reported behaviour: `--group-by-team-prefix gamme-/squad-` (a 2-level
+    // chain) renders 3 heading levels — `gamme-lead-client` /
+    // `gamme-lead-client-security-p1` / `squad-accounting` — instead of the
+    // 2 the chain declares. This documents that this is the INTENDED result
+    // of combining two separate, both-documented mechanisms: automatic
+    // overlap-nesting of single-team labels (this describe block) PLUS the
+    // chain's own `/squad-` depth — not a bug in either mechanism alone.
+    const groups = [
+      makeGroup("org/parent-only", ["gamme-lead-client"]),
+      makeGroup("org/leaf", ["gamme-lead-client-security-p1", "squad-accounting"]),
+    ];
+    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    expect(collectLabels(tree)).toEqual([
+      "gamme-lead-client",
+      "  gamme-lead-client-security-p1",
+      "    squad-accounting",
+      "  other",
+    ]);
   });
 });
 
@@ -714,6 +761,103 @@ describe("findCombinedSectionPaths", () => {
     // exercises two independent combined sections at the same nested depth.
     const paths = findCombinedSectionPaths(tree);
     expect(paths).toContainEqual(["gamme-x", "squad-a + squad-b"]);
+  });
+});
+
+// ─── autoPickTeamsByCommonPrefix ───────────────────────────────────────────────
+
+describe("autoPickTeamsByCommonPrefix", () => {
+  it("resolves a combined section to the team that is a prefix of the other", () => {
+    const groups = [makeGroup("org/a", ["gamme-lead-client", "gamme-lead-client-p1"])];
+    const tree = groupByTeamHierarchy(groups, [["gamme-"]]);
+    expect(findCombinedSectionPaths(tree)).toEqual([["gamme-lead-client + gamme-lead-client-p1"]]);
+
+    const resolved = autoPickTeamsByCommonPrefix(tree);
+    expect(findCombinedSectionPaths(resolved)).toEqual([]);
+    const winner = resolved.find((s) => s.label === "gamme-lead-client")!;
+    expect(winner.groups.map((g) => g.repoFullName)).toEqual(["org/a"]);
+  });
+
+  it("leaves a combined section unresolved when no team is a prefix of the others", () => {
+    const groups = [makeGroup("org/a", ["squad-frontend", "squad-mobile"])];
+    const tree = groupByTeamHierarchy(groups, [["squad-"]]);
+    const resolved = autoPickTeamsByCommonPrefix(tree);
+    expect(findCombinedSectionPaths(resolved)).toEqual([["squad-frontend + squad-mobile"]]);
+  });
+
+  it("picks the shortest common-prefix team among 3+ combined teams", () => {
+    const groups = [makeGroup("org/a", ["gamme-x", "gamme-x-y", "gamme-x-y-z"])];
+    const tree = groupByTeamHierarchy(groups, [["gamme-"]]);
+    const resolved = autoPickTeamsByCommonPrefix(tree);
+    expect(findCombinedSectionPaths(resolved)).toEqual([]);
+    expect(resolved.map((s) => s.label)).toEqual(["gamme-x"]);
+  });
+
+  it("resolves independently at a nested (non-top-level) depth", () => {
+    const groups = [
+      makeGroup("org/a", ["gamme-client", "squad-a", "squad-a-legacy"]),
+      makeGroup("org/b", ["gamme-client"]),
+    ];
+    const tree = groupByTeamHierarchy(groups, [["gamme-", "squad-"]]);
+    const resolved = autoPickTeamsByCommonPrefix(tree);
+    expect(findCombinedSectionPaths(resolved)).toEqual([]);
+    const gamme = resolved.find((s) => s.label === "gamme-client")!;
+    const child = (gamme.children ?? []).find((c) => c.label === "squad-a")!;
+    expect(child).toBeDefined();
+    expect(child.groups.map((g) => g.repoFullName)).toEqual(["org/a"]);
+  });
+
+  it("an explicit --pick-team resolution is left untouched (no longer combined) when auto-pick runs after", () => {
+    const groups = [makeGroup("org/a", ["squad-frontend", "squad-mobile"])];
+    const tree = groupByTeamHierarchy(groups, [["squad-"]]);
+    const picked = applyTeamPickInTree(tree, ["squad-frontend + squad-mobile"], "squad-frontend");
+    const resolved = autoPickTeamsByCommonPrefix(picked);
+    expect(resolved).toEqual(picked);
+  });
+
+  it("is a pure function — does not mutate the input tree", () => {
+    const groups = [makeGroup("org/a", ["gamme-lead-client", "gamme-lead-client-p1"])];
+    const tree = groupByTeamHierarchy(groups, [["gamme-"]]);
+    const before = JSON.stringify(tree);
+    autoPickTeamsByCommonPrefix(tree);
+    expect(JSON.stringify(tree)).toBe(before);
+  });
+
+  it("returns the tree unchanged when there is no combined section", () => {
+    const groups = [makeGroup("org/a", ["squad-front"])];
+    const tree = groupByTeamHierarchy(groups, [["squad-"]]);
+    expect(autoPickTeamsByCommonPrefix(tree)).toEqual(tree);
+  });
+
+  it("investigation (#issue: chapter-secops not merging): does NOT merge combos that only share SOME members but no candidate is a literal prefix of every other candidate", () => {
+    // Reported expectation: "chapter-secops + chapter-validators-core",
+    // "chapter-head-of-frontend + chapter-secops + chapter-validators-core"
+    // and "chapter-secops + chapter-validators + chapter-validators-core"
+    // should all collapse under "chapter-secops". None of the 4 distinct
+    // team names here is a literal string-prefix of the others (secops vs
+    // validators-core vs validators vs head-of-frontend), so the current
+    // "one candidate is a prefix of all others" strategy correctly leaves
+    // all 3 combined and unresolved — merging them would require a
+    // different algorithm (cluster by shared team membership across
+    // combos), which is out of scope for this strategy.
+    const groups = [
+      makeGroup("org/a", ["chapter-secops", "chapter-validators-core"]),
+      makeGroup("org/b", ["chapter-head-of-frontend", "chapter-secops", "chapter-validators-core"]),
+      makeGroup("org/c", ["chapter-secops", "chapter-validators", "chapter-validators-core"]),
+    ];
+    const tree = groupByTeamHierarchy(groups, [["chapter-"]]);
+    const resolved = autoPickTeamsByCommonPrefix(tree);
+    expect(
+      findCombinedSectionPaths(resolved)
+        .map((p) => p[0])
+        .toSorted(),
+    ).toEqual(
+      [
+        "chapter-head-of-frontend + chapter-secops + chapter-validators-core",
+        "chapter-secops + chapter-validators + chapter-validators-core",
+        "chapter-secops + chapter-validators-core",
+      ].toSorted(),
+    );
   });
 });
 
