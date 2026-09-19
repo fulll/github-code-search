@@ -81,9 +81,7 @@ function bucketSingleLevel(remaining: Set<RepoGroup>, prefix: string): TeamSecti
 
   const byCount = new Map<number, RepoGroup[]>();
   for (const g of matchingGroups) {
-    const matchingTeams = dropRedundantSubTeams(
-      (g.teams ?? []).filter((t) => t.startsWith(prefix)),
-    );
+    const matchingTeams = (g.teams ?? []).filter((t) => t.startsWith(prefix));
     const count = matchingTeams.length;
     if (!byCount.has(count)) byCount.set(count, []);
     byCount.get(count)!.push(g);
@@ -95,9 +93,8 @@ function bucketSingleLevel(remaining: Set<RepoGroup>, prefix: string): TeamSecti
 
     const byCombo = new Map<string, RepoGroup[]>();
     for (const g of groupsInBucket) {
-      const matchingTeams = dropRedundantSubTeams(
-        (g.teams ?? []).filter((t) => t.startsWith(prefix)),
-      )
+      const matchingTeams = (g.teams ?? [])
+        .filter((t) => t.startsWith(prefix))
         .toSorted()
         .join(" + ");
       if (!byCombo.has(matchingTeams)) byCombo.set(matchingTeams, []);
@@ -110,18 +107,6 @@ function bucketSingleLevel(remaining: Set<RepoGroup>, prefix: string): TeamSecti
   }
 
   return sections;
-}
-
-/**
- * Drops any team that is a proper prefix-extension of another team already
- * present in `teams` (e.g. `chapter-architect-a` is dropped when
- * `chapter-architect` is also present in the same repo's matching teams) —
- * the broader team already implies the narrower one for grouping purposes,
- * so keeping both only inflates combined-section labels with redundant
- * information. Pure — returns a new array.
- */
-function dropRedundantSubTeams(teams: string[]): string[] {
-  return teams.filter((t) => !teams.some((other) => other !== t && t.startsWith(other)));
 }
 
 // ─── Hierarchical (nested) team-prefix grouping ───────────────────────────────

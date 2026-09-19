@@ -47,7 +47,7 @@ Within **one level** of a chain, repos are bucketed exactly the same way regardl
 3. Repos belonging to **3+** matching teams → same, in ascending combination-size order.
 4. Repos matching **no team** at this level → collected into an `other` section.
 
-Before bucketing, a team that is a prefix of another team **already matched by the same repo** is dropped from that repo's matching set (e.g. `chapter-architect-a` is redundant when `chapter-architect` is also present) — the broader team already implies the narrower one, so keeping both would only inflate the combined-section label.
+Every matching team is kept in the combined-section label, even when one team's name happens to be a prefix of another's (e.g. `chapter-architect` and `chapter-architect-a`) — GitHub team memberships are independent, so a name prefix doesn't imply membership in the other team. If a chain of narrow, noisy sub-teams (e.g. many `chapter-validators-*` teams) is inflating your combined labels, use [`--exclude-team-prefixes`](#excluding-noisy-team-prefixes) to strip them explicitly before grouping.
 
 Then, for a chain with more levels, **every section produced above is recursively sub-grouped** by the next prefix — including its own `other` bucket, which becomes a nested `other` at the next depth.
 

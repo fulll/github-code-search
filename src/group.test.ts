@@ -58,6 +58,25 @@ describe("excludeTeamsByPrefix", () => {
     expect(result[0].teams).toEqual(["chapter-secops"]);
   });
 
+  it("is the recommended opt-in workaround for the chapter-architect mega-combo (see review comment on dropRedundantSubTeams)", () => {
+    // groupByTeamPrefix no longer auto-drops narrower same-prefix teams (a
+    // team-name prefix does not imply GitHub team membership) — trimming
+    // noisy sub-team prefixes is an explicit, opt-in choice via
+    // --exclude-team-prefixes / excludeTeamsByPrefix.
+    const groups = [
+      makeGroup("org/a", [
+        "chapter-architect",
+        "chapter-architect-a",
+        "chapter-architect-b",
+        "chapter-head-of-frontend",
+      ]),
+    ];
+    const filtered = excludeTeamsByPrefix(groups, ["chapter-architect-"]);
+    const sections = groupByTeamPrefix(filtered, ["chapter-"]);
+    expect(sections).toHaveLength(1);
+    expect(sections[0].label).toBe("chapter-architect + chapter-head-of-frontend");
+  });
+
   it("returns a repo with an empty teams array when every team is excluded", () => {
     const groups = [makeGroup("org/a", ["chapter-validators-core", "chapter-validators-client"])];
     const result = excludeTeamsByPrefix(groups, ["chapter-validators-"]);
@@ -157,14 +176,17 @@ describe("groupByTeamPrefix — multi-team repos", () => {
     expect(sections[0].groups).toHaveLength(2);
   });
 
-  it("fix (#issue: chapter-architect mega-combo): drops redundant sub-teams from a matching-team set before forming the combo label", () => {
-    // Reported behaviour: a repo tagged with a broad team (chapter-architect)
-    // AND several of its own narrower variants (chapter-architect-a,
-    // chapter-architect-b, ...) used to form an unwieldy N-way combined
-    // section listing every variant. Since the broader team already implies
-    // membership in each narrower one for grouping purposes, the narrower
-    // ones are now dropped from the matching set, leaving only the genuinely
-    // unrelated team (chapter-head-of-frontend) alongside the broad one.
+  it("fix (#review: chapter-architect mega-combo): keeps every matching team in the combo label — a name prefix does not imply GitHub team membership", () => {
+    // Regression: an earlier version of this function dropped any team whose
+    // name was a string-prefix-extension of another matching team (e.g.
+    // chapter-architect-a dropped because chapter-architect was also
+    // present), assuming the broader team name implied membership in the
+    // narrower one. Code review correctly pointed out this is unsound —
+    // GitHub team memberships are independent of naming, so a repo can
+    // genuinely and separately belong to both. Every matching team must
+    // stay in the combo label; --exclude-team-prefixes is the explicit,
+    // opt-in mechanism for trimming noisy sub-team prefixes (see the
+    // excludeTeamsByPrefix describe block below).
     const groups = [
       makeGroup("org/a", [
         "chapter-architect",
@@ -181,7 +203,20 @@ describe("groupByTeamPrefix — multi-team repos", () => {
     ];
     const sections = groupByTeamPrefix(groups, ["chapter-"]);
     expect(sections).toHaveLength(1);
-    expect(sections[0].label).toBe("chapter-architect + chapter-head-of-frontend");
+    expect(sections[0].label).toBe(
+      [
+        "chapter-architect",
+        "chapter-architect-a",
+        "chapter-architect-b",
+        "chapter-architect-c",
+        "chapter-architect-d",
+        "chapter-architect-mobile",
+        "chapter-architect-nodejs",
+        "chapter-architect-php",
+        "chapter-architect-python",
+        "chapter-head-of-frontend",
+      ].join(" + "),
+    );
   });
 });
 
@@ -919,12 +954,9 @@ describe("autoPickTeamsByCommonPrefix", () => {
   });
 
   it("fix (#issue: cross-combo clustering): merges 3+ combos onto the team that recurs in the most of them", () => {
-    // "chapter-secops" recurs in all 3 combos below (unlike
-    // "chapter-validators-core", which only recurs in 2), so it wins and all
-    // 3 combos collapse under it. org/repo-c's own combo is already reduced
-    // from 3-way to 2-way by dropRedundantSubTeams beforehand, since
-    // chapter-validators-core is a redundant sub-team of chapter-validators
-    // (both present on org/repo-c).
+    // Both "chapter-secops" and "chapter-validators-core" recur in all 3
+    // combos below — a tie broken alphabetically in favor of
+    // "chapter-secops" — so all 3 combos collapse under it.
     const groups = [
       makeGroup("org/repo-a", ["chapter-secops", "chapter-validators-core"]),
       makeGroup("org/repo-b", [
