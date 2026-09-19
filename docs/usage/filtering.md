@@ -9,11 +9,11 @@ Excludes entire repositories from the results. The org prefix is optional.
 ```bash
 # Short form (recommended)
 github-code-search "useFeatureFlag" --org fulll \
-  --exclude-repositories legacy-monolith,archived-app
+  --exclude-repositories legacy-app,archived-app
 
 # Long form (also accepted)
 github-code-search "useFeatureFlag" --org fulll \
-  --exclude-repositories fulll/legacy-monolith,fulll/archived-app
+  --exclude-repositories fulll/legacy-app,fulll/archived-app
 ```
 
 Pass a comma-separated list. There is no limit on the number of repos you can exclude.
@@ -27,17 +27,17 @@ The short form (without the org prefix) is recommended — it is easier to read 
 Excludes individual code extracts. The format is `repoName:path/to/file:matchIndex`.
 
 ```bash
-# Exclude the first extract (index 0) of src/flags.ts in billing-api
+# Exclude the first extract (index 0) of src/flags.ts in service-b
 github-code-search "useFeatureFlag" --org fulll \
-  --exclude-extracts billing-api:src/flags.ts:0
+  --exclude-extracts service-b:src/flags.ts:0
 
 # Exclude multiple extracts
 github-code-search "useFeatureFlag" --org fulll \
-  --exclude-extracts billing-api:src/flags.ts:0,auth-service:tests/unit/featureFlags.test.ts:1
+  --exclude-extracts service-b:src/flags.ts:0,service-a:tests/unit/featureFlags.test.ts:1
 
 # Long form (also accepted)
 github-code-search "useFeatureFlag" --org fulll \
-  --exclude-extracts fulll/billing-api:src/flags.ts:0
+  --exclude-extracts fulll/service-b:src/flags.ts:0
 ```
 
 The index is **zero-based** and corresponds to the position of the file in the GitHub API result list for that repository — not the position of the match within the file itself. Each `(repo, file)` pair is one extract with a unique index.
@@ -84,8 +84,8 @@ All four flags can be combined freely:
 github-code-search "useFeatureFlag" --org fulll \
   --include-archived \
   --exclude-template-repositories \
-  --exclude-repositories legacy-monolith \
-  --exclude-extracts billing-api:src/flags.ts:0
+  --exclude-repositories legacy-app \
+  --exclude-extracts service-b:src/flags.ts:0
 ```
 
 ## In-TUI filtering

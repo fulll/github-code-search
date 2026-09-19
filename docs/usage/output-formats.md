@@ -15,12 +15,12 @@ github-code-search "useFeatureFlag" --org fulll --format markdown --no-interacti
 
 3 repos · 4 files selected
 
-- **fulll/auth-service** (2 matches)
+- **fulll/service-a** (2 matches)
   - [ ] [src/middlewares/featureFlags.ts:2:19](...): `useFeatureFlag`
   - [ ] [tests/unit/featureFlags.test.ts:1:8](...): `useFeatureFlag`
-- **fulll/billing-api** (1 match)
+- **fulll/service-b** (1 match)
   - [ ] [src/flags.ts:3:14](...): `useFeatureFlag`
-- **fulll/frontend-app** (1 match)
+- **fulll/app-a** (1 match)
   - [ ] [src/hooks/useFeatureFlag.ts:1:1](...): `useFeatureFlag`
 ```
 
@@ -67,11 +67,11 @@ github-code-search "useFeatureFlag" --org fulll --format json --no-interactive
   "selection": { "repos": 1, "matches": 1 },
   "results": [
     {
-      "repo": "fulll/auth-service",
+      "repo": "fulll/service-a",
       "matches": [
         {
           "path": "src/middlewares/featureFlags.ts",
-          "url": "https://github.com/fulll/auth-service/blob/main/src/middlewares/featureFlags.ts",
+          "url": "https://github.com/fulll/service-a/blob/main/src/middlewares/featureFlags.ts",
           "line": 2,
           "col": 19,
           "matchedText": "useFeatureFlag"
@@ -106,9 +106,9 @@ github-code-search "useFeatureFlag" --org fulll \
 ```text
 # Results for "useFeatureFlag"
 
-fulll/auth-service
-fulll/billing-api
-fulll/frontend-app
+fulll/service-a
+fulll/service-b
+fulll/app-a
 ```
 
 ::: details replay command
@@ -132,9 +132,9 @@ github-code-search "useFeatureFlag" --org fulll \
   "org": "fulll",
   "selection": { "repos": 3, "matches": 5 },
   "results": [
-    { "repo": "fulll/auth-service" },
-    { "repo": "fulll/billing-api" },
-    { "repo": "fulll/frontend-app" }
+    { "repo": "fulll/service-a" },
+    { "repo": "fulll/service-b" },
+    { "repo": "fulll/app-a" }
   ],
   "replayCommand": "# Replay:\ngithub-code-search \"useFeatureFlag\" --org fulll --format json --no-interactive --output-type repo-only"
 }

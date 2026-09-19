@@ -747,30 +747,40 @@ export function findCombinedSectionPaths(sections: TeamSection[]): string[][] {
 }
 
 /**
- * Auto-resolves every combined (`"a + b"`) section whose candidate team names
- * share a single common-prefix "parent" — one team name that is a literal
- * string-prefix of every other team name in the combo (e.g. `"tribe-lead-
- * client"` for `"tribe-a + tribe-a-p1"`) — applying the
- * same tree update as an explicit `--pick-team` assignment. Combined sections
- * with no such prefix relationship (e.g. `"squad-frontend + squad-mobile"`)
- * are left combined and unresolved, same as today.
+ * Auto-resolves every combined (`"a + b"`) section using two passes:
  *
- * Applies independently at every hierarchy depth. Pure — does not mutate
- * `sections`.
+ * 1. Any combo whose candidate team names share a single common-prefix
+ *    "parent" — one team name that is a literal string-prefix of every other
+ *    team name in the combo (e.g. `"tribe-lead-client"` for `"tribe-a +
+ *    tribe-a-p1"`) — resolves to that team.
+ * 2. Any combo still unresolved is clustered against its siblings (combos
+ *    under the same parent path): the team that recurs in the most of them
+ *    (at least 2) wins, and every combo containing it merges into a single
+ *    section named after that team. Combos that never share a recurring team
+ *    with a sibling combo are left combined and unresolved (e.g. `"squad-
+ *    frontend + squad-mobile"` alone).
+ *
+ * Both passes apply the same tree update as an explicit `--pick-team`
+ * assignment. Applies independently at every hierarchy depth. Pure — does
+ * not mutate `sections`.
  */
 export function autoPickTeamsByCommonPrefix(sections: TeamSection[]): TeamSection[] {
   let result = sections;
+  const stillCombined: string[][] = [];
 
   for (const path of findCombinedSectionPaths(sections)) {
     const combinedLabel = path[path.length - 1];
     const candidates = combinedLabel.split(" + ").map((c) => c.trim());
     const winner = findCommonPrefixTeam(candidates);
-    if (winner === undefined) continue;
+    if (winner === undefined) {
+      stillCombined.push(path);
+      continue;
+    }
 
     result = applyTeamPickInTree(result, path, winner);
   }
 
-  return result;
+  return clusterRemainingCombosByRecurringTeam(result, stillCombined);
 }
 
 /**
@@ -781,6 +791,81 @@ export function autoPickTeamsByCommonPrefix(sections: TeamSection[]): TeamSectio
 function findCommonPrefixTeam(candidates: string[]): string | undefined {
   const winners = candidates.filter((c) => candidates.every((other) => other.startsWith(c)));
   return winners.length === 1 ? winners[0] : undefined;
+}
+
+/**
+ * Second-pass resolution for combined sections that `findCommonPrefixTeam`
+ * couldn't resolve on their own (no candidate is a literal prefix of every
+ * other). Groups the still-unresolved combo paths by parent path (siblings
+ * under the same ancestor) and delegates each group to
+ * `clusterGroupByRecurringTeam`. Pure — does not mutate `sections`.
+ */
+function clusterRemainingCombosByRecurringTeam(
+  sections: TeamSection[],
+  combinedPaths: string[][],
+): TeamSection[] {
+  let result = sections;
+
+  const byParent = new Map<string, string[][]>();
+  for (const path of combinedPaths) {
+    const parentKey = path.slice(0, -1).join(PATH_SEPARATOR);
+    const group = byParent.get(parentKey) ?? [];
+    group.push(path);
+    byParent.set(parentKey, group);
+  }
+
+  for (const paths of byParent.values()) {
+    result = clusterGroupByRecurringTeam(result, paths);
+  }
+
+  return result;
+}
+
+/**
+ * Repeatedly finds the team name that recurs in the MOST of the given combo
+ * paths (all siblings under the same parent, at least 2 combos required —
+ * ties broken alphabetically) and merges every combo containing it into a
+ * single section named after that team, the same tree update as an explicit
+ * `--pick-team` assignment. Repeats until no team recurs across 2+ of the
+ * remaining combos. Combos that never share a recurring team with another
+ * combo are left combined and unresolved. Pure — does not mutate `sections`.
+ */
+function clusterGroupByRecurringTeam(sections: TeamSection[], paths: string[][]): TeamSection[] {
+  let result = sections;
+  let remaining = paths;
+
+  while (remaining.length >= 2) {
+    const counts = new Map<string, number>();
+    for (const path of remaining) {
+      const candidates = path[path.length - 1].split(" + ").map((c) => c.trim());
+      for (const team of candidates) counts.set(team, (counts.get(team) ?? 0) + 1);
+    }
+
+    let winner: string | undefined;
+    let winnerCount = 1;
+    for (const [team, count] of [...counts.entries()].toSorted((a, b) =>
+      a[0].localeCompare(b[0]),
+    )) {
+      if (count > winnerCount) {
+        winner = team;
+        winnerCount = count;
+      }
+    }
+    if (winner === undefined) break;
+
+    const matched = remaining.filter((path) =>
+      path[path.length - 1]
+        .split(" + ")
+        .map((c) => c.trim())
+        .includes(winner as string),
+    );
+    for (const path of matched) {
+      result = applyTeamPickInTree(result, path, winner);
+    }
+    remaining = remaining.filter((path) => !matched.includes(path));
+  }
+
+  return result;
 }
 
 /** Returns whether `path` (root-first ancestor labels) resolves to an actual node in the tree. */

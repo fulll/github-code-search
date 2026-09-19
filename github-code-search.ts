@@ -33,7 +33,12 @@ import {
 import { checkForUpdate } from "./src/upgrade.ts";
 import { runInteractive } from "./src/tui.ts";
 import { generateCompletion, detectShell } from "./src/completions.ts";
-import { buildApiQuery, isRegexQuery, validateQuoteBalance } from "./src/regex.ts";
+import {
+  buildApiQuery,
+  detectPathWildcardLimitation,
+  isRegexQuery,
+  validateQuoteBalance,
+} from "./src/regex.ts";
 import type { OutputFormat, OutputType } from "./src/types.ts";
 
 // Version + build metadata injected at compile time via --define (see build.ts).
@@ -279,6 +284,14 @@ async function searchAction(
   if (quoteError) {
     console.error(style.red(`Error: ${quoteError}`));
     process.exit(1);
+  }
+
+  // Non-fatal: warn when path: is used with a "*" glob wildcard, which GitHub's
+  // API silently ignores rather than expanding — the search would otherwise
+  // appear to return no/wrong results with no explanation.
+  const pathWildcardWarning = detectPathWildcardLimitation(query);
+  if (pathWildcardWarning) {
+    console.error(style.yellow(`⚠  ${pathWildcardWarning}`));
   }
 
   const org = opts.org;

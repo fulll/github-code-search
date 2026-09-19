@@ -25,7 +25,7 @@ The value of `--group-by-team-prefix` is a small grammar:
 - `,` separates **independent chains** — each is grouped on its own, in order, against whatever repos the previous chains haven't already claimed.
 
 ```bash
-# One 2-level chain: group by tribe- first, then by squad- within each gamme
+# One 2-level chain: group by tribe- first, then by squad- within each tribe
 github-code-search "useFeatureFlag" --org fulll \
   --group-by-team-prefix tribe-/squad-
 ```
@@ -74,23 +74,23 @@ This cascades across any number of overlapping names (all merging into one secti
 
 ## squad-backend
 
-- **fulll/billing-api** (3 matches)
-  - [ ] [src/flags.ts:3:14](https://github.com/fulll/billing-api/blob/main/src/flags.ts#L3)
+- **fulll/service-b** (3 matches)
+  - [ ] [src/flags.ts:3:14](https://github.com/fulll/service-b/blob/main/src/flags.ts#L3)
 
 ## squad-frontend
 
-- **fulll/auth-service** (2 matches)
-  - [ ] [src/middlewares/featureFlags.ts:2:19](https://github.com/fulll/auth-service/blob/main/src/middlewares/featureFlags.ts#L2)
+- **fulll/service-a** (2 matches)
+  - [ ] [src/middlewares/featureFlags.ts:2:19](https://github.com/fulll/service-a/blob/main/src/middlewares/featureFlags.ts#L2)
 
 ## squad-frontend + squad-mobile
 
-- **fulll/frontend-app** (1 match)
-  - [ ] [src/hooks/useFeatureFlag.ts:1:1](https://github.com/fulll/frontend-app/blob/main/src/hooks/useFeatureFlag.ts#L1)
+- **fulll/app-a** (1 match)
+  - [ ] [src/hooks/useFeatureFlag.ts:1:1](https://github.com/fulll/app-a/blob/main/src/hooks/useFeatureFlag.ts#L1)
 
 ## other
 
-- **fulll/legacy-monolith** (1 match)
-  - [ ] [src/legacy.js:5:1](https://github.com/fulll/legacy-monolith/blob/main/src/legacy.js#L5)
+- **fulll/legacy-app** (1 match)
+  - [ ] [src/legacy.js:5:1](https://github.com/fulll/legacy-app/blob/main/src/legacy.js#L5)
 ```
 
 ### Nested (`tribe-/squad-`) output
@@ -103,19 +103,19 @@ Nested levels render as consecutive markdown headings (`##`, `###`, `####`, …,
 ## tribe-a
 ### squad-a
 
-- **fulll/bank** (1 match)
-  - [ ] [src/index.ts:3:14](https://github.com/fulll/bank/blob/main/src/index.ts#L3)
+- **fulll/service-c** (1 match)
+  - [ ] [src/index.ts:3:14](https://github.com/fulll/service-c/blob/main/src/index.ts#L3)
 
 ## tribe-b
 ### squad-core + squad-mobile
 
-- **fulll/tools-mobile** (1 match)
-  - [ ] [src/index.ts:1:1](https://github.com/fulll/tools-mobile/blob/main/src/index.ts#L1)
+- **fulll/mobile-app** (1 match)
+  - [ ] [src/index.ts:1:1](https://github.com/fulll/mobile-app/blob/main/src/index.ts#L1)
 
 ### other
 
-- **fulll/wizard-mobile** (1 match)
-  - [ ] [src/index.ts:2:5](https://github.com/fulll/wizard-mobile/blob/main/src/index.ts#L2)
+- **fulll/mobile-app-legacy** (1 match)
+  - [ ] [src/index.ts:2:5](https://github.com/fulll/mobile-app-legacy/blob/main/src/index.ts#L2)
 
 ## other
 
@@ -131,7 +131,7 @@ Each result carries its full hierarchy path (root first) in a `section` array:
 {
   "results": [
     {
-      "repo": "fulll/tools-mobile",
+      "repo": "fulll/mobile-app",
       "section": ["tribe-b", "squad-core + squad-mobile"],
       "matches": [{ "path": "src/index.ts", "url": "...", "line": 1, "col": 1 }]
     }
@@ -146,12 +146,12 @@ In the TUI, team sections appear as separator lines between repository rows, ind
 ```text
 ── tribe-a
   ── squad-a
-▶ ◉  fulll/bank  (1 match)
+▶ ◉  fulll/service-c  (1 match)
 ── tribe-b
   ── squad-core + squad-mobile
-▶ ◉  fulll/tools-mobile  (1 match)
+▶ ◉  fulll/mobile-app  (1 match)
   ── other
-▶ ◉  fulll/wizard-mobile  (1 match)
+▶ ◉  fulll/mobile-app-legacy  (1 match)
 ── other
 ▶ ◉  fulll/github-code-search  (1 match)
 ```
@@ -252,7 +252,7 @@ Navigate to any **picked repo** (marked `◈`) and press **`t`** to enter re-pic
 
 ```text
   ── squad-core
-▶ ◈  fulll/tools-mobile              ← press t here
+▶ ◈  fulll/mobile-app              ← press t here
 ```
 
 The hints bar shows a horizontal pick bar — exactly like team pick mode — with the current focused team highlighted in `[ brackets ]`:
@@ -274,7 +274,7 @@ Pressing `0` or `u` in re-pick mode restores **all** repos from the same combine
 
 ```text
   ── squad-core + squad-mobile      ← all repos restored
-▶ ◉  fulll/tools-mobile
+▶ ◉  fulll/mobile-app
 ```
 
 In **non-interactive mode**, undoing a pick is implicit: simply omit the `--pick-team` flag for that combined section in the replay command.

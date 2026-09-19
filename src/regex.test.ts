@@ -1,5 +1,11 @@
 import { describe, expect, it } from "bun:test";
-import { buildApiQuery, escapeApiTerm, isRegexQuery, validateQuoteBalance } from "./regex.ts";
+import {
+  buildApiQuery,
+  detectPathWildcardLimitation,
+  escapeApiTerm,
+  isRegexQuery,
+  validateQuoteBalance,
+} from "./regex.ts";
 
 // ─── isRegexQuery ─────────────────────────────────────────────────────────────
 
@@ -375,5 +381,46 @@ describe("validateQuoteBalance (issue #149)", () => {
 
   it("returns null for four unescaped quotes (two balanced phrases)", () => {
     expect(validateQuoteBalance('"foo" "bar"')).toBeNull();
+  });
+});
+
+describe("detectPathWildcardLimitation (issue: path:*.ext silently returns no results)", () => {
+  it("warns when path: is used with a glob-style extension wildcard", () => {
+    // Regression: `path:*.tf ACME123456789.EXAMPLE_CUSTOMER` returns zero results,
+    // while the equivalent `language:hcl ACME123456789.EXAMPLE_CUSTOMER` works —
+    // GitHub's code search API silently ignores the `*` wildcard character
+    // rather than expanding it as a glob, so `path:*.tf` is effectively
+    // matched as `path:.tf`, which rarely matches any real file path.
+    const warn = detectPathWildcardLimitation("path:*.tf ACME123456789.EXAMPLE_CUSTOMER");
+    expect(warn).toBeDefined();
+    expect(warn).toContain("path:*.tf");
+    expect(warn).toContain("language:");
+    expect(warn).toContain("extension:");
+  });
+
+  it("returns undefined for a query with no path: qualifier", () => {
+    expect(
+      detectPathWildcardLimitation("language:hcl ACME123456789.EXAMPLE_CUSTOMER"),
+    ).toBeUndefined();
+  });
+
+  it("returns undefined when path: has no wildcard character", () => {
+    expect(detectPathWildcardLimitation("path:terraform language:hcl connect")).toBeUndefined();
+  });
+
+  it("detects the wildcard even when path: is not the first qualifier", () => {
+    const warn = detectPathWildcardLimitation("connect language:hcl path:*.tf");
+    expect(warn).toBeDefined();
+    expect(warn).toContain("path:*.tf");
+  });
+
+  it("detects a wildcard-quoted path value", () => {
+    const warn = detectPathWildcardLimitation('connect path:"*.tf"');
+    expect(warn).toBeDefined();
+    expect(warn).toContain('path:"*.tf"');
+  });
+
+  it("returns undefined for an empty query", () => {
+    expect(detectPathWildcardLimitation("")).toBeUndefined();
   });
 });
