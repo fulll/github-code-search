@@ -9,7 +9,8 @@
  *   github-code-search query <query> --org <org> [options]
  *
  * Requirements:
- *   GITHUB_TOKEN env var must be set (for search; optional for upgrade).
+ *   GITHUB_TOKEN env var must be set (for search; optional for upgrade),
+ *   or the GitHub CLI (`gh`) installed and authenticated as a fallback.
  */
 
 import { Command, Option, program } from "commander";
@@ -33,6 +34,7 @@ import {
 import { checkForUpdate } from "./src/upgrade.ts";
 import { runInteractive } from "./src/tui.ts";
 import { generateCompletion, detectShell } from "./src/completions.ts";
+import { getGhAuthToken } from "./src/gh-cli.ts";
 import {
   buildApiQuery,
   detectPathWildcardLimitation,
@@ -281,9 +283,17 @@ async function searchAction(
   },
 ): Promise<void> {
   // ─── GitHub API token ───────────────────────────────────────────────────────
-  const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+  // Falls back to `gh auth token` when GITHUB_TOKEN isn't set and the GitHub
+  // CLI is installed and authenticated — see src/gh-cli.ts.
+  const GITHUB_TOKEN = process.env.GITHUB_TOKEN ?? getGhAuthToken();
   if (!GITHUB_TOKEN) {
-    console.error(style.red("Error: GITHUB_TOKEN environment variable is not set."));
+    console.error(
+      style.red(
+        "Error: GITHUB_TOKEN environment variable is not set, and no token could be " +
+          "retrieved via `gh auth token` (install and authenticate the GitHub CLI, " +
+          "or set GITHUB_TOKEN directly).",
+      ),
+    );
     process.exit(1);
   }
 
@@ -590,7 +600,8 @@ program
   .option("--debug", "Print debug information for troubleshooting")
   .action(async (opts: { debug?: boolean }) => {
     const { performUpgrade } = await import("./src/upgrade.ts");
-    const token = process.env.GITHUB_TOKEN;
+    // Falls back to `gh auth token` — same as the search commands, see src/gh-cli.ts.
+    const token = process.env.GITHUB_TOKEN ?? getGhAuthToken();
     // Fix: in some Bun versions, process.execPath returns the Bun runtime path
     // (e.g. ~/.bun/bin/bun) or an internal /$bunfs/ path instead of the compiled
     // binary path — which causes the mv to fail or replace the wrong file.
