@@ -22,8 +22,12 @@ on:
 #     - each vX/ snapshot from the gh-pages branch merged in
 #   → single artifact deployed via actions/deploy-pages
 # • Snapshot job stores the built snapshot in gh-pages branch via plain git,
-#   then pushes the updated versions.json to main (no [skip ci]) which
-#   re-triggers the deploy job to include the new snapshot immediately.
+#   then merges a PR updating versions.json on main. That merge is itself
+#   GITHUB_TOKEN-authored (via the API), so it does NOT cascade into a new
+#   `push`-triggered run — the snapshot job explicitly dispatches this
+#   workflow (workflow_dispatch) for main right after merging, so the new
+#   snapshot goes live immediately instead of waiting for an unrelated
+#   docs change.
 # Requires: Settings → Pages → Source: GitHub Actions.
 permissions:
   contents: write
@@ -118,8 +122,9 @@ jobs:
   #    push is rejected. Since GITHUB_TOKEN-authored events don't trigger new
   #    workflow runs, ci.yaml is explicitly dispatched (workflow_dispatch is
   #    exempt from that restriction) for this branch/SHA and awaited before
-  #    merging. Once merged (no [skip ci]), the push re-triggers the deploy
-  #    job so the new snapshot goes live.
+  #    merging. The merge itself is also GITHUB_TOKEN-authored, so it won't
+  #    trigger this workflow's own `push` trigger either — this workflow is
+  #    explicitly dispatched for main right after merging instead.
   #
   # Convention: only tags matching vX.0.0 (major bumps) trigger a snapshot.
   # Patch and minor releases update the main docs in-place via the deploy job.
@@ -267,7 +272,7 @@ jobs:
           PY
           fi
 
-      - name: Open PR with versions.json and blog stub, run CI, and merge
+      - name: Open PR with versions.json and blog stub, run CI, merge, and deploy
         # main is protected by a ruleset requiring signed commits and passing
         # status checks — a direct push (previously via
         # stefanzweifel/git-auto-commit-action) is rejected. Open a PR instead:
@@ -280,7 +285,9 @@ jobs:
         # and auto-merge would wait indefinitely. workflow_dispatch is
         # exempted from that restriction, so we explicitly dispatch ci.yaml
         # for this branch/SHA, wait for it, then merge directly once it's
-        # green — see review on PR #215.
+        # green — see review on PR #215. The merge push is ALSO
+        # GITHUB_TOKEN-authored, so this workflow's own `push` trigger won't
+        # fire either — dispatch it explicitly for main afterwards.
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -304,6 +311,13 @@ jobs:
           git checkout -B "$BRANCH" origin/main
           git stash pop
           git add docs/public/versions.json docs/blog/
+          # The pre-rebase guard above doesn't cover this state: origin/main
+          # may already carry this exact metadata (e.g. a retry after it was
+          # applied manually), in which case there's nothing left to commit.
+          if git diff --staged --quiet; then
+            echo "No changes remaining after rebasing onto origin/main — already up to date, skipping."
+            exit 0
+          fi
           git commit -m "docs: add ${MAJOR} to versions.json and blog"
           git push --force origin "$BRANCH"
           SHA="$(git rev-parse HEAD)"
@@ -337,3 +351,9 @@ jobs:
           gh run watch "$RUN_ID" --exit-status
 
           gh pr merge "$BRANCH" --squash
+
+          # This merge is itself GITHUB_TOKEN-authored, so the resulting push
+          # to main won't trigger docs.yaml's `push` trigger either — dispatch
+          # it explicitly so the deploy job picks up the new snapshot now,
+          # instead of waiting for the next unrelated docs change to main.
+          gh workflow run docs.yaml --ref main
