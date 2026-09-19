@@ -3,9 +3,9 @@
 // Fallback for GITHUB_TOKEN: when the env var isn't set, detect whether the
 // GitHub CLI (`gh`) is installed and, if so, retrieve a token via
 // `gh auth token`. Pure decision logic lives in `resolveGhAuthToken` (unit
-// tested via injected `which`/`runAuthToken`); `getGhAuthToken` is the sole,
-// untested call site for the real `Bun.which` / subprocess spawn, mirroring
-// how `render/terminal.ts` is the sole call site for other Bun APIs.
+// tested via injected `which`/`runAuthToken`); `getGhAuthToken` is the sole
+// call site for the real `Bun.which` / subprocess spawn, tested by
+// reassigning those globals rather than spawning a real `gh` process.
 
 /** Result of a single subprocess invocation, abstracted for testability. */
 export interface ExecResult {
