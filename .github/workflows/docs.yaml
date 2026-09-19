@@ -22,8 +22,12 @@ on:
 #     - each vX/ snapshot from the gh-pages branch merged in
 #   → single artifact deployed via actions/deploy-pages
 # • Snapshot job stores the built snapshot in gh-pages branch via plain git,
-#   then pushes the updated versions.json to main (no [skip ci]) which
-#   re-triggers the deploy job to include the new snapshot immediately.
+#   then merges a PR updating versions.json on main. That merge is itself
+#   GITHUB_TOKEN-authored (via the API), so it does NOT cascade into a new
+#   `push`-triggered run — the snapshot job explicitly dispatches this
+#   workflow (workflow_dispatch) for main right after merging, so the new
+#   snapshot goes live immediately instead of waiting for an unrelated
+#   docs change.
 # Requires: Settings → Pages → Source: GitHub Actions.
 permissions:
   contents: write
@@ -113,8 +117,14 @@ jobs:
   # 2. Stores the output in the gh-pages branch under /v2/ using plain git
   #    (no third-party action). The gh-pages branch is storage only — Pages
   #    still points to GitHub Actions; the deploy job merges snapshots in.
-  # 3. Prepends the entry to versions.json on main WITHOUT [skip ci], which
-  #    re-triggers the deploy job so the new snapshot is live immediately.
+  # 3. Opens a PR with the versions.json + blog stub changes against main —
+  #    main requires signed commits and passing status checks, so a direct
+  #    push is rejected. Since GITHUB_TOKEN-authored events don't trigger new
+  #    workflow runs, ci.yaml is explicitly dispatched (workflow_dispatch is
+  #    exempt from that restriction) for this branch/SHA and awaited before
+  #    merging. The merge itself is also GITHUB_TOKEN-authored, so it won't
+  #    trigger this workflow's own `push` trigger either — this workflow is
+  #    explicitly dispatched for main right after merging instead.
   #
   # Convention: only tags matching vX.0.0 (major bumps) trigger a snapshot.
   # Patch and minor releases update the main docs in-place via the deploy job.
@@ -124,6 +134,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
+      actions: write
 
     steps:
       - name: Checkout
@@ -188,9 +200,13 @@ jobs:
         run: |
           MAJOR="${{ steps.ver.outputs.major }}"
           LINK="/${MAJOR}/"
-          # Idempotent — skip if the entry already exists.
-          jq --arg text "$MAJOR" --arg link "$LINK" \
-            'if any(.[]; .link == $link) then . else [{"text": $text, "link": $link}] + . end' \
+          # Idempotent — skip if the entry already exists. Otherwise, prepend
+          # the new version tagged "(latest)" and strip that suffix from any
+          # previous entry, since it's now superseded.
+          jq --arg text "$MAJOR (latest)" --arg link "$LINK" \
+            'if any(.[]; .link == $link) then .
+             else [{"text": $text, "link": $link}] + (map(.text |= sub(" [(]latest[)]$"; "")))
+             end' \
             docs/public/versions.json > /tmp/versions_new.json
           mv /tmp/versions_new.json docs/public/versions.json
 
@@ -256,12 +272,88 @@ jobs:
           PY
           fi
 
-      - name: Commit blog stub and versions.json to main
-        # Pin to exact commit SHA to prevent supply-chain attacks.
-        uses: stefanzweifel/git-auto-commit-action@8621497c8c39c72f3e2a999a26b4ca1b5058a842 # v5.0.1
-        with:
-          # No [skip ci] — the push to main matches paths: docs/** and re-triggers
-          # the deploy job, which merges the new snapshot into the Pages artifact.
-          commit_message: "docs: add ${{ steps.ver.outputs.major }} to versions.json and blog"
-          file_pattern: docs/public/versions.json docs/blog/
-          branch: main
+      - name: Open PR with versions.json and blog stub, run CI, merge, and deploy
+        # main is protected by a ruleset requiring signed commits and passing
+        # status checks — a direct push (previously via
+        # stefanzweifel/git-auto-commit-action) is rejected. Open a PR instead:
+        # GitHub's own merge-via-API produces a Verified commit.
+        #
+        # `gh pr merge --auto` alone is NOT enough here: this PR/branch is
+        # created using the default GITHUB_TOKEN, and events authored by that
+        # token don't cascade into new workflow runs — ci.yaml's `pull_request`
+        # trigger never fires, the required checks stay "expected" forever,
+        # and auto-merge would wait indefinitely. workflow_dispatch is
+        # exempted from that restriction, so we explicitly dispatch ci.yaml
+        # for this branch/SHA, wait for it, then merge directly once it's
+        # green — see review on PR #215. The merge push is ALSO
+        # GITHUB_TOKEN-authored, so this workflow's own `push` trigger won't
+        # fire either — dispatch it explicitly for main afterwards.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          MAJOR="${{ steps.ver.outputs.major }}"
+          BRANCH="docs/${MAJOR}-snapshot-metadata"
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/public/versions.json docs/blog/
+          if git diff --staged --quiet; then
+            echo "No changes to commit — skipping."
+            exit 0
+          fi
+
+          # Re-base the pending changes onto a fresh branch off origin/main —
+          # the tag checkout and main's tip are normally the same commit, but
+          # this is robust even if main advanced in between.
+          git stash
+          git fetch origin main
+          git checkout -B "$BRANCH" origin/main
+          git stash pop
+          git add docs/public/versions.json docs/blog/
+          # The pre-rebase guard above doesn't cover this state: origin/main
+          # may already carry this exact metadata (e.g. a retry after it was
+          # applied manually), in which case there's nothing left to commit.
+          if git diff --staged --quiet; then
+            echo "No changes remaining after rebasing onto origin/main — already up to date, skipping."
+            exit 0
+          fi
+          git commit -m "docs: add ${MAJOR} to versions.json and blog"
+          git push --force origin "$BRANCH"
+          SHA="$(git rev-parse HEAD)"
+
+          PR_URL=$(gh pr create --base main --head "$BRANCH" \
+            --title "docs: add ${MAJOR} to versions.json and blog" \
+            --body "Automated versioned-docs snapshot metadata for \`${GITHUB_REF_NAME}\`." \
+            2>&1) || PR_URL=$(gh pr view "$BRANCH" --json url -q .url)
+          echo "Opened $PR_URL"
+
+          gh workflow run ci.yaml --ref "$BRANCH"
+          RUN_ID=""
+          for _ in $(seq 1 10); do
+            # Filter by headSha, not just the newest run for this branch — a
+            # retry (or an earlier attempt reusing this branch name) can leave
+            # a stale, already-green run around whose SHA no longer matches
+            # what was just pushed. See review on PR #215.
+            # Note: gh's --jq takes a single expression string — it has no
+            # --arg support like the jq binary, so interpolate $SHA directly
+            # (safe: it's the output of `git rev-parse HEAD`, not user input).
+            RUN_ID=$(gh run list --workflow=ci.yaml --branch="$BRANCH" \
+              --event=workflow_dispatch --limit=10 --json databaseId,headSha \
+              --jq "[.[] | select(.headSha == \"${SHA}\")] | .[0].databaseId // empty")
+            [ -n "$RUN_ID" ] && break
+            sleep 3
+          done
+          if [ -z "$RUN_ID" ]; then
+            echo "::error::Could not find the dispatched CI run for $BRANCH at $SHA" >&2
+            exit 1
+          fi
+          gh run watch "$RUN_ID" --exit-status
+
+          gh pr merge "$BRANCH" --squash
+
+          # This merge is itself GITHUB_TOKEN-authored, so the resulting push
+          # to main won't trigger docs.yaml's `push` trigger either — dispatch
+          # it explicitly so the deploy job picks up the new snapshot now,
+          # instead of waiting for the next unrelated docs change to main.
+          gh workflow run docs.yaml --ref main

@@ -1,1 +1,10 @@
-[{ "text": "v1 (latest)", "link": "/" }]
+[
+  {
+    "text": "v2 (latest)",
+    "link": "/v2/"
+  },
+  {
+    "text": "v1",
+    "link": "/"
+  }
+]
