@@ -287,11 +287,11 @@ async function searchAction(
   // CLI is installed and authenticated — see src/gh-cli.ts.
   const GITHUB_TOKEN = process.env.GITHUB_TOKEN ?? getGhAuthToken();
   if (!GITHUB_TOKEN) {
+    console.error(style.red("Error: GITHUB_TOKEN environment variable is not set."));
     console.error(
-      style.red(
-        "Error: GITHUB_TOKEN environment variable is not set, and no token could be " +
-          "retrieved via `gh auth token` (install and authenticate the GitHub CLI, " +
-          "or set GITHUB_TOKEN directly).",
+      style.dim(
+        "Tip: install and authenticate the GitHub CLI (`gh auth login`) to use " +
+          "`gh auth token` as a fallback.",
       ),
     );
     process.exit(1);

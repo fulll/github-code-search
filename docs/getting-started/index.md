@@ -35,6 +35,10 @@ Add this to your shell profile (`~/.zshrc`, `~/.bashrc`, `~/.config/fish/config.
 Never commit your token to version control. Use environment variables or a secrets manager.
 :::
 
+::: tip Already using the GitHub CLI?
+If `GITHUB_TOKEN` isn't set and [`gh`](https://cli.github.com/) is installed and authenticated (`gh auth login`), `github-code-search` automatically retrieves a token via `gh auth token` — no extra setup needed. Applies to the search commands and the `upgrade` subcommand.
+:::
+
 ## Default organization
 
 If you mostly search a single organization, set `GCS_DEFAULT_ORG` once to omit `--org` on every call:

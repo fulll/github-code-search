@@ -30,7 +30,7 @@ Successfully upgraded to v1.3.0.
 
 ## Token requirement
 
-The `upgrade` subcommand works without a `GITHUB_TOKEN`. A token is used only if the `GITHUB_TOKEN` environment variable is already set (to avoid GitHub API rate limiting on the release fetch).
+The `upgrade` subcommand works without a `GITHUB_TOKEN`. A token is used only if the `GITHUB_TOKEN` environment variable is set, or otherwise retrieved via `gh auth token` when the [GitHub CLI](https://cli.github.com/) is installed and authenticated (to avoid GitHub API rate limiting on the release fetch).
 
 ## Checking the current version
 

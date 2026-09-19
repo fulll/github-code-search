@@ -11,7 +11,7 @@
 | `CI`                           | ❌       | `false`              | Set to `true` to disable the interactive TUI and print results directly to stdout. Automatically set by GitHub Actions, GitLab CI, CircleCI and most CI platforms. |
 | `GITHUB_CODE_SEARCH_CACHE_DIR` | ❌       | OS-dependent (below) | Override the directory used to cache the team list when `--group-by-team-prefix` is set.                                                                           |
 
-¹ Required unless the [GitHub CLI](https://cli.github.com/) is installed and authenticated — `gh auth token` is used as a fallback.
+¹ Required for the search commands, unless the [GitHub CLI](https://cli.github.com/) is installed and authenticated — `gh auth token` is used as a fallback. The `upgrade` subcommand never requires a token; it only uses one opportunistically (higher GitHub API rate limits) when available.
 
 ## `GITHUB_TOKEN`
 
