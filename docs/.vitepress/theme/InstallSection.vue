@@ -153,6 +153,27 @@ function copySearch() {
           <h3 class="is-step-label">
             <span class="sr-only">Step 2: </span>Export your GitHub token
           </h3>
+          <div class="is-token-hint is-token-hint-skip">
+            <svg
+              class="is-info-icon"
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 16v-4M12 8h.01" />
+            </svg>
+            Already using the
+            <a href="https://cli.github.com/" target="_blank" rel="noopener noreferrer"
+              >GitHub CLI</a
+            >? Skip this step — a token is retrieved automatically via <code>gh auth token</code>.
+          </div>
           <div class="is-token-hint">
             <svg
               class="is-info-icon"
