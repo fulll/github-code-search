@@ -1,6 +1,6 @@
 # Team grouping
 
-`--group-by-team-prefix` organises result repositories by their GitHub team membership. It is especially useful in large organisations with multiple squads or chapters.
+`--group-by-team-prefix` organises result repositories by their GitHub team membership, as a **hierarchy** of headings. It is especially useful in large organisations with multiple tribes, chapters or squads.
 
 ## Prerequisites
 
@@ -15,76 +15,159 @@ github-code-search "useFeatureFlag" --org fulll \
   --group-by-team-prefix squad-
 ```
 
-Pass one or more **comma-separated prefixes**. The tool fetches all org teams whose **slugs** (derived from the team name) start with any of the given prefixes, then groups repositories accordingly.
+Pass one or more team-name prefixes. The tool fetches all org teams whose **slugs** (derived from the team name) start with any of the given prefixes, then groups repositories accordingly.
+
+## Chain syntax: nesting and independent chains
+
+The value of `--group-by-team-prefix` is a small grammar:
+
+- `/` nests levels **within one chain** — repos are grouped by the first prefix, then each resulting section is sub-grouped by the next prefix, and so on.
+- `,` separates **independent chains** — each is grouped on its own, in order, against whatever repos the previous chains haven't already claimed.
 
 ```bash
-# Multiple prefixes
+# One 2-level chain: group by tribe- first, then by squad- within each tribe
 github-code-search "useFeatureFlag" --org fulll \
-  --group-by-team-prefix squad-,chapter-
+  --group-by-team-prefix tribe-/squad-
 ```
+
+```bash
+# A 2-level chain (tribe-/squad-) plus an independent 1-level chain (chapter-)
+github-code-search "useFeatureFlag" --org fulll \
+  --group-by-team-prefix tribe-/squad-,chapter-
+```
+
+A chain can have as many levels as you need (`tribe-/squad-/chapter-`, …). Malformed segments (a stray leading/trailing/double `,` or `/`) are dropped with a warning on stderr rather than silently producing an empty prefix.
 
 ## Grouping algorithm
 
-The grouping is applied sequentially, one prefix at a time:
+Within **one level** of a chain, repos are bucketed exactly the same way regardless of depth:
 
-1. **First prefix** (`squad-`)
-   - Repos belonging to **exactly 1** matching team → one section per team, sorted alphabetically.
-   - Repos belonging to **2** matching teams → one section per combination, sorted alphabetically.
-   - Repos belonging to **3+** matching teams → same, in ascending combination-size order.
-2. **Next prefix** (`chapter-`) — applied to repos **not yet assigned** in the previous step.
-3. Repos matching **no prefix** → collected into an `other` section at the end.
+1. Repos belonging to **exactly 1** matching team at this level → one section per team, sorted alphabetically.
+2. Repos belonging to **2** matching teams → one section per combination (e.g. `squad-a + squad-b`), sorted alphabetically.
+3. Repos belonging to **3+** matching teams → same, in ascending combination-size order.
+4. Repos matching **no team** at this level → collected into an `other` section.
+
+Every matching team is kept in the combined-section label, even when one team's name happens to be a prefix of another's (e.g. `chapter-architect` and `chapter-architect-a`) — GitHub team memberships are independent, so a name prefix doesn't imply membership in the other team. If a chain of narrow, noisy sub-teams (e.g. many `chapter-validators-*` teams) is inflating your combined labels, use [`--exclude-team-prefixes`](#excluding-noisy-team-prefixes) to strip them explicitly before grouping.
+
+Then, for a chain with more levels, **every section produced above is recursively sub-grouped** by the next prefix — including its own `other` bucket, which becomes a nested `other` at the next depth.
+
+Every level of a chain is tried in order against whatever repos the _earlier levels of that same chain_ haven't already claimed — a repo that only matches `squad-` (not `tribe-`) in a `tribe-/squad-` chain still gets its own top-level section from `squad-`, instead of being invisible to the chain and falling through to a later chain or `other`.
+
+Independent chains (separated by `,`) are processed in order, each consuming repos from the pool not yet claimed by an earlier chain. Repos matched by no chain at all end up in a single top-level `other` section.
+
+### Automatic combining of overlapping team names
+
+Within one level, if a team's name is a **prefix of another team's name** (e.g. `tribe-a` and `tribe-a-p1`), the tool combines them into one section automatically — instead of listing them as unrelated siblings or nesting one under the other:
+
+```text
+## tribe-a + tribe-a-p1
+```
+
+This cascades across any number of overlapping names (all merging into one section), and applies independently at every depth of a chain. The combined section behaves exactly like a multi-team combo — `--pick-team` and [`--pick-team-auto`](#auto-pick-by-common-prefix) can resolve it the same way.
 
 ## Non-interactive output
+
+### Flat (single-level) output
 
 ```text
 4 repos · 5 files · 6 matches selected
 
 ## squad-backend
 
-- **fulll/billing-api** (3 matches)
-  - [ ] [src/flags.ts:3:14](https://github.com/fulll/billing-api/blob/main/src/flags.ts#L3)
+- **fulll/service-b** (3 matches)
+  - [ ] [src/flags.ts:3:14](https://github.com/fulll/service-b/blob/main/src/flags.ts#L3)
 
 ## squad-frontend
 
-- **fulll/auth-service** (2 matches)
-  - [ ] [src/middlewares/featureFlags.ts:2:19](https://github.com/fulll/auth-service/blob/main/src/middlewares/featureFlags.ts#L2)
+- **fulll/service-a** (2 matches)
+  - [ ] [src/middlewares/featureFlags.ts:2:19](https://github.com/fulll/service-a/blob/main/src/middlewares/featureFlags.ts#L2)
 
 ## squad-frontend + squad-mobile
 
-- **fulll/frontend-app** (1 match)
-  - [ ] [src/hooks/useFeatureFlag.ts:1:1](https://github.com/fulll/frontend-app/blob/main/src/hooks/useFeatureFlag.ts#L1)
+- **fulll/app-a** (1 match)
+  - [ ] [src/hooks/useFeatureFlag.ts:1:1](https://github.com/fulll/app-a/blob/main/src/hooks/useFeatureFlag.ts#L1)
 
 ## other
 
-- **fulll/legacy-monolith** (1 match)
-  - [ ] [src/legacy.js:5:1](https://github.com/fulll/legacy-monolith/blob/main/src/legacy.js#L5)
+- **fulll/legacy-app** (1 match)
+  - [ ] [src/legacy.js:5:1](https://github.com/fulll/legacy-app/blob/main/src/legacy.js#L5)
+```
+
+### Nested (`tribe-/squad-`) output
+
+Nested levels render as consecutive markdown headings (`##`, `###`, `####`, …, capped at H6) — a sibling section that shares an ancestor with the previous one doesn't repeat that ancestor's heading:
+
+```text
+7 repos · 7 files · 8 matches selected
+
+## tribe-a
+### squad-a
+
+- **fulll/service-c** (1 match)
+  - [ ] [src/index.ts:3:14](https://github.com/fulll/service-c/blob/main/src/index.ts#L3)
+
+## tribe-b
+### squad-core + squad-mobile
+
+- **fulll/mobile-app** (1 match)
+  - [ ] [src/index.ts:1:1](https://github.com/fulll/mobile-app/blob/main/src/index.ts#L1)
+
+### other
+
+- **fulll/mobile-app-legacy** (1 match)
+  - [ ] [src/index.ts:2:5](https://github.com/fulll/mobile-app-legacy/blob/main/src/index.ts#L2)
+
+## other
+
+- **fulll/github-code-search** (1 match)
+  - [ ] [src/index.ts:7:1](https://github.com/fulll/github-code-search/blob/main/src/index.ts#L7)
+```
+
+### JSON output
+
+Each result carries its full hierarchy path (root first) in a `section` array:
+
+```json
+{
+  "results": [
+    {
+      "repo": "fulll/mobile-app",
+      "section": ["tribe-b", "squad-core + squad-mobile"],
+      "matches": [{ "path": "src/index.ts", "url": "...", "line": 1, "col": 1 }]
+    }
+  ]
+}
 ```
 
 ## Interactive mode with sections
 
-In the TUI, team sections appear as separator lines between repository rows:
+In the TUI, team sections appear as separator lines between repository rows, indented by 2 spaces per nesting level:
 
 ```text
-── squad-frontend
-▶ ◉  fulll/auth-service  (2 matches)
-── squad-mobile
-▶ ◉  fulll/frontend-app  (1 match)
+── tribe-a
+  ── squad-a
+▶ ◉  fulll/service-c  (1 match)
+── tribe-b
+  ── squad-core + squad-mobile
+▶ ◉  fulll/mobile-app  (1 match)
+  ── other
+▶ ◉  fulll/mobile-app-legacy  (1 match)
 ── other
-▶ ◉  fulll/legacy-monolith  (1 match)
+▶ ◉  fulll/github-code-search  (1 match)
 ```
 
-Section header rows **are navigable** — `↑` / `↓` can land on them. Pressing `p` while the cursor rests on a multi-team section header enters [team pick mode](#team-pick-mode).
+Section header rows **are navigable** at any depth — `↑` / `↓` can land on them. Pressing `p` while the cursor rests on a multi-team section header enters [team pick mode](#team-pick-mode), regardless of its nesting level.
 
 ## Team pick mode
 
-When a section header shows multiple teams (e.g. `squad-frontend + squad-mobile`), pressing `p` on it enters **team pick mode**. Use this to assign the entire section to a single owner before exporting results to downstream tooling.
+When a section header shows multiple teams (e.g. `squad-frontend + squad-mobile`), pressing `p` on it enters **team pick mode**. Use this to assign the entire section — including any nested sub-sections underneath it — to a single owner before exporting results to downstream tooling.
 
 ### In the TUI
 
-The section header switches to a horizontal pick bar:
+The section header switches to a horizontal pick bar, at whatever depth the cursor was on:
 
 ```
-── [ squad-frontend ]  squad-mobile
+  ── [ squad-core ]  squad-mobile
 ```
 
 The highlighted team (bold, full colour, wrapped in `[ ]`) is the current selection. The others are dimmed.
@@ -107,30 +190,75 @@ github-code-search query "useFeatureFlag" --org fulll \
   --pick-team "squad-frontend + squad-mobile"=squad-frontend
 ```
 
-The flag is repeatable — add one `--pick-team` per combined section to resolve. The replay command emits `--pick-team` automatically when a pick was confirmed in the TUI.
+The combined label can be:
+
+- **A bare label** (as above) — auto-resolved as long as it's **unambiguous** anywhere in the hierarchy. Since a label like `other` (or even a specific combination) can legitimately appear under more than one parent, an ambiguous bare label is rejected with the list of full paths to choose from.
+- **A fully-qualified path**, joined with `>`, when the label is ambiguous or you'd rather be explicit:
+
+  ```bash
+  --pick-team "tribe-a > squad-a + squad-b"=squad-a
+  ```
+
+The flag is repeatable — add one `--pick-team` per combined section to resolve. The replay command emits `--pick-team` automatically (with a fully-qualified path when the pick was made on a nested section) when a pick was confirmed in the TUI.
 
 > **Note:** Per-repo re-picks performed in the TUI (pressing `t` on a `◈` repo) are **not** encoded in the replay command. They are interactive-only adjustments and must be repeated manually if you re-run the command.
 
-If the combined label is not found (typo, or the section was not formed), a warning is emitted on stderr listing the available combined sections — the run continues without error.
+If the combined label or path is not found (typo, ambiguous, or the section was not formed), a warning is emitted on stderr listing the available combined sections — the run continues without error.
+
+## Auto-pick by common prefix
+
+Many combined sections aren't actually ambiguous: when one of the team names is a literal prefix of every other team name in the combo (e.g. `tribe-a` and `tribe-a-p1`), the "parent" team is the obvious owner. `--pick-team-auto` resolves these automatically, without needing a manual `--pick-team`:
+
+```bash
+github-code-search query "useFeatureFlag" --org fulll \
+  --group-by-team-prefix tribe- \
+  --pick-team-auto
+```
+
+```text
+## tribe-a + tribe-a-p1   →   ## tribe-a
+```
+
+- Combos with **no common-prefix team** (e.g. `squad-frontend + squad-mobile` — neither is a prefix of the other) are left combined and unresolved, exactly like today.
+- Applies independently **at every hierarchy depth**, not just the top level.
+- An explicit `--pick-team` for the same section always wins: run explicit picks first, then `--pick-team-auto` resolves whatever combined sections remain.
+- The replay command emits `--pick-team-auto` when it was used, so a session is reproduced exactly.
+
+## Excluding noisy team prefixes
+
+Some orgs have many closely related, deeply-overlapping team names under one prefix (e.g. `chapter-validators-core`, `chapter-validators-client`, `chapter-validators-frontend-client`, ...). When several of these co-occur on the same repos, `--group-by-team-prefix` produces many distinct combined sections that neither `--pick-team-auto` nor manual `--pick-team` can cleanly resolve, since no single team name is a common prefix of the others.
+
+`--exclude-team-prefixes` removes matching teams from consideration **before** grouping runs, reducing ambiguous combos at the source:
+
+```bash
+github-code-search query "useFeatureFlag" --org fulll \
+  --group-by-team-prefix chapter- \
+  --exclude-team-prefixes chapter-validators- \
+  --pick-team-auto
+```
+
+- Comma-separated, same syntax as `--exclude-repositories` / `--exclude-extracts`.
+- A repo left with **no matching team** after exclusion falls into `other`, exactly like a repo with no matching team today.
+- Only applies with `--group-by-team-prefix`; a warning is emitted (and the flag is a no-op) otherwise.
+- The replay command emits `--exclude-team-prefixes` when it was used, so a session is reproduced exactly.
 
 ## Re-pick & undo pick
 
-After using `--pick-team` (or the interactive `p` shortcut) to assign a combined section to a team, individual repos marked `◈` can be re-assigned or restored to their original combined section at any time.
+After using `--pick-team` (or the interactive `p` shortcut) to assign a combined section to a team, individual repos marked `◈` can be re-assigned or restored to their original combined section at any time — regardless of how deeply nested the original section was.
 
 ### TUI — re-pick mode
 
 Navigate to any **picked repo** (marked `◈`) and press **`t`** to enter re-pick mode.
 
 ```text
-── squad-frontend
-▶ ◈  fulll/frontend-app              ← press t here
-▶ ◈  fulll/mobile-sdk
+  ── squad-core
+▶ ◈  fulll/mobile-app              ← press t here
 ```
 
 The hints bar shows a horizontal pick bar — exactly like team pick mode — with the current focused team highlighted in `[ brackets ]`:
 
 ```text
-Re-pick: [ squad-frontend ]  squad-mobile  0/u restore  ← → move  ↵ confirm  Esc/t cancel
+Re-pick: [ squad-core ]  squad-mobile  0/u restore  ← → move  ↵ confirm  Esc/t cancel
 ```
 
 | Key         | Action                                                          |
@@ -142,12 +270,11 @@ Re-pick: [ squad-frontend ]  squad-mobile  0/u restore  ← → move  ↵ confir
 
 ### Undoing a pick (merge)
 
-Pressing `0` or `u` in re-pick mode restores **all** repos from the same combined section back to where they came from (e.g. `squad-frontend + squad-mobile`). Every `◈` badge from that section is removed and all repos are treated as unassigned again.
+Pressing `0` or `u` in re-pick mode restores **all** repos from the same combined section back to where they came from (e.g. `squad-core + squad-mobile`). Every `◈` badge from that section is removed and all repos are treated as unassigned again.
 
 ```text
-── squad-frontend + squad-mobile      ← all repos restored
-▶ ◉  fulll/frontend-app
-▶ ◉  fulll/mobile-sdk
+  ── squad-core + squad-mobile      ← all repos restored
+▶ ◉  fulll/mobile-app
 ```
 
 In **non-interactive mode**, undoing a pick is implicit: simply omit the `--pick-team` flag for that combined section in the replay command.

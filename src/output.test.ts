@@ -198,6 +198,35 @@ describe("buildReplayCommand", () => {
     expect(cmd).not.toContain("--group-by-team-prefix");
   });
 
+  it("includes --exclude-team-prefixes when set", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const opts: ReplayOptions = {
+      groupByTeamPrefix: "chapter-",
+      excludeTeamPrefixes: "chapter-validators-",
+    };
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
+    expect(cmd).toContain("--exclude-team-prefixes 'chapter-validators-'");
+  });
+
+  it("does not include --exclude-team-prefixes when unset (default)", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set());
+    expect(cmd).not.toContain("--exclude-team-prefixes");
+  });
+
+  it("includes --pick-team-auto when pickTeamAuto is true", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const opts: ReplayOptions = { groupByTeamPrefix: "tribe-/squad-", pickTeamAuto: true };
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set(), opts);
+    expect(cmd).toContain("--pick-team-auto");
+  });
+
+  it("does not include --pick-team-auto when pickTeamAuto is false (default)", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const cmd = buildReplayCommand(groups, QUERY, ORG, new Set(), new Set());
+    expect(cmd).not.toContain("--pick-team-auto");
+  });
+
   it("includes --regex-hint when regexHint is set", () => {
     const groups = [makeGroup("myorg/repoA", ["a.ts"])];
     const opts: ReplayOptions = { regexHint: '"axios"' };
@@ -477,6 +506,90 @@ describe("buildMarkdownOutput", () => {
     const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set(), "repo-only");
     expect(out).not.toContain("selected");
   });
+
+  it("renders each sectionPath entry as a heading at 2 + level (## / ###)", () => {
+    const groups: RepoGroup[] = [
+      {
+        ...makeGroup("myorg/repoA", ["a.ts"]),
+        sectionPath: [
+          { label: "tribe-a", level: 0 },
+          { label: "squad-a", level: 1 },
+        ],
+      },
+    ];
+    const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set());
+    expect(out).toContain("## tribe-a");
+    expect(out).toContain("### squad-a");
+  });
+
+  it("does not repeat an unchanged ancestor heading for a sibling leaf", () => {
+    const groups: RepoGroup[] = [
+      {
+        ...makeGroup("myorg/repoA", ["a.ts"]),
+        sectionPath: [
+          { label: "tribe-a", level: 0 },
+          { label: "squad-b", level: 1 },
+        ],
+      },
+      {
+        ...makeGroup("myorg/repoB", ["b.ts"]),
+        sectionPath: [{ label: "squad-a", level: 1 }],
+      },
+    ];
+    const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set());
+    expect((out.match(/^## /gm) ?? []).length).toBe(1);
+    expect((out.match(/^### /gm) ?? []).length).toBe(2);
+  });
+
+  it("caps heading depth at H6 for very deep chains", () => {
+    const groups: RepoGroup[] = [
+      {
+        ...makeGroup("myorg/repoA", ["a.ts"]),
+        sectionPath: [{ label: "deep", level: 10 }],
+      },
+    ];
+    const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set());
+    expect(out).toContain("###### deep");
+    expect(out).not.toContain("####### deep");
+  });
+
+  it("does not lose the heading when the repo that carries sectionPath is deselected", () => {
+    const groups: RepoGroup[] = [
+      {
+        ...makeGroup("myorg/repoA", ["a.ts"], { repoSelected: false }),
+        sectionPath: [{ label: "tribe-a", level: 0 }],
+      },
+      makeGroup("myorg/repoB", ["b.ts"]), // same leaf, no sectionPath of its own
+    ];
+    const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set());
+    expect(out).toContain("## tribe-a");
+    expect(out).toContain("myorg/repoB");
+  });
+
+  it("does not lose the heading when the repo that carries sectionPath has no selected matches", () => {
+    const groups: RepoGroup[] = [
+      {
+        ...makeGroup("myorg/repoA", ["a.ts"], { extractSelected: [false] }),
+        sectionPath: [{ label: "tribe-a", level: 0 }],
+      },
+      makeGroup("myorg/repoB", ["b.ts"]),
+    ];
+    const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set());
+    expect(out).toContain("## tribe-a");
+  });
+
+  it("does not lose a flat sectionLabel heading when its bearing repo is deselected", () => {
+    const groups: RepoGroup[] = [
+      {
+        ...makeGroup("myorg/repoA", ["a.ts"], { repoSelected: false }),
+        sectionLabel: "squad-frontend",
+      },
+      makeGroup("myorg/repoB", ["b.ts"]),
+    ];
+    const out = buildMarkdownOutput(groups, QUERY, ORG, new Set(), new Set());
+    expect(out).toContain("## squad-frontend");
+    expect((out.match(/^## /gm) ?? []).length).toBe(1);
+  });
 });
 
 describe("buildJsonOutput", () => {
@@ -533,6 +646,45 @@ describe("buildJsonOutput", () => {
     );
     expect(parsed.results[0].repo).toBe("myorg/repoA");
     expect(parsed.results[0].matches).toBeUndefined();
+  });
+
+  it("includes the full section path on a repo tagged with sectionPath", () => {
+    const groups: RepoGroup[] = [
+      {
+        ...makeGroup("myorg/repoA", ["a.ts"]),
+        sectionPath: [
+          { label: "tribe-a", level: 0 },
+          { label: "squad-a", level: 1 },
+        ],
+      },
+    ];
+    const parsed = JSON.parse(buildJsonOutput(groups, QUERY, ORG, new Set(), new Set()));
+    expect(parsed.results[0].section).toEqual(["tribe-a", "squad-a"]);
+  });
+
+  it("carries the reconstructed path forward to a sibling repo missing the shared ancestor", () => {
+    const groups: RepoGroup[] = [
+      {
+        ...makeGroup("myorg/repoA", ["a.ts"]),
+        sectionPath: [
+          { label: "tribe-a", level: 0 },
+          { label: "squad-b", level: 1 },
+        ],
+      },
+      {
+        ...makeGroup("myorg/repoB", ["b.ts"]),
+        sectionPath: [{ label: "squad-a", level: 1 }],
+      },
+    ];
+    const parsed = JSON.parse(buildJsonOutput(groups, QUERY, ORG, new Set(), new Set()));
+    expect(parsed.results[0].section).toEqual(["tribe-a", "squad-b"]);
+    expect(parsed.results[1].section).toEqual(["tribe-a", "squad-a"]);
+  });
+
+  it("omits the section field when no sectionPath/sectionLabel is present", () => {
+    const groups = [makeGroup("myorg/repoA", ["a.ts"])];
+    const parsed = JSON.parse(buildJsonOutput(groups, QUERY, ORG, new Set(), new Set()));
+    expect(parsed.results[0].section).toBeUndefined();
   });
 });
 
@@ -719,6 +871,26 @@ describe("buildOutput", () => {
       { includeArchived: true, groupByTeamPrefix: "" },
     );
     expect(out).toContain("--include-archived");
+  });
+
+  it("threads pickTeamAuto into the replay command", () => {
+    const groups = [makeGroup("myorg/repoA", ["src/foo.ts"])];
+    const out = buildOutput(groups, QUERY, ORG, new Set(), new Set(), "json", "repo-and-matches", {
+      groupByTeamPrefix: "tribe-/squad-",
+      pickTeamAuto: true,
+    });
+    const parsed = JSON.parse(out);
+    expect(parsed.replayCommand).toContain("--pick-team-auto");
+  });
+
+  it("threads excludeTeamPrefixes into the replay command", () => {
+    const groups = [makeGroup("myorg/repoA", ["src/foo.ts"])];
+    const out = buildOutput(groups, QUERY, ORG, new Set(), new Set(), "json", "repo-and-matches", {
+      groupByTeamPrefix: "chapter-",
+      excludeTeamPrefixes: "chapter-validators-",
+    });
+    const parsed = JSON.parse(out);
+    expect(parsed.replayCommand).toContain("--exclude-team-prefixes 'chapter-validators-'");
   });
 
   it("threads --group-by-team-prefix into json replay command", () => {

@@ -15,13 +15,13 @@ github-code-search "useFeatureFlag" --org fulll
 3 repos · 4 files
 ← / → fold/unfold  ↑ / ↓ navigate  spc select  a all  n none  f filter  h help  ↵ confirm  q quit
 
-▸   fulll/billing-api                                         3 matches
-▾ ✓ fulll/auth-service                                       2 matches
+▸   fulll/service-b                                         3 matches
+▾ ✓ fulll/service-a                                       2 matches
       ✓ src/middlewares/featureFlags.ts
             …const flag = useFeatureFlag('new-onboarding'); if (!flag) return next();…
       ✓ tests/unit/featureFlags.test.ts
             …expect(useFeatureFlag('new-onboarding')).toBe(true);…
-▸   fulll/legacy-monolith                                     1 match
+▸   fulll/legacy-app                                     1 match
 ```
 
 - `▸` — folded repo (extracts hidden)
@@ -167,10 +167,10 @@ After pressing `Enter`:
 ```text
 2 repos · 2 files selected
 
-- **fulll/auth-service** (1 match)
-  - [ ] [src/middlewares/featureFlags.ts:2:19](https://github.com/fulll/auth-service/blob/main/src/middlewares/featureFlags.ts#L2)
-- **fulll/billing-api** (1 match)
-  - [ ] [src/flags.ts:3:14](https://github.com/fulll/billing-api/blob/main/src/flags.ts#L3)
+- **fulll/service-a** (1 match)
+  - [ ] [src/middlewares/featureFlags.ts:2:19](https://github.com/fulll/service-a/blob/main/src/middlewares/featureFlags.ts#L2)
+- **fulll/service-b** (1 match)
+  - [ ] [src/flags.ts:3:14](https://github.com/fulll/service-b/blob/main/src/flags.ts#L3)
 ```
 
 <details>
@@ -178,7 +178,7 @@ After pressing `Enter`:
 
 ```bash
 github-code-search "useFeatureFlag" --org fulll --no-interactive \
-  --exclude-repositories legacy-monolith
+  --exclude-repositories legacy-app
 ```
 
 </details>

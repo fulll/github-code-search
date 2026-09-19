@@ -41,14 +41,14 @@ $ CI=true github-code-search "useFeatureFlag" --org fulll
 
 3 repos · 5 files selected
 
-- **fulll/auth-service** (2 matches)
-  - [ ] [src/middlewares/featureFlags.ts:2:19](https://github.com/fulll/auth-service/blob/main/src/middlewares/featureFlags.ts#L2): `useFeatureFlag`
-  - [ ] [tests/unit/featureFlags.test.ts:1:8](https://github.com/fulll/auth-service/blob/main/tests/unit/featureFlags.test.ts#L1): `useFeatureFlag`
-- **fulll/billing-api** (2 matches)
-  - [ ] [src/flags.ts:3:14](https://github.com/fulll/billing-api/blob/main/src/flags.ts#L3): `useFeatureFlag`
-  - [ ] [src/routes/invoices.ts:1:1](https://github.com/fulll/billing-api/blob/main/src/routes/invoices.ts#L1): `useFeatureFlag`
-- **fulll/frontend-app** (1 match)
-  - [ ] [src/hooks/useFeatureFlag.ts:1:1](https://github.com/fulll/frontend-app/blob/main/src/hooks/useFeatureFlag.ts#L1): `useFeatureFlag`
+- **fulll/service-a** (2 matches)
+  - [ ] [src/middlewares/featureFlags.ts:2:19](https://github.com/fulll/service-a/blob/main/src/middlewares/featureFlags.ts#L2): `useFeatureFlag`
+  - [ ] [tests/unit/featureFlags.test.ts:1:8](https://github.com/fulll/service-a/blob/main/tests/unit/featureFlags.test.ts#L1): `useFeatureFlag`
+- **fulll/service-b** (2 matches)
+  - [ ] [src/flags.ts:3:14](https://github.com/fulll/service-b/blob/main/src/flags.ts#L3): `useFeatureFlag`
+  - [ ] [src/routes/invoices.ts:1:1](https://github.com/fulll/service-b/blob/main/src/routes/invoices.ts#L1): `useFeatureFlag`
+- **fulll/app-a** (1 match)
+  - [ ] [src/hooks/useFeatureFlag.ts:1:1](https://github.com/fulll/app-a/blob/main/src/hooks/useFeatureFlag.ts#L1): `useFeatureFlag`
 ```
 
 <details>
@@ -66,8 +66,8 @@ At the end of every interactive session, `github-code-search` prints a **replay 
 
 ```bash
 github-code-search "useFeatureFlag" --org fulll --no-interactive \
-  --exclude-repositories legacy-monolith \
-  --exclude-extracts auth-service:tests/unit/featureFlags.test.ts:0
+  --exclude-repositories legacy-app \
+  --exclude-extracts service-a:tests/unit/featureFlags.test.ts:0
 ```
 
 This is the recommended bridge between an interactive exploration session and a reproducible CI step.

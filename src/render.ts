@@ -2,7 +2,7 @@ import * as style from "./style.ts";
 import type { FilterTarget, RepoGroup, Row, TextMatchSegment } from "./types.ts";
 import { highlightFragment } from "./render/highlight.ts";
 import { buildFilterStats, type FilterStats } from "./render/filter.ts";
-import { rowTerminalLines } from "./render/rows.ts";
+import { getSectionPath, rowTerminalLines } from "./render/rows.ts";
 import { buildMatchCountLabel, buildSummaryFull } from "./render/summary.ts";
 import { renderTeamPickHeader } from "./render/team-pick.ts";
 import { visibleWidth, stripAnsi, clipToWidth } from "./render/terminal.ts";
@@ -23,6 +23,7 @@ export {
   buildRows,
   isCursorVisible,
   normalizeScrollOffset,
+  getSectionPath,
 } from "./render/rows.ts";
 export {
   buildMatchCountLabel,
@@ -274,6 +275,11 @@ interface RenderOptions {
   teamPickMode?: {
     active: boolean;
     sectionLabel: string;
+    /** Full ancestor path (root first, ending with `sectionLabel`) used to
+     *  unambiguously match the target row in a `groupByTeamHierarchy` tree,
+     *  where the same label can appear under multiple parents. Falls back to
+     *  matching on `sectionLabel` alone when absent (flat sections). */
+    sectionPath?: string[];
     candidates: string[];
     focusedIndex: number;
   };
@@ -508,9 +514,15 @@ export function renderGroups(
       // is the very first row rendered — see issue #105.
       const sectionCost = usedLines === 0 ? 1 : 2;
       if (sectionCost + usedLines > viewportHeight && usedLines > 0) break;
+      // Nested hierarchy headings (from groupByTeamHierarchy) are indented
+      // 2 spaces per level; flat groupByTeamPrefix sections are always
+      // level 0 (no indent) — see issue #180.
+      const level = row.sectionLevel ?? 0;
+      const indent = "  ".repeat(level);
       // Fix: clip section label to termWidth so the label line never wraps.
-      // "── " prefix is 3 visible chars + 1 trailing space = 4 chars total.
-      const SECTION_FIXED = 4; // "── " (3) + trailing " " (1)
+      // "── " prefix is 3 visible chars + 1 trailing space = 4 chars total,
+      // plus the per-level indent consumed before it.
+      const SECTION_FIXED = 4 + indent.length; // "── " (3) + trailing " " (1) + indent
       const maxLabelChars = Math.max(0, termWidth - SECTION_FIXED);
       if (maxLabelChars === 0) {
         if (usedLines > 0) lines.push(""); // blank separator when not first
@@ -526,11 +538,23 @@ export function renderGroups(
       // Emit the blank separator only when there are rows above in the viewport.
       if (usedLines > 0) lines.push("");
       // Feat: team pick mode — show pick bar when active for this section — see issue #85.
+      // Fix: match by full ancestor path (not just label) when available, so
+      // the same label at a different tree branch isn't targeted by mistake
+      // in a groupByTeamHierarchy tree — see issue #181.
       const pickMode = opts.teamPickMode;
-      if (pickMode?.active && pickMode.sectionLabel === row.sectionLabel) {
+      if (
+        pickMode?.active &&
+        (pickMode.sectionPath !== undefined
+          ? pickMode.sectionPath.join(" > ") === getSectionPath(rows, i).join(" > ")
+          : pickMode.sectionLabel === row.sectionLabel)
+      ) {
         // Fix: clip pick bar to (termWidth - 3) so "── " + bar never wraps — see issue #121.
-        const bar = renderTeamPickHeader(pickMode.candidates, pickMode.focusedIndex, termWidth - 3);
-        lines.push(`${style.style(["magenta", "bold"], "── ")}${bar}`);
+        const bar = renderTeamPickHeader(
+          pickMode.candidates,
+          pickMode.focusedIndex,
+          termWidth - 3 - indent.length,
+        );
+        lines.push(`${indent}${style.style(["magenta", "bold"], "── ")}${bar}`);
       } else if (isActiveSectionCursor) {
         const isMultiTeam = (row.sectionLabel ?? "").includes(" + ");
         if (isMultiTeam) {
@@ -556,13 +580,13 @@ export function renderGroups(
             }
           }
           lines.push(
-            `${style.style(["bgMagenta", "bold"], `── ${activeLabel} `)}${hint ? style.dim(hint) : ""}`,
+            `${indent}${style.style(["bgMagenta", "bold"], `── ${activeLabel} `)}${hint ? style.dim(hint) : ""}`,
           );
         } else {
-          lines.push(style.style(["bgMagenta", "bold"], `── ${label} `));
+          lines.push(`${indent}${style.style(["bgMagenta", "bold"], `── ${label} `)}`);
         }
       } else {
-        lines.push(style.style(["magenta", "bold"], `── ${label} `));
+        lines.push(`${indent}${style.style(["magenta", "bold"], `── ${label} `)}`);
       }
       usedLines += sectionCost;
       if (usedLines >= viewportHeight) break;

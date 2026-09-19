@@ -46,9 +46,21 @@ const OPTIONS = [
     values: [],
   },
   {
+    flag: "exclude-team-prefixes",
+    description: "Comma-separated team-name prefixes to exclude from grouping",
+    takesArg: true,
+    values: [],
+  },
+  {
     flag: "pick-team",
     description: "Assign a combined team section to a single owner (repeatable)",
     takesArg: true,
+    values: [],
+  },
+  {
+    flag: "pick-team-auto",
+    description: "Auto-resolve combined team sections by common prefix",
+    takesArg: false,
     values: [],
   },
   {

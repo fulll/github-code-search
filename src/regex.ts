@@ -65,6 +65,37 @@ export function validateQuoteBalance(query: string): string | null {
 }
 
 /**
+ * Detects a `path:` qualifier whose value contains a `*` wildcard character
+ * (e.g. `path:*.tf`) and returns a human-readable warning explaining why it
+ * silently returns no (or wrong) results, with a suggested workaround.
+ *
+ * GitHub's code search API documents `*` (along with several other symbols)
+ * as a character it **ignores** rather than expands as a glob — so
+ * `path:*.tf` is effectively matched as `path:.tf`, which rarely matches any
+ * real file path. The `path:` qualifier itself is meant for matching a
+ * directory location, not a filename extension; `language:` or `extension:`
+ * should be used instead to filter by file type.
+ * @see https://docs.github.com/en/search-github/searching-on-github/searching-code
+ *
+ * Returns `undefined` when the query has no `path:` qualifier, or when its
+ * value has no wildcard character. Pure — no I/O.
+ */
+export function detectPathWildcardLimitation(query: string): string | undefined {
+  const m = query.match(/(?:^|\s)path:("[^"]*"|\S+)/);
+  if (!m || !m[1]) return undefined;
+  const value = m[1];
+  if (!value.includes("*")) return undefined;
+
+  return (
+    `The query contains "path:${value}", but GitHub's code search API ignores the "*" ` +
+    "wildcard character rather than expanding it as a glob, so this qualifier will " +
+    "silently match few or no files. The path: qualifier matches a directory location, " +
+    'not a filename extension — use "language:<name>" or "extension:<ext>" instead ' +
+    "(e.g. language:hcl or extension:tf)."
+  );
+}
+
+/**
  * Given a raw query string (possibly mixing GitHub qualifiers and a /regex/flags
  * token), returns:
  *

@@ -14,19 +14,38 @@ Searches for the literal string `useFeatureFlag` across all repositories in the 
 
 GitHub code search supports a set of qualifiers you can combine with your keyword:
 
-| Qualifier             | Description                                                      | Example                              |
-| --------------------- | ---------------------------------------------------------------- | ------------------------------------ |
-| `language:<lang>`     | Filter by programming language                                   | `useFeatureFlag language:TypeScript` |
-| `path:<pattern>`      | Restrict to files whose path matches the glob or substring       | `config path:src/config`             |
-| `filename:<name>`     | Match files by name (supports wildcards)                         | `SECRET filename:.env`               |
-| `extension:<ext>`     | Match files by extension                                         | `connect extension:ts`               |
-| `repo:<owner>/<repo>` | Restrict to a single repository (less useful here — use `--org`) | `connect repo:fulll/billing-api`     |
-| `NOT <term>`          | Exclude a keyword                                                | `connect NOT deprecated`             |
-| `"exact phrase"`      | Exact multi-word match                                           | `"feature flag"`                     |
+| Qualifier             | Description                                                                                               | Example                              |
+| --------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `language:<lang>`     | Filter by programming language                                                                            | `useFeatureFlag language:TypeScript` |
+| `path:<directory>`    | Restrict to files located in a directory (or any of its subdirectories) — **not** a glob/extension filter | `config path:src/config`             |
+| `filename:<name>`     | Match files by name (supports wildcards)                                                                  | `SECRET filename:.env`               |
+| `extension:<ext>`     | Match files by extension                                                                                  | `connect extension:ts`               |
+| `repo:<owner>/<repo>` | Restrict to a single repository (less useful here — use `--org`)                                          | `connect repo:fulll/service-b`       |
+| `NOT <term>`          | Exclude a keyword                                                                                         | `connect NOT deprecated`             |
+| `"exact phrase"`      | Exact multi-word match                                                                                    | `"feature flag"`                     |
 
 ::: tip
 Qualifiers can be combined freely:  
 `"feature flag" language:TypeScript path:src/`
+:::
+
+::: warning `path:` does not support glob wildcards
+`path:` matches a **directory location**, not a filename pattern — GitHub's code
+search API silently ignores the `*` wildcard character rather than expanding it
+as a glob, so a query like `path:*.tf` matches few or no files. To filter by
+file type, use `language:<lang>` or `extension:<ext>` instead:
+
+```bash
+# Wrong — path:*.tf is silently ignored by the GitHub API, returns no results
+github-code-search "ACME123456789 path:*.tf" --org fulll
+
+# Right — filters by language or extension instead
+github-code-search "ACME123456789 language:hcl" --org fulll
+github-code-search "ACME123456789 extension:tf" --org fulll
+```
+
+`github-code-search` detects this pattern and prints a warning on stderr when a
+`path:` qualifier contains a `*` character.
 :::
 
 ## Practical examples
@@ -66,7 +85,7 @@ github-code-search "useFeatureFlag NOT filename:test NOT filename:spec" --org fu
 Although `--org` already limits the search to your organisation, you can further narrow results to one or more specific repositories using `repo:` qualifiers in the query string:
 
 ```bash
-github-code-search "useFeatureFlag repo:fulll/billing-api repo:fulll/auth-service" --org fulll
+github-code-search "useFeatureFlag repo:fulll/service-b repo:fulll/service-a" --org fulll
 ```
 
 `--org` is still required for the API call even when `repo:` qualifiers are present. The `org:<org>` qualifier is injected automatically alongside your query.
