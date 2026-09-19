@@ -7,7 +7,7 @@ This guide walks through a complete search session from first invocation to stru
 Make sure you have:
 
 - `github-code-search` [installed](/getting-started/installation)
-- `GITHUB_TOKEN` set in your environment ([see Prerequisites](/getting-started/))
+- `GITHUB_TOKEN` set in your environment, or the [GitHub CLI](https://cli.github.com/) installed and authenticated ([see Prerequisites](/getting-started/))
 
 ## Run a search
 

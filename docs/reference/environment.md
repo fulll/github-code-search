@@ -6,10 +6,12 @@
 
 | Variable                       | Required | Default              | Description                                                                                                                                                        |
 | ------------------------------ | -------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `GITHUB_TOKEN`                 | ✅       | —                    | GitHub personal access token. Used to authenticate API calls. See [Prerequisites](/getting-started/).                                                              |
+| `GITHUB_TOKEN`                 | ✅¹      | —                    | GitHub personal access token. Used to authenticate API calls. See [Prerequisites](/getting-started/).                                                              |
 | `GCS_DEFAULT_ORG`              | ❌       | —                    | Default value for `--org` when the flag is omitted. An explicit `--org` always takes precedence. See [CLI options](/reference/cli-options).                        |
 | `CI`                           | ❌       | `false`              | Set to `true` to disable the interactive TUI and print results directly to stdout. Automatically set by GitHub Actions, GitLab CI, CircleCI and most CI platforms. |
 | `GITHUB_CODE_SEARCH_CACHE_DIR` | ❌       | OS-dependent (below) | Override the directory used to cache the team list when `--group-by-team-prefix` is set.                                                                           |
+
+¹ Required for the search commands, unless the [GitHub CLI](https://cli.github.com/) is installed and authenticated — `gh auth token` is used as a fallback. The `upgrade` subcommand never requires a token; it only uses one opportunistically (higher GitHub API rate limits) when available.
 
 ## `GITHUB_TOKEN`
 
@@ -24,6 +26,10 @@ Add this to your shell profile (`~/.zshrc`, `~/.bashrc`, `~/.config/fish/config.
 | `repo`        | Searching **private** repositories                     |
 | `public_repo` | Searching public repositories only                     |
 | `read:org`    | Using [`--group-by-team-prefix`](/usage/team-grouping) |
+
+::: tip Already using the GitHub CLI?
+If `GITHUB_TOKEN` isn't set and [`gh`](https://cli.github.com/) is installed and authenticated (`gh auth login`), `github-code-search` automatically retrieves a token via `gh auth token` — no extra setup needed. Applies to the search commands and the `upgrade` subcommand.
+:::
 
 ## `GCS_DEFAULT_ORG`
 

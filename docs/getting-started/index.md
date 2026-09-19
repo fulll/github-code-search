@@ -1,6 +1,6 @@
 # Prerequisites
 
-The only runtime prerequisite is a **GitHub personal access token**. The pre-compiled binary is self-contained and has no runtime dependency — you do not need Bun to run it.
+The only runtime prerequisite is a **GitHub personal access token** (or the [GitHub CLI](https://cli.github.com/), see below). The pre-compiled binary is self-contained and has no runtime dependency — you do not need Bun to run it.
 
 ::: tip Building from source?
 If you want to build `github-code-search` from source, you will additionally need [Bun](https://bun.sh) ≥ 1.0. See the [Installation guide](/getting-started/installation#from-source).
@@ -33,6 +33,10 @@ Add this to your shell profile (`~/.zshrc`, `~/.bashrc`, `~/.config/fish/config.
 
 ::: warning Token security
 Never commit your token to version control. Use environment variables or a secrets manager.
+:::
+
+::: tip Already using the GitHub CLI?
+If `GITHUB_TOKEN` isn't set and [`gh`](https://cli.github.com/) is installed and authenticated (`gh auth login`), `github-code-search` automatically retrieves a token via `gh auth token` — no extra setup needed. Applies to the search commands and the `upgrade` subcommand.
 :::
 
 ## Default organization
