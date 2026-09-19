@@ -83,10 +83,11 @@ jobs:
           set -euo pipefail
           if git ls-remote --heads origin gh-pages | grep -q gh-pages; then
             git fetch origin gh-pages
-            # List only top-level entries that match v<integer> (e.g. v1, v2).
-            # Using a pathspec glob and a strict regex avoids iterating over
-            # unrelated files (.nojekyll, README, etc.) at the branch root.
-            for entry in $(git ls-tree --name-only origin/gh-pages -- 'v[0-9]*'); do
+            # List all top-level entries and filter with a strict regex —
+            # `ls-tree` pathspecs are matched literally (no glob expansion,
+            # unlike `git log`/`git diff`), so `-- 'v[0-9]*'` would silently
+            # match nothing and skip every snapshot.
+            for entry in $(git ls-tree --name-only origin/gh-pages); do
               if echo "$entry" | grep -qE '^v[0-9]+$'; then
                 echo "Merging snapshot: $entry"
                 mkdir -p "docs/.vitepress/dist/$entry"
