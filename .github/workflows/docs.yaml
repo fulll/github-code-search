@@ -321,9 +321,12 @@ jobs:
             # retry (or an earlier attempt reusing this branch name) can leave
             # a stale, already-green run around whose SHA no longer matches
             # what was just pushed. See review on PR #215.
+            # Note: gh's --jq takes a single expression string — it has no
+            # --arg support like the jq binary, so interpolate $SHA directly
+            # (safe: it's the output of `git rev-parse HEAD`, not user input).
             RUN_ID=$(gh run list --workflow=ci.yaml --branch="$BRANCH" \
               --event=workflow_dispatch --limit=10 --json databaseId,headSha \
-              --jq --arg sha "$SHA" '[.[] | select(.headSha == $sha)] | .[0].databaseId // empty')
+              --jq "[.[] | select(.headSha == \"${SHA}\")] | .[0].databaseId // empty")
             [ -n "$RUN_ID" ] && break
             sleep 3
           done
