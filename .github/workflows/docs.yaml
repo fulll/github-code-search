@@ -113,10 +113,13 @@ jobs:
   # 2. Stores the output in the gh-pages branch under /v2/ using plain git
   #    (no third-party action). The gh-pages branch is storage only — Pages
   #    still points to GitHub Actions; the deploy job merges snapshots in.
-  # 3. Opens a PR with the versions.json + blog stub changes against main and
-  #    enables auto-merge — main requires signed commits and passing status
-  #    checks, so a direct push is rejected. Once merged (no [skip ci]), the
-  #    push re-triggers the deploy job so the new snapshot goes live.
+  # 3. Opens a PR with the versions.json + blog stub changes against main —
+  #    main requires signed commits and passing status checks, so a direct
+  #    push is rejected. Since GITHUB_TOKEN-authored events don't trigger new
+  #    workflow runs, ci.yaml is explicitly dispatched (workflow_dispatch is
+  #    exempt from that restriction) for this branch/SHA and awaited before
+  #    merging. Once merged (no [skip ci]), the push re-triggers the deploy
+  #    job so the new snapshot goes live.
   #
   # Convention: only tags matching vX.0.0 (major bumps) trigger a snapshot.
   # Patch and minor releases update the main docs in-place via the deploy job.
@@ -127,6 +130,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      actions: write
 
     steps:
       - name: Checkout
@@ -263,13 +267,20 @@ jobs:
           PY
           fi
 
-      - name: Open PR with versions.json and blog stub, enable auto-merge
+      - name: Open PR with versions.json and blog stub, run CI, and merge
         # main is protected by a ruleset requiring signed commits and passing
         # status checks — a direct push (previously via
         # stefanzweifel/git-auto-commit-action) is rejected. Open a PR instead:
-        # GitHub's own merge-via-API produces a Verified commit, and auto-merge
-        # waits for CI (required checks) to pass before merging — no third-party
-        # action needed, using the pre-installed git/gh CLIs.
+        # GitHub's own merge-via-API produces a Verified commit.
+        #
+        # `gh pr merge --auto` alone is NOT enough here: this PR/branch is
+        # created using the default GITHUB_TOKEN, and events authored by that
+        # token don't cascade into new workflow runs — ci.yaml's `pull_request`
+        # trigger never fires, the required checks stay "expected" forever,
+        # and auto-merge would wait indefinitely. workflow_dispatch is
+        # exempted from that restriction, so we explicitly dispatch ci.yaml
+        # for this branch/SHA, wait for it, then merge directly once it's
+        # green — see review on PR #215.
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -301,4 +312,19 @@ jobs:
             --body "Automated versioned-docs snapshot metadata for \`${GITHUB_REF_NAME}\`." \
             2>&1) || PR_URL=$(gh pr view "$BRANCH" --json url -q .url)
           echo "Opened $PR_URL"
-          gh pr merge "$BRANCH" --auto --squash
+
+          gh workflow run ci.yaml --ref "$BRANCH"
+          RUN_ID=""
+          for _ in $(seq 1 10); do
+            RUN_ID=$(gh run list --workflow=ci.yaml --branch="$BRANCH" \
+              --event=workflow_dispatch --limit=1 --json databaseId --jq '.[0].databaseId // empty')
+            [ -n "$RUN_ID" ] && break
+            sleep 3
+          done
+          if [ -z "$RUN_ID" ]; then
+            echo "::error::Could not find the dispatched CI run for $BRANCH" >&2
+            exit 1
+          fi
+          gh run watch "$RUN_ID" --exit-status
+
+          gh pr merge "$BRANCH" --squash

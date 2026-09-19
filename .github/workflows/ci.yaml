@@ -3,6 +3,14 @@ name: CI
 on:
   pull_request:
     branches: ["main"]
+  # Allows other automation (e.g. docs.yaml's snapshot job) to explicitly
+  # trigger a CI run for a specific branch/SHA. Required because events
+  # authored by the default GITHUB_TOKEN (e.g. opening a PR from a workflow)
+  # do NOT cascade into new workflow runs — workflow_dispatch is exempted
+  # from that restriction, so it's the supported way to get a fresh run
+  # whose check results attach to that commit for required-status-check
+  # evaluation.
+  workflow_dispatch:
 
 jobs:
   test:
