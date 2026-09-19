@@ -67,10 +67,5 @@
     "sharp": "^0.35.4",
     "vitepress": "^1.6.4",
     "vitepress-mermaid-renderer": "^1.2.2"
-  },
-  "overrides": {
-    "brace-expansion": "1.1.13",
-    "dompurify": "3.3.2",
-    "undici": "7.24.1"
   }
 }
