@@ -69,7 +69,6 @@ a SHA corresponds to without running `git ls-remote` manually.
 | `actions/github-script`                  | v7      | `f28e40c7f34bde8b3046d885e986cb6290c5673b` |
 | `marocchino/sticky-pull-request-comment` | v2.9.4  | `773744901bac0e8cbb5a0dc842800d45e9b2b405` |
 | `romeovs/lcov-reporter-action`           | v0.4.0  | `87a815f34ec27a5826abba44ce09bbc688da58fd` |
-| `stefanzweifel/git-auto-commit-action`   | v5.0.1  | `8621497c8c39c72f3e2a999a26b4ca1b5058a842` |
 | `bats-core/bats-action`                  | v4.0.0  | `77d6fb60505b4d0d1d73e48bd035b55074bbfb43` |
 
 When upgrading an action, update **every row in this table** and **every workflow file**

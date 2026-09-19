@@ -113,8 +113,10 @@ jobs:
   # 2. Stores the output in the gh-pages branch under /v2/ using plain git
   #    (no third-party action). The gh-pages branch is storage only — Pages
   #    still points to GitHub Actions; the deploy job merges snapshots in.
-  # 3. Prepends the entry to versions.json on main WITHOUT [skip ci], which
-  #    re-triggers the deploy job so the new snapshot is live immediately.
+  # 3. Opens a PR with the versions.json + blog stub changes against main and
+  #    enables auto-merge — main requires signed commits and passing status
+  #    checks, so a direct push is rejected. Once merged (no [skip ci]), the
+  #    push re-triggers the deploy job so the new snapshot goes live.
   #
   # Convention: only tags matching vX.0.0 (major bumps) trigger a snapshot.
   # Patch and minor releases update the main docs in-place via the deploy job.
@@ -124,6 +126,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
 
     steps:
       - name: Checkout
@@ -188,9 +191,13 @@ jobs:
         run: |
           MAJOR="${{ steps.ver.outputs.major }}"
           LINK="/${MAJOR}/"
-          # Idempotent — skip if the entry already exists.
-          jq --arg text "$MAJOR" --arg link "$LINK" \
-            'if any(.[]; .link == $link) then . else [{"text": $text, "link": $link}] + . end' \
+          # Idempotent — skip if the entry already exists. Otherwise, prepend
+          # the new version tagged "(latest)" and strip that suffix from any
+          # previous entry, since it's now superseded.
+          jq --arg text "$MAJOR (latest)" --arg link "$LINK" \
+            'if any(.[]; .link == $link) then .
+             else [{"text": $text, "link": $link}] + (map(.text |= sub(" [(]latest[)]$"; "")))
+             end' \
             docs/public/versions.json > /tmp/versions_new.json
           mv /tmp/versions_new.json docs/public/versions.json
 
@@ -256,12 +263,42 @@ jobs:
           PY
           fi
 
-      - name: Commit blog stub and versions.json to main
-        # Pin to exact commit SHA to prevent supply-chain attacks.
-        uses: stefanzweifel/git-auto-commit-action@8621497c8c39c72f3e2a999a26b4ca1b5058a842 # v5.0.1
-        with:
-          # No [skip ci] — the push to main matches paths: docs/** and re-triggers
-          # the deploy job, which merges the new snapshot into the Pages artifact.
-          commit_message: "docs: add ${{ steps.ver.outputs.major }} to versions.json and blog"
-          file_pattern: docs/public/versions.json docs/blog/
-          branch: main
+      - name: Open PR with versions.json and blog stub, enable auto-merge
+        # main is protected by a ruleset requiring signed commits and passing
+        # status checks — a direct push (previously via
+        # stefanzweifel/git-auto-commit-action) is rejected. Open a PR instead:
+        # GitHub's own merge-via-API produces a Verified commit, and auto-merge
+        # waits for CI (required checks) to pass before merging — no third-party
+        # action needed, using the pre-installed git/gh CLIs.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          MAJOR="${{ steps.ver.outputs.major }}"
+          BRANCH="docs/${MAJOR}-snapshot-metadata"
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/public/versions.json docs/blog/
+          if git diff --staged --quiet; then
+            echo "No changes to commit — skipping."
+            exit 0
+          fi
+
+          # Re-base the pending changes onto a fresh branch off origin/main —
+          # the tag checkout and main's tip are normally the same commit, but
+          # this is robust even if main advanced in between.
+          git stash
+          git fetch origin main
+          git checkout -B "$BRANCH" origin/main
+          git stash pop
+          git add docs/public/versions.json docs/blog/
+          git commit -m "docs: add ${MAJOR} to versions.json and blog"
+          git push --force origin "$BRANCH"
+
+          PR_URL=$(gh pr create --base main --head "$BRANCH" \
+            --title "docs: add ${MAJOR} to versions.json and blog" \
+            --body "Automated versioned-docs snapshot metadata for \`${GITHUB_REF_NAME}\`." \
+            2>&1) || PR_URL=$(gh pr view "$BRANCH" --json url -q .url)
+          echo "Opened $PR_URL"
+          gh pr merge "$BRANCH" --auto --squash
