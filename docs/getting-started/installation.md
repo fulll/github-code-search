@@ -47,7 +47,7 @@ The script automatically adds the install directory to your user PATH. New termi
 
 ## From source
 
-Requires [Bun](https://bun.sh) ≥ 1.0.
+Requires [Bun](https://bun.sh) ≥ 1.4.
 
 ```bash
 git clone https://github.com/fulll/github-code-search

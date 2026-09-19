@@ -4,7 +4,7 @@ Thank you for taking the time to contribute! This document describes how to set 
 
 ## Prerequisites
 
-- [Bun](https://bun.sh) ≥ 1.0
+- [Bun](https://bun.sh) ≥ 1.4
 - A GitHub personal access token with `repo` scope (for integration testing)
 
 ## Development setup
