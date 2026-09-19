@@ -306,6 +306,7 @@ jobs:
           git add docs/public/versions.json docs/blog/
           git commit -m "docs: add ${MAJOR} to versions.json and blog"
           git push --force origin "$BRANCH"
+          SHA="$(git rev-parse HEAD)"
 
           PR_URL=$(gh pr create --base main --head "$BRANCH" \
             --title "docs: add ${MAJOR} to versions.json and blog" \
@@ -316,13 +317,18 @@ jobs:
           gh workflow run ci.yaml --ref "$BRANCH"
           RUN_ID=""
           for _ in $(seq 1 10); do
+            # Filter by headSha, not just the newest run for this branch — a
+            # retry (or an earlier attempt reusing this branch name) can leave
+            # a stale, already-green run around whose SHA no longer matches
+            # what was just pushed. See review on PR #215.
             RUN_ID=$(gh run list --workflow=ci.yaml --branch="$BRANCH" \
-              --event=workflow_dispatch --limit=1 --json databaseId --jq '.[0].databaseId // empty')
+              --event=workflow_dispatch --limit=10 --json databaseId,headSha \
+              --jq --arg sha "$SHA" '[.[] | select(.headSha == $sha)] | .[0].databaseId // empty')
             [ -n "$RUN_ID" ] && break
             sleep 3
           done
           if [ -z "$RUN_ID" ]; then
-            echo "::error::Could not find the dispatched CI run for $BRANCH" >&2
+            echo "::error::Could not find the dispatched CI run for $BRANCH at $SHA" >&2
             exit 1
           fi
           gh run watch "$RUN_ID" --exit-status
