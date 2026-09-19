@@ -12,7 +12,7 @@
  *   GITHUB_TOKEN env var must be set (for search; optional for upgrade).
  */
 
-import { Command, program } from "commander";
+import { Command, Option, program } from "commander";
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import * as style from "./src/style.ts";
@@ -138,7 +138,15 @@ const helpFormatConfig = {
 function addSearchOptions(cmd: Command): Command {
   return cmd
     .argument("<query>", "Search query")
-    .requiredOption("--org <org>", "GitHub organization to search in")
+    .addOption(
+      new Option(
+        "--org <org>",
+        [
+          "GitHub organization to search in.",
+          "Falls back to the GCS_DEFAULT_ORG environment variable when omitted.",
+        ].join("\n"),
+      ).env("GCS_DEFAULT_ORG"),
+    )
     .option(
       "--exclude-repositories <repos>",
       [
@@ -256,7 +264,7 @@ function addSearchOptions(cmd: Command): Command {
 async function searchAction(
   query: string,
   opts: {
-    org: string;
+    org?: string;
     excludeRepositories: string;
     excludeExtracts: string;
     interactive: boolean;
@@ -276,6 +284,15 @@ async function searchAction(
   const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
   if (!GITHUB_TOKEN) {
     console.error(style.red("Error: GITHUB_TOKEN environment variable is not set."));
+    process.exit(1);
+  }
+
+  if (!opts.org) {
+    console.error(
+      style.red(
+        "Error: --org is required (set the --org flag or the GCS_DEFAULT_ORG environment variable).",
+      ),
+    );
     process.exit(1);
   }
 

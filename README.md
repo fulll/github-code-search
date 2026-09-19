@@ -35,6 +35,10 @@ powershell -c "irm https://raw.githubusercontent.com/fulll/github-code-search/ma
 github-code-search query "TODO" --org my-org
 ```
 
+> [!TIP]
+> `GITHUB_TOKEN` falls back to `gh auth token` when unset and the [GitHub CLI](https://cli.github.com/) is installed and authenticated.
+> Set `GCS_DEFAULT_ORG=my-org` to omit `--org` on every call. See [Environment variables](https://fulll.github.io/github-code-search/reference/environment).
+
 ## Features
 
 - **Org-wide search** — queries all repositories in a GitHub organization in one command, with automatic pagination up to 1 000 results
