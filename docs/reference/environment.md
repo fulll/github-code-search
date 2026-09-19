@@ -25,8 +25,6 @@ Add this to your shell profile (`~/.zshrc`, `~/.bashrc`, `~/.config/fish/config.
 | `public_repo` | Searching public repositories only                     |
 | `read:org`    | Using [`--group-by-team-prefix`](/usage/team-grouping) |
 
-If `GITHUB_TOKEN` isn't set and the [GitHub CLI](https://cli.github.com/) (`gh`) is installed and authenticated, `github-code-search` automatically falls back to the token returned by `gh auth token` — no extra configuration needed.
-
 ## `GCS_DEFAULT_ORG`
 
 ```bash
