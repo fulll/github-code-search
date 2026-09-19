@@ -7,6 +7,12 @@ Full release notes and changelogs are always available on
 
 ---
 
+## v2 series
+
+| Release                    | Highlights                                                                                                                                          |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [v2.0.0](./release-v2-0-0) | Hierarchical `--group-by-team-prefix` grouping (nested headings, auto-pick, exclusions), `GCS_DEFAULT_ORG`, gh CLI token fallback — breaking change |
+
 ## v1 series
 
 | Release                      | Highlights                                                                                                 |
