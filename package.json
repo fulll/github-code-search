@@ -59,7 +59,7 @@
     "@playwright/test": "^1.63.0",
     "@resvg/resvg-js": "^2.6.2",
     "bun-types": "^1.4.2",
-    "knip": "^6.36.0",
+    "knip": "^6.37.0",
     "mermaid": "^12.0.0",
     "oxfmt": "^0.68.0",
     "oxlint": "^1.83.0",
