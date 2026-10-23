@@ -29,10 +29,7 @@ on:
 #   snapshot goes live immediately instead of waiting for an unrelated
 #   docs change.
 # Requires: Settings → Pages → Source: GitHub Actions.
-permissions:
-  contents: write
-  pages: write
-  id-token: write
+permissions: {}
 
 # Only one concurrent deployment for the same ref; cancel outdated runs.
 concurrency:
