@@ -60,7 +60,7 @@ describe("highlightFragment", () => {
   it("highlights matched segment", () => {
     const result = highlightFragment(
       "hello world",
-      [{ text: "world", indices: [6, 11] }],
+      [{ text: "world", indices: [6, 11], line: 1, col: 7 }],
       "file.ts",
     );
     const joined = result.join("\n");

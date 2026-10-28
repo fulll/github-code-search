@@ -7,3 +7,10 @@
  * whenever stdout is a pipe.
  */
 process.env.FORCE_COLOR = "1";
+
+/** Replace the callable part of Bun's fetch while preserving its static API. */
+export function mockFetch(
+  implementation: (...args: Parameters<typeof fetch>) => ReturnType<typeof fetch>,
+): void {
+  globalThis.fetch = Object.assign(implementation, { preconnect: globalThis.fetch.preconnect });
+}

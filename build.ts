@@ -184,7 +184,7 @@ if (import.meta.main) {
   const icoPath = `${import.meta.dir}/docs/public/icons/favicon.ico`;
 
   const currentYear = new Date().getFullYear();
-  const authorName = typeof author === "string" ? author : author.name;
+  const authorName = author;
 
   await Bun.$`mkdir -p dist`;
   await Bun.build({

@@ -339,7 +339,7 @@ export async function runInteractive(
   process.on("SIGWINCH", onResize);
 
   for await (const chunk of process.stdin) {
-    const key = chunk.toString();
+    const key: string = chunk.toString();
 
     // Try parsing as a mouse event; if it's not a mouse event, treat as keyboard input
     const mouseEvent = parseMouseEvent(key);
@@ -379,7 +379,7 @@ export async function runInteractive(
       // Includes: title + summary + hints + blank (base 4) + filter bar if active.
       const headerLines = getHeaderLines(
         filterMode,
-        filterPath || filterTarget !== "path" || filterRegex,
+        filterPath.length > 0 || filterTarget !== "path" || filterRegex,
       );
 
       // Hit-test the click against visible rows (non-wheel buttons)

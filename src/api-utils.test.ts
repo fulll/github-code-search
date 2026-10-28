@@ -1,8 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { mockFetch } from "./test-setup.ts";
 import { concurrentMap, fetchWithRetry, formatRetryWait, paginatedFetch } from "./api-utils.ts";
 
 const originalFetch = globalThis.fetch;
 const originalSetTimeout = globalThis.setTimeout;
+
+it("preserves Bun's fetch.preconnect when mocking fetch", async () => {
+  mockFetch(async () => new Response("mocked"));
+  expect(globalThis.fetch.preconnect).toBe(originalFetch.preconnect);
+  expect(await (await fetch("https://example.com")).text()).toBe("mocked");
+});
 
 // Make all delays instant in tests so the suite stays fast
 beforeEach(() => {
@@ -23,10 +30,10 @@ afterEach(() => {
 describe("fetchWithRetry", () => {
   it("returns a 200 response immediately without retrying", async () => {
     let calls = 0;
-    globalThis.fetch = (async () => {
+    mockFetch(async () => {
       calls++;
       return new Response("ok", { status: 200 });
-    }) as typeof fetch;
+    });
 
     const res = await fetchWithRetry("https://example.com", {});
     expect(res.status).toBe(200);
@@ -35,10 +42,10 @@ describe("fetchWithRetry", () => {
 
   it("returns a non-retryable error response (404) immediately without retrying", async () => {
     let calls = 0;
-    globalThis.fetch = (async () => {
+    mockFetch(async () => {
       calls++;
       return new Response("not found", { status: 404 });
-    }) as typeof fetch;
+    });
 
     const res = await fetchWithRetry("https://example.com", {}, 3);
     expect(res.status).toBe(404);
@@ -47,10 +54,10 @@ describe("fetchWithRetry", () => {
 
   it("returns a non-retryable error response (401) immediately without retrying", async () => {
     let calls = 0;
-    globalThis.fetch = (async () => {
+    mockFetch(async () => {
       calls++;
       return new Response("unauthorized", { status: 401 });
-    }) as typeof fetch;
+    });
 
     const res = await fetchWithRetry("https://example.com", {}, 3);
     expect(res.status).toBe(401);
@@ -59,11 +66,11 @@ describe("fetchWithRetry", () => {
 
   it("retries on 429 and succeeds on the second attempt", async () => {
     let calls = 0;
-    globalThis.fetch = (async () => {
+    mockFetch(async () => {
       calls++;
       if (calls === 1) return new Response("rate limited", { status: 429 });
       return new Response("ok", { status: 200 });
-    }) as typeof fetch;
+    });
 
     const res = await fetchWithRetry("https://example.com", {}, 3);
     expect(res.status).toBe(200);
@@ -72,7 +79,7 @@ describe("fetchWithRetry", () => {
 
   it("retries on 429 and reads the Retry-After header", async () => {
     let calls = 0;
-    globalThis.fetch = (async () => {
+    mockFetch(async () => {
       calls++;
       if (calls === 1) {
         return new Response("rate limited", {
@@ -81,7 +88,7 @@ describe("fetchWithRetry", () => {
         });
       }
       return new Response("ok", { status: 200 });
-    }) as typeof fetch;
+    });
 
     const res = await fetchWithRetry("https://example.com", {}, 3);
     expect(res.status).toBe(200);
@@ -90,11 +97,11 @@ describe("fetchWithRetry", () => {
 
   it("retries on 503 and succeeds on the third attempt", async () => {
     let calls = 0;
-    globalThis.fetch = (async () => {
+    mockFetch(async () => {
       calls++;
       if (calls < 3) return new Response("service unavailable", { status: 503 });
       return new Response("ok", { status: 200 });
-    }) as typeof fetch;
+    });
 
     const res = await fetchWithRetry("https://example.com", {}, 3);
     expect(res.status).toBe(200);
@@ -103,10 +110,10 @@ describe("fetchWithRetry", () => {
 
   it("returns the last 429 response after maxRetries exhausted", async () => {
     let calls = 0;
-    globalThis.fetch = (async () => {
+    mockFetch(async () => {
       calls++;
       return new Response("still rate limited", { status: 429 });
-    }) as typeof fetch;
+    });
 
     const res = await fetchWithRetry("https://example.com", {}, 2);
     expect(res.status).toBe(429);
@@ -116,10 +123,10 @@ describe("fetchWithRetry", () => {
 
   it("passes the request options to fetch", async () => {
     let capturedOptions: RequestInit | undefined;
-    globalThis.fetch = (async (_url: string | URL | Request, opts?: RequestInit) => {
+    mockFetch(async (_url: string | URL | Request, opts?: RequestInit) => {
       capturedOptions = opts;
       return new Response("ok", { status: 200 });
-    }) as typeof fetch;
+    });
 
     await fetchWithRetry("https://example.com", {
       headers: { Authorization: "Bearer token" },
@@ -169,7 +176,7 @@ describe("fetchWithRetry – 403 rate-limit handling", () => {
     let calls = 0;
     // reset = now + 1 second → well within the 10 s threshold
     const resetTimestamp = Math.ceil((Date.now() + 1_000) / 1_000);
-    globalThis.fetch = (async () => {
+    mockFetch(async () => {
       calls++;
       if (calls === 1) {
         return new Response("rate limited", {
@@ -181,7 +188,7 @@ describe("fetchWithRetry – 403 rate-limit handling", () => {
         });
       }
       return new Response("ok", { status: 200 });
-    }) as typeof fetch;
+    });
 
     const res = await fetchWithRetry("https://example.com", {}, 3);
     expect(res.status).toBe(200);
@@ -191,7 +198,7 @@ describe("fetchWithRetry – 403 rate-limit handling", () => {
   it("throws a human-readable error when the rate-limit reset is far in the future", async () => {
     // reset = now + 5 minutes → exceeds the 10 s auto-retry threshold
     const resetTimestamp = Math.ceil((Date.now() + 300_000) / 1_000);
-    globalThis.fetch = (async () => {
+    mockFetch(async () => {
       return new Response("rate limited", {
         status: 403,
         headers: {
@@ -199,7 +206,7 @@ describe("fetchWithRetry – 403 rate-limit handling", () => {
           "x-ratelimit-reset": String(resetTimestamp),
         },
       });
-    }) as typeof fetch;
+    });
 
     await expect(fetchWithRetry("https://example.com", {}, 3)).rejects.toThrow(
       /GitHub API rate limit exceeded\. Please retry in \d+ minute/,
@@ -208,10 +215,10 @@ describe("fetchWithRetry – 403 rate-limit handling", () => {
 
   it("does NOT treat a plain 403 (non-rate-limit) as retryable", async () => {
     let calls = 0;
-    globalThis.fetch = (async () => {
+    mockFetch(async () => {
       calls++;
       return new Response("forbidden", { status: 403 });
-    }) as typeof fetch;
+    });
 
     const res = await fetchWithRetry("https://example.com", {}, 3);
     expect(res.status).toBe(403);
@@ -220,7 +227,7 @@ describe("fetchWithRetry – 403 rate-limit handling", () => {
 
   it("retries on 403 secondary rate-limit (Retry-After header) within threshold", async () => {
     let calls = 0;
-    globalThis.fetch = (async () => {
+    mockFetch(async () => {
       calls++;
       if (calls === 1) {
         return new Response("secondary rate limited", {
@@ -229,7 +236,7 @@ describe("fetchWithRetry – 403 rate-limit handling", () => {
         });
       }
       return new Response("ok", { status: 200 });
-    }) as typeof fetch;
+    });
 
     const res = await fetchWithRetry("https://example.com", {}, 3);
     expect(res.status).toBe(200);
@@ -239,7 +246,7 @@ describe("fetchWithRetry – 403 rate-limit handling", () => {
   it("calls onRateLimit for 403 secondary rate-limit (Retry-After) exceeding threshold", async () => {
     let calls = 0;
     const callbackArgs: number[] = [];
-    globalThis.fetch = (async () => {
+    mockFetch(async () => {
       calls++;
       if (calls === 1) {
         return new Response("secondary rate limited", {
@@ -248,7 +255,7 @@ describe("fetchWithRetry – 403 rate-limit handling", () => {
         });
       }
       return new Response("ok", { status: 200 });
-    }) as typeof fetch;
+    });
 
     const res = await fetchWithRetry("https://example.com", {}, 3, async (ms) => {
       callbackArgs.push(ms);
@@ -260,12 +267,12 @@ describe("fetchWithRetry – 403 rate-limit handling", () => {
   });
 
   it("throws with a human-readable error when Retry-After header exceeds threshold", async () => {
-    globalThis.fetch = (async () => {
+    mockFetch(async () => {
       return new Response("rate limited", {
         status: 429,
         headers: { "Retry-After": "300" }, // 5 minutes
       });
-    }) as typeof fetch;
+    });
 
     await expect(fetchWithRetry("https://example.com", {}, 3)).rejects.toThrow(
       /GitHub API rate limit exceeded\. Please retry in \d+ minute/,
@@ -277,7 +284,7 @@ describe("fetchWithRetry – 403 rate-limit handling", () => {
     const callbackArgs: number[] = [];
     // reset = now + 5 minutes → exceeds the 10 s threshold
     const resetTimestamp = Math.ceil((Date.now() + 300_000) / 1_000);
-    globalThis.fetch = (async () => {
+    mockFetch(async () => {
       calls++;
       if (calls === 1) {
         return new Response("rate limited", {
@@ -289,7 +296,7 @@ describe("fetchWithRetry – 403 rate-limit handling", () => {
         });
       }
       return new Response("ok", { status: 200 });
-    }) as typeof fetch;
+    });
 
     const onRateLimit = async (waitMs: number) => {
       callbackArgs.push(waitMs);
@@ -306,7 +313,7 @@ describe("fetchWithRetry – 403 rate-limit handling", () => {
     const resetTimestamp = Math.ceil((Date.now() + 300_000) / 1_000);
     // First 2 calls: rate-limited (long wait); 3rd call: success.
     // maxRetries = 5 so neither longWaitAttempts (2) nor attempt (0) hits the cap.
-    globalThis.fetch = (async () => {
+    mockFetch(async () => {
       calls++;
       if (calls < 3) {
         return new Response("rate limited", {
@@ -318,7 +325,7 @@ describe("fetchWithRetry – 403 rate-limit handling", () => {
         });
       }
       return new Response("ok", { status: 200 });
-    }) as typeof fetch;
+    });
 
     const callbackCount = { n: 0 };
     const res = await fetchWithRetry(
@@ -337,14 +344,16 @@ describe("fetchWithRetry – 403 rate-limit handling", () => {
     const resetTimestamp = Math.ceil((Date.now() + 300_000) / 1_000);
     let callbackCalls = 0;
     // Always rate-limited — the loop must not run forever
-    globalThis.fetch = (async () =>
-      new Response("rate limited", {
-        status: 403,
-        headers: {
-          "x-ratelimit-remaining": "0",
-          "x-ratelimit-reset": String(resetTimestamp),
-        },
-      })) as typeof fetch;
+    mockFetch(
+      async () =>
+        new Response("rate limited", {
+          status: 403,
+          headers: {
+            "x-ratelimit-remaining": "0",
+            "x-ratelimit-reset": String(resetTimestamp),
+          },
+        }),
+    );
 
     await expect(
       fetchWithRetry("https://example.com", {}, 2, async () => {

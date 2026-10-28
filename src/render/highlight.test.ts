@@ -386,7 +386,11 @@ describe("CSS tokenizer", () => {
 
 describe("highlightFragment segment highlighting", () => {
   it("highlights a matched segment in bold yellow", () => {
-    const result = highlightFragment("hello world", [{ text: "world", indices: [6, 11] }], "f.ts");
+    const result = highlightFragment(
+      "hello world",
+      [{ text: "world", indices: [6, 11], line: 1, col: 7 }],
+      "f.ts",
+    );
     const raw = result.join("");
     // Must contain ANSI (bold + yellow applied to segment)
     expect(raw).toMatch(/\x1b\[/);
@@ -395,18 +399,30 @@ describe("highlightFragment segment highlighting", () => {
   });
 
   it("handles a segment at the start of the line", () => {
-    const result = highlightFragment("const x = 1", [{ text: "const", indices: [0, 5] }], "f.ts");
+    const result = highlightFragment(
+      "const x = 1",
+      [{ text: "const", indices: [0, 5], line: 1, col: 1 }],
+      "f.ts",
+    );
     expect(strip(result.join(""))).toContain("const");
   });
 
   it("handles a segment at the end of the line", () => {
-    const result = highlightFragment("hello world", [{ text: "world", indices: [6, 11] }], "f.ts");
+    const result = highlightFragment(
+      "hello world",
+      [{ text: "world", indices: [6, 11], line: 1, col: 7 }],
+      "f.ts",
+    );
     expect(strip(result.join(""))).toContain("world");
   });
 
   it("handles overlapping segment that extends past line end (clamped)", () => {
     // segment goes past end of line → should not throw
-    const result = highlightFragment("hello", [{ text: "hello!", indices: [0, 999] }], "f.ts");
+    const result = highlightFragment(
+      "hello",
+      [{ text: "hello!", indices: [0, 999], line: 1, col: 1 }],
+      "f.ts",
+    );
     expect(strip(result.join(""))).toBe("hello");
   });
 
@@ -414,8 +430,8 @@ describe("highlightFragment segment highlighting", () => {
     const result = highlightFragment(
       "foo bar baz",
       [
-        { text: "foo", indices: [0, 3] },
-        { text: "baz", indices: [8, 11] },
+        { text: "foo", indices: [0, 3], line: 1, col: 1 },
+        { text: "baz", indices: [8, 11], line: 1, col: 9 },
       ],
       "f.ts",
     );
@@ -429,7 +445,7 @@ describe("highlightFragment segment highlighting", () => {
     const fragment = "foo\nbar\nbaz";
     const result = highlightFragment(
       fragment,
-      [{ text: "bar", indices: [4, 7] }], // 'bar' starts at offset 4 (after "foo\n")
+      [{ text: "bar", indices: [4, 7], line: 2, col: 1 }], // 'bar' starts at offset 4 (after "foo\n")
       "f.ts",
     );
     expect(strip(result[0])).toBe("foo");

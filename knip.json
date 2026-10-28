@@ -2,5 +2,5 @@
   "$schema": "https://unpkg.com/knip@latest/schema.json",
   "ignore": ["docs/**", ".lhci.config.cjs"],
   "ignoreDependencies": ["bun-types", "mermaid", "vitepress-mermaid-renderer"],
-  "ignoreBinaries": ["bats"]
+  "ignoreBinaries": ["bats", "fmt", "check"]
 }

@@ -115,8 +115,8 @@ bun run knip
 
 ```bash
 bun test               # full suite passes — same behaviour before and after
-bun run lint           # oxlint — zero errors
-bun run format:check   # oxfmt — no formatting diff
+bun run typecheck      # bun check — zero type errors
+bun run format:check   # bun fmt --check — no formatting diff
 bun run knip           # no unused exports or imports
 bun run build.ts       # binary compiles without errors
 ```

@@ -57,18 +57,24 @@ export interface RepoGroup {
   pickedFrom?: string;
 }
 
-export interface Row {
-  type: "repo" | "extract" | "section";
-  /** -1 for section rows */
-  repoIndex: number;
-  extractIndex?: number;
-  /** Populated only for `type === "section"` rows. */
-  sectionLabel?: string;
-  /** Nesting depth for `type === "section"` rows produced from a
-   *  `groupByTeamHierarchy` tree (0, 1, 2, …). Rows from the flat
-   *  `groupByTeamPrefix` path are always level 0. Defaults to 0 when unset. */
-  sectionLevel?: number;
-}
+export type Row =
+  | {
+      type: "repo" | "extract";
+      repoIndex: number;
+      extractIndex?: number;
+      sectionLabel?: never;
+      sectionLevel?: never;
+    }
+  | {
+      type: "section";
+      /** -1 for section rows */
+      repoIndex: number;
+      extractIndex?: never;
+      sectionLabel: string;
+      /** Nesting depth from `groupByTeamHierarchy` (0, 1, 2, …).
+       *  Flat `groupByTeamPrefix` rows default to 0 when unset. */
+      sectionLevel?: number;
+    };
 
 /**
  * One labelled group of repos produced by `groupByTeamPrefix` or

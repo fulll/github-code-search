@@ -104,8 +104,8 @@ Do **not** create the GitHub Release manually — the CD pipeline handles it.
 
 ```bash
 bun test               # full suite green
-bun run lint           # oxlint — zero errors
-bun run format:check   # oxfmt — no diff
+bun run typecheck      # bun check — zero type errors
+bun run format:check   # bun fmt --check — no diff
 bun run knip           # no unused exports
 bun run build.ts       # binary compiles
 ```

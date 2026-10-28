@@ -14,8 +14,13 @@ keyboard- and mouse-driven TUI, fine-grained extract selection, markdown/JSON ou
 
 ## Requirements
 
-- **Bun** ≥ 1.4 (runtime and package manager)
+- **Bun** ≥ 1.4.4 when running or building from source; compiled binaries do not require Bun
 - **GitHub Token** with `repo` and `read:org` scopes
+
+Development uses Bun's built-in `bun fmt` and `bun check`, with no standalone
+formatter or linter dependency. Run `bun run format`, `bun run format:check` and
+`bun run typecheck`; `bun run lint` is a compatibility alias for type checking,
+not equivalent lint coverage. See [Contributing](CONTRIBUTING.md) for setup and checks.
 
 ## Quick start
 

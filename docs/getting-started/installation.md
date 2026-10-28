@@ -47,7 +47,8 @@ The script automatically adds the install directory to your user PATH. New termi
 
 ## From source
 
-Requires [Bun](https://bun.sh) ≥ 1.4.
+Requires [Bun](https://bun.sh) ≥ 1.4.4. CI/CD and documentation workflows use the
+version pinned in `.bun-version`. Pre-compiled binaries do not require Bun.
 
 ```bash
 git clone https://github.com/fulll/github-code-search
@@ -56,6 +57,19 @@ bun install
 bun run build.ts
 # → produces dist/github-code-search
 ```
+
+For development, use Bun's native formatter and TypeScript checker:
+
+```bash
+bun run format        # bun fmt . (writes formatted files)
+bun run format:check  # bun fmt --check . (read-only verification)
+bun run typecheck     # bun check (strict TypeScript checking)
+```
+
+`bun run lint` is retained as a compatibility alias for `typecheck`. Type checking
+does not replace general-purpose lint rules; the former standalone oxlint rules
+are intentionally no longer enforced. Formatting options are configured in
+`bunfig.toml`, and no standalone formatter or linter dependency is needed.
 
 Copy the binary wherever you like:
 

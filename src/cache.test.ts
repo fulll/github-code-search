@@ -195,7 +195,7 @@ describe("writeCache / readCache round-trip", () => {
     const data = { repo: "org/repo", teams: ["squad-alpha"] };
     const key = getCacheKey("myorg", ["squad-"]);
     writeCache(key, data);
-    expect(readCache(key)).toEqual(data);
+    expect(readCache<typeof data>(key)).toEqual(data);
   });
 
   it("returns null when the key does not exist", () => {
@@ -222,7 +222,7 @@ describe("writeCache / readCache round-trip", () => {
     const key = getCacheKey("myorg", ["fresh-"]);
     const payload = [{ full_name: "org/repo" }];
     writeCache(key, payload);
-    expect(readCache(key)).toEqual(payload);
+    expect(readCache<typeof payload>(key)).toEqual(payload);
   });
 
   it("creates the cache directory if it does not exist", () => {
@@ -232,7 +232,7 @@ describe("writeCache / readCache round-trip", () => {
     const key = getCacheKey("myorg", ["squad-"]);
     // Should not throw
     expect(() => writeCache(key, { ok: true })).not.toThrow();
-    expect(readCache(key)).toEqual({ ok: true });
+    expect(readCache<{ ok: boolean }>(key)).toEqual({ ok: true });
   });
 
   it("silently ignores write errors on read-only paths", () => {
@@ -296,6 +296,6 @@ describe("Path traversal vulnerability mitigation", () => {
     const safeKey = "teams__myorg__squad-.json";
     const data = { teams: ["squad-alpha"] };
     writeCache(safeKey, data);
-    expect(readCache(safeKey)).toEqual(data);
+    expect(readCache<typeof data>(safeKey)).toEqual(data);
   });
 });

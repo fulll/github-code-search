@@ -158,5 +158,5 @@ bun run docs:build:a11y      # build for a11y audit
 bun run docs:preview -- --port 4173 &
 bun run docs:a11y            # 0 pa11y violations
 bun run docs:test:responsive # 20/20 Playwright tests green
-bun run format:check         # oxfmt — no formatting diff
+bun run format:check         # bun fmt --check — no formatting diff
 ```
