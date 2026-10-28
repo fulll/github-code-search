@@ -12,7 +12,7 @@
 #      http://localhost:4173 so the generated sitemap.xml contains localhost
 #      URLs that the audit can reach directly)
 #   2. Start `vitepress preview` via the shared composite action
-#   3. Exercise the audit harness, then scan the full sitemap with two workers
+#   3. Exercise the audit harness, then scan the full sitemap with up to four workers (one per CPU)
 #   4. Publish JSON/Markdown artifacts and a sticky same-repository PR summary
 #
 # Chrome: Playwright reuses Ubuntu's system Chrome; no browser download.

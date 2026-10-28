@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { chromium, type Browser, type Page } from "@playwright/test";
 import { formatSummary, validateSitemapUrls, WCAG_TAGS } from "./a11y-utils.ts";
+import { availableParallelism } from "node:os";
 
 async function readSitemap(page: Page, base: string): Promise<string[]> {
   const response = await page.request.get(new URL("sitemap.xml", base).href, {
@@ -25,7 +26,12 @@ async function readSitemap(page: Page, base: string): Promise<string[]> {
 }
 
 async function auditPage(browser: Browser, url: string) {
-  const context = await browser.newContext({ reducedMotion: "reduce" });
+  // `vitepress preview` Brotli-compresses on every request: ~5 s per page for the
+  // 4 MB Mermaid chunk. Encoding is irrelevant to axe, so request raw bytes.
+  const context = await browser.newContext({
+    reducedMotion: "reduce",
+    extraHTTPHeaders: { "Accept-Encoding": "identity" },
+  });
   const page = await context.newPage();
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -90,7 +96,9 @@ async function runAudit(): Promise<number> {
         }
       }
     };
-    await Promise.all(Array.from({ length: Math.min(2, urls.length) }, worker));
+    await Promise.all(
+      Array.from({ length: Math.min(4, availableParallelism(), urls.length) }, worker),
+    );
   } catch (failure) {
     error = String(failure);
     console.error(error);

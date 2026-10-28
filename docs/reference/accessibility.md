@@ -36,7 +36,7 @@ VITEPRESS_HOSTNAME=http://localhost:4174 VITEPRESS_BASE=/github-code-search/v2/ 
 ## Coverage and reports
 
 The official Deque `@axe-core/playwright` adapter runs axe-core in a real browser.
-`scripts/a11y.ts` scans every distinct sitemap URL with two workers sharing one
+`scripts/a11y.ts` scans every distinct sitemap URL with up to four workers (one per CPU) sharing one
 browser. It waits for Vue hydration, Mermaid rendering and fonts, rather than a fixed
 sleep. Pages have isolated browser contexts and a 60-second audit deadline.
 
@@ -98,13 +98,21 @@ dependency installation and the documentation build are excluded from audit timi
 | Installed `node_modules`, `du -sk`                     | 610,532 KiB | 575,500 KiB |
 
 The timing compares the original configuration (one worker, 1,500 ms fixed wait,
-HTML_CodeSniffer) with axe (two workers, readiness checks). It is **not** an
+HTML_CodeSniffer) with the first axe version (two workers, readiness checks). It is **not** an
 engine-only comparison or a hosted-CI speed guarantee. The first axe run audited
 all 36 pages but failed on newly detected search-label and Mermaid-role issues;
 these were repaired rather than suppressed. Adding this guide expands the final
 sitemap, so subsequent audit durations are not the same 36-page workload.
 The installed-tree reduction is about 34.2 MiB (5.7%); lockfile entries are not
 equivalent to unique packages. Measurements exclude browser caches.
+
+Profiling then showed ~5 s of every page load spent waiting for `vitepress preview`
+to Brotli-compress the 4 MB Mermaid chunk on each request; axe itself takes ~0.4 s.
+The audit context therefore sends `Accept-Encoding: identity` (encoding does not
+affect axe results; Lighthouse keeps compression) and uses one worker per CPU, up
+to four. On the 37-page sitemap this brought the local audit from 116 s to 14–20 s
+and the hosted CI audit step from 220 s (two workers) to the duration reported on
+the pull request.
 
 The old `WCAG2AA` HTML_CodeSniffer configuration did not explicitly add WCAG 2.1
 rules despite the workflow title. It also ignored background-image contrast

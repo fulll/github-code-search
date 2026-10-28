@@ -80,7 +80,7 @@ Install local Chromium with `bun run playwright install chromium`, or point
 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` at an installed Chrome executable.
 CI uses system Chrome without downloading another browser.
 
-`scripts/a11y.ts` scans every sitemap URL with two workers, explicit WCAG
+`scripts/a11y.ts` scans every sitemap URL with up to four workers (one per CPU), explicit WCAG
 2.0/2.1/2.2 A/AA tags, and readiness checks for Vue hydration, Mermaid and fonts.
 Pure URL validation and Markdown formatting live in `scripts/a11y-utils.ts`.
 The generated `a11y-report.json` includes full axe results and operational
