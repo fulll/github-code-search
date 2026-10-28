@@ -123,7 +123,10 @@ the Mermaid renderer statically. The Vue runtime and Vite helpers now go to the
 `framework` chunk, and the theme only imports the renderer on pages that contain a
 diagram, so other pages modulepreload ~200 kB. Combined with per-worker context reuse,
 this brought the local audit from 14 s to 8 s. In CI, the audit-harness fixture tests
-(which need no docs build) now run in a parallel job.
+(which need no docs build) now run in a parallel job, the theme-semantics tests run
+alongside the audit, and the preview action no longer blocks ~5 s on its background
+server's output: the audit step went from 41 s to 17 s and the audit job from 108 s
+to 45 s.
 
 The old `WCAG2AA` HTML_CodeSniffer configuration did not explicitly add WCAG 2.1
 rules despite the workflow title. It also ignored background-image contrast
