@@ -144,8 +144,11 @@ Inspect `a11y-report.json` for affected nodes, rule help links, scan errors and
 incomplete findings; `a11y-report.md` summarizes every page. Any violation or
 operational error fails the command. Do not copy obsolete HTML_CodeSniffer
 exceptions into axe or disable rules to make CI pass. Manual keyboard,
-screen-reader and interaction checks remain necessary. See the
-[audit guide](docs/reference/accessibility.md) for coverage and benchmark details.
+screen-reader and interaction checks remain necessary: review `incomplete` results,
+keyboard navigation, focus order, screen-reader announcements, zoom/reflow, both
+color schemes and interactive states (search dialog, tabs, expanded menus). The audit
+only checks the initial desktop state of each page. The alternatives benchmark that
+led to `@axe-core/playwright` is in [#241](https://github.com/fulll/github-code-search/issues/241).
 
 ## AI agent tooling
 

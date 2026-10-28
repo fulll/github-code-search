@@ -4,10 +4,10 @@ import { formatSummary, validateSitemapUrls, WCAG_TAGS } from "./a11y-utils.ts";
 import { availableParallelism } from "node:os";
 
 async function readSitemap(page: Page, base: string): Promise<string[]> {
-  const response = await page.request.get(new URL("sitemap.xml", base).href, {
-    failOnStatusCode: true,
-    timeout: 30_000,
-  });
+  const url = new URL("sitemap.xml", base).href;
+  // Redirects are not followed: a moved sitemap must fail like any other non-2xx.
+  const response = await page.request.get(url, { maxRedirects: 0, timeout: 30_000 });
+  if (!response.ok()) throw new Error(`HTTP ${response.status()} on ${url}`);
   const locations = await page.evaluate(
     (xml) => {
       const doc = new DOMParser().parseFromString(xml, "application/xml");

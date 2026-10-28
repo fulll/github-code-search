@@ -95,9 +95,10 @@ manual review, not an automatic compliance claim. Never disable contrast/ARIA
 rules or carry over HTML_CodeSniffer exclusions as a shortcut.
 
 Read `.github/skills/documentation.md` for accessible theme patterns and
-`.github/skills/github-actions.md` before changing the workflow. The comparison,
-measurement caveats and manual-review checklist are in
-`docs/reference/accessibility.md`. Repository-local custom agents are not
+`.github/skills/github-actions.md` before changing the workflow. The audit only
+guarantees the accessibility of the documentation site, not of the CLI, so it is
+documented for contributors in `CONTRIBUTING.md` (manual-review checklist), not in
+the product docs. The alternatives benchmark is in issue #241. Repository-local custom agents are not
 currently defined; these shared instructions are the agent entry point.
 
 ## Project layout

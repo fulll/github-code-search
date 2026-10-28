@@ -149,4 +149,5 @@ The audit checks every sitemap URL with WCAG 2.0/2.1/2.2 A/AA tags and writes JS
 and Markdown reports. CI reuses system Chrome without downloading a browser.
 Automated checks do not certify WCAG compliance: incomplete results, keyboard use,
 screen-reader behavior and interactive states still need manual review.
-See the [audit guide and alternatives benchmark](https://fulll.github.io/github-code-search/reference/accessibility).
+See [CONTRIBUTING.md](CONTRIBUTING.md#contributing) for the audit workflow and
+[#241](https://github.com/fulll/github-code-search/issues/241) for the alternatives benchmark.

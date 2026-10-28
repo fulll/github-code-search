@@ -119,5 +119,6 @@ findings requiring manual review. Do not disable contrast/ARIA rules or treat
 passing automation as WCAG certification.
 
 See `.github/skills/documentation.md` for the axe runner, WCAG contrast rules,
-accessible component patterns and responsive guidance, and
-`docs/reference/accessibility.md` for coverage and benchmark methodology.
+accessible component patterns and responsive guidance, and `CONTRIBUTING.md` for
+the manual-review checklist. The audit covers the documentation site only, so do
+not document it in the product docs (`docs/`); the benchmark lives in issue #241.

@@ -92,8 +92,9 @@ shortcut. Its mobile label is visually hidden, not `display:none`. Mermaid
 wrappers with `aria-label` receive `role="group"` via a scoped observer so
 asynchronously rendered diagrams and client-side navigation stay valid.
 
-See `docs/reference/accessibility.md` for the sourced alternatives benchmark,
-measurement methodology, engine-coverage differences and manual-review checklist.
+The audit only covers the documentation site, not the product: keep it out of the
+product docs (`docs/`). The manual-review checklist is in `CONTRIBUTING.md`; the
+sourced alternatives benchmark and engine-coverage differences are in issue #241.
 
 ### Common patterns
 

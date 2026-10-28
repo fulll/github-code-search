@@ -245,7 +245,8 @@ preview action as well as docs and the workflow itself.
 
 Always upload `a11y-report.json` and `a11y-report.md`, publish the Markdown to
 `GITHUB_STEP_SUMMARY`, and post the `accessibility-audit` sticky comment only
-for same-repository PRs (fork tokens cannot write comments). Preserve a failing
+for same-repository PRs not triggered by `dependabot[bot]` (fork and Dependabot
+tokens are read-only and cannot write comments). Preserve a failing
 job after reporting violations or operational errors; do not mask scan failures
 with `continue-on-error` alone. Incomplete results are manual-review findings,
 not proof of compliance.

@@ -126,7 +126,7 @@ jobs:
         run: cat a11y-report.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Post / update accessibility report on PR
-        if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.audit.outcome != 'skipped' }}
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' && steps.audit.outcome != 'skipped' }}
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         with:
           header: accessibility-audit

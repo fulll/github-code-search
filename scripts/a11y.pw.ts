@@ -16,11 +16,14 @@ for (const scenario of [
   "outside",
   "http-error",
   "sitemap-error",
+  "sitemap-redirect",
 ]) {
   test(`audit harness: ${scenario}`, async () => {
     const directory = await mkdtemp(join(tmpdir(), "gcs-a11y-"));
     const server = createServer((request, response) => {
-      if (request.url === "/docs/sitemap.xml") {
+      if (request.url === "/docs/sitemap.xml" && scenario === "sitemap-redirect") {
+        response.writeHead(301, { Location: "/docs/moved-sitemap.xml" }).end();
+      } else if (request.url === "/docs/sitemap.xml" || request.url === "/docs/moved-sitemap.xml") {
         response.setHeader("Content-Type", "application/xml");
         if (scenario === "sitemap-error") {
           response.writeHead(500).end("Unavailable");
@@ -125,5 +128,6 @@ test("Mermaid containers retain permitted labels after client navigation", async
   const diagram = page.locator(".mermaid[aria-label]").first();
   await expect(diagram).toHaveAttribute("role", "group");
   await page.getByRole("link", { name: "Containers (C4 L2)", exact: true }).first().click();
+  await expect(page.getByRole("heading", { level: 1, name: "Level 2: Containers" })).toBeVisible();
   await expect(page.locator(".mermaid[aria-label]").first()).toHaveAttribute("role", "group");
 });

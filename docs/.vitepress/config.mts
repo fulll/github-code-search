@@ -370,7 +370,6 @@ export default defineConfig({
               link: "/reference/github-api-limits",
             },
             { text: "Environment variables", link: "/reference/environment" },
-            { text: "Accessibility audits", link: "/reference/accessibility" },
           ],
         },
       ],
