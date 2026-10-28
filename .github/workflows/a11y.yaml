@@ -12,8 +12,8 @@
 #      http://localhost:4173 so the generated sitemap.xml contains localhost
 #      URLs that the audit can reach directly)
 #   2. Start `vitepress preview` via the shared composite action
-#   3. Check theme semantics, then scan the full sitemap with up to four workers
-#      (one per CPU, each reusing a single browser context)
+#   3. Scan the full sitemap with up to four workers (one per CPU, each reusing
+#      a single browser context) while the theme-semantics tests run alongside
 #   4. Publish JSON/Markdown artifacts and a sticky same-repository PR summary
 #
 # The audit-harness fixture tests need no docs build, so they run in a parallel
@@ -97,13 +97,29 @@ jobs:
       - name: Start VitePress preview server
         uses: ./.github/actions/start-preview-server
 
-      - name: Test theme accessibility semantics
-        run: bun run docs:test:a11y --grep-invert "audit harness" --reporter=dot
+      # Theme-semantics tests run concurrently with the audit (same preview);
+      # their result is checked after the audit step.
+      - name: Start theme accessibility semantics tests
+        id: theme
+        run: |
+          (
+            rc=0
+            bun run docs:test:a11y --grep-invert "audit harness" --reporter=dot || rc=$?
+            echo "$rc" > "$RUNNER_TEMP/theme-tests.exit"
+          ) > "$RUNNER_TEMP/theme-tests.log" 2>&1 &
 
       - name: Run accessibility audit (axe-core)
         id: audit
         continue-on-error: true
         run: bun run docs:a11y
+
+      - name: Check theme accessibility semantics tests
+        if: ${{ !cancelled() && steps.theme.outcome == 'success' }}
+        timeout-minutes: 3
+        run: |
+          until [ -f "$RUNNER_TEMP/theme-tests.exit" ]; do sleep 0.5; done
+          cat "$RUNNER_TEMP/theme-tests.log"
+          exit "$(cat "$RUNNER_TEMP/theme-tests.exit")"
 
       - name: Publish job summary
         if: ${{ !cancelled() && steps.audit.outcome != 'skipped' }}

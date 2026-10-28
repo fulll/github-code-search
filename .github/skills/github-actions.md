@@ -233,8 +233,11 @@ env:
 
 Do not install/download another browser in this job. The audit-harness fixture
 tests (`docs:test:a11y --grep "audit harness"`) need no docs build and run in a
-parallel `harness` job. The `audit` job runs the theme-semantics tests
-(`--grep-invert "audit harness"`) after the preview starts, then `docs:a11y`. The
+parallel `harness` job. Once the preview starts, the `audit` job runs the
+theme-semantics tests (`--grep-invert "audit harness"`) in the background while
+`docs:a11y` runs, then checks their exit code in a later step. Composite actions
+that start background servers must redirect their output, otherwise the runner
+waits ~5 s for the step's stdout to close. The
 audit scans the entire sitemap with up to four workers and explicit WCAG
 2.0/2.1/2.2 A/AA tags. Its path filters must include
 `scripts/a11y*.ts`, `playwright.config.ts`, `package.json`, `bun.lock` and the shared
