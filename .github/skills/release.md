@@ -77,7 +77,7 @@ Pushing `vX.Y.Z` triggers the release pipeline automatically:
 
 ## Version badge
 
-`VersionBadge.vue` reads `version` from `package.json` at build time via `vite.define`. It auto-derives the blog post slug (`release-vX-Y-Z`) from the version — no manual update needed. Verify it shows correctly after the docs deploy (~5 min after tag push).
+`VersionBadge.vue` reads `version` from `package.json` at build time via `vite.define`. It auto-derives the blog post slug (`release-vX-Y-Z`) from the version and falls back to the GitHub Release page when that post does not exist (optional for patch releases) — no manual update needed. Verify it shows correctly after the docs deploy (~5 min after tag push).
 
 ---
 

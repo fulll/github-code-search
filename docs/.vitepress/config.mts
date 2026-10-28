@@ -1,11 +1,17 @@
 import { defineConfig } from "vitepress";
-import { readdirSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import versionsData from "../public/versions.json";
 import pkg from "../../package.json";
 
 const latestVersion: string = pkg.version;
 const latestBlogSlug = `release-v${latestVersion.replace(/\./g, "-")}`;
+// Patch releases may ship without a blog post: fall back to the GitHub Release page.
+const latestReleaseUrl = existsSync(
+  fileURLToPath(new URL(`../blog/${latestBlogSlug}.md`, import.meta.url)),
+)
+  ? null
+  : `https://github.com/fulll/github-code-search/releases/tag/v${latestVersion}`;
 
 // ─── Semantic version helpers for blog sidebar sort ───────────────────────────
 function parseBlogVersion(filename: string): number[] {
@@ -177,6 +183,7 @@ export default defineConfig({
       // Consumed by docs/.vitepress/theme/VersionBadge.vue — auto-updates on docs:build
       __LATEST_VERSION__: JSON.stringify(latestVersion),
       __LATEST_BLOG_SLUG__: JSON.stringify(latestBlogSlug),
+      __LATEST_RELEASE_URL__: JSON.stringify(latestReleaseUrl),
     },
     plugins: [
       {

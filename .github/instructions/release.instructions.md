@@ -117,7 +117,8 @@ bun run build.ts       # binary compiles
 - [ ] `bun run docs:build` succeeds locally (spot-check the new blog entry)
   - The **version badge** in the hero (`VersionBadge.vue`) reads `version` from `package.json` at
     build time via `vite.define` — no manual update needed. It auto-points to the new blog post
-    slug (`release-vX-Y-Z`) derived from the version. Verify it shows the new version after deploy.
+    slug (`release-vX-Y-Z`) derived from the version, or to the GitHub Release page when no blog
+    post exists (e.g. patch releases). Verify it shows the new version after deploy.
 - [ ] `CHANGELOG.md` has no `_pending_` entries
 - [ ] For **major** releases: versioned docs snapshot available at `/github-code-search/vX/`
 

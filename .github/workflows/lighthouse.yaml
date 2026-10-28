@@ -101,8 +101,12 @@ jobs:
       # Uses marocchino/sticky-pull-request-comment which upserts the comment
       # (one create, then updates on every subsequent push to the PR).
       # Reads the report written by the previous step via the `path:` input.
+      # continue-on-error: fork PRs get a read-only GITHUB_TOKEN, so posting the
+      # comment can fail even when the audit passes. The job summary and the
+      # "Fail if LHCI assertions failed" step below still reflect the result.
       - name: Post / update Lighthouse report on PR
         if: github.event_name == 'pull_request'
+        continue-on-error: true
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         with:
           header: lighthouse-ci
