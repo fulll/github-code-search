@@ -96,7 +96,7 @@ Before opening a PR for any docs change:
 
 ```bash
 bun run docs:build           # must complete without errors or dead-link warnings
-bun run format:check         # oxfmt — no formatting diff
+bun run format:check         # bun fmt --check — no formatting diff
 ```
 
 - All internal links must resolve (VitePress reports dead links on build).

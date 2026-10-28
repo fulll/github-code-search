@@ -814,9 +814,9 @@ describe("buildOutput", () => {
     expect(parsed.results).toBeDefined();
   });
 
-  it("dispatches to markdown when format is text", () => {
+  it("dispatches to markdown when format is markdown", () => {
     const groups = [makeGroup("myorg/repoA", ["src/foo.ts"])];
-    const out = buildOutput(groups, QUERY, ORG, new Set(), new Set(), "text");
+    const out = buildOutput(groups, QUERY, ORG, new Set(), new Set(), "markdown");
     expect(out).toContain("- **myorg/repoA**");
   });
 
@@ -827,9 +827,9 @@ describe("buildOutput", () => {
     expect(parsed.results[0].matches).toBeUndefined();
   });
 
-  it("passes repo-only outputType to text dispatcher", () => {
+  it("passes repo-only outputType to markdown dispatcher", () => {
     const groups = [makeGroup("myorg/repoA", ["src/foo.ts"])];
-    const out = buildOutput(groups, QUERY, ORG, new Set(), new Set(), "text", "repo-only");
+    const out = buildOutput(groups, QUERY, ORG, new Set(), new Set(), "markdown", "repo-only");
     expect(out).not.toContain("[src/foo.ts]");
     expect(out).toContain("myorg/repoA");
   });

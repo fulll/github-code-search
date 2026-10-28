@@ -49,6 +49,12 @@ Actions that appear in multiple workflows (e.g. `actions/checkout`, `oven-sh/set
 always reference **the same commit SHA** across all files. Use `grep` to find all usages before
 opening a PR.
 
+Every `oven-sh/setup-bun` step must use `bun-version-file: .bun-version`, including
+release, documentation and browser-test jobs. Keep `.bun-version` at Bun 1.4.4 or
+newer: quality checks use native `bun fmt` / `bun check`, not standalone tools.
+Use `bun run typecheck` and `bun run format:check` in CI; `bun run lint` is only a
+compatibility alias for type checking, not an equivalent linter.
+
 ```bash
 grep -r "oven-sh/setup-bun" .github/workflows/
 ```

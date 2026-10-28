@@ -121,8 +121,8 @@ Conventions:
 
 ```bash
 bun test               # all tests green (including new ones)
-bun run lint           # oxlint — zero errors
-bun run format:check   # oxfmt — no diff
+bun run typecheck      # bun check — zero type errors
+bun run format:check   # bun fmt --check — no diff
 bun run knip           # no unused exports / imports
 bun run build.ts       # binary compiles without errors
 ```

@@ -15,12 +15,15 @@ import { withBase } from "vitepress";
  * __LATEST_VERSION__ and __LATEST_BLOG_SLUG__ are replaced at build/dev time
  * by vite.define in docs/.vitepress/config.mts, reading from package.json.
  * When docs:build is triggered after a release tag, the badge auto-updates.
+ * __LATEST_RELEASE_URL__ is set (GitHub Release page) only when the version
+ * has no blog post (optional for patch releases); otherwise it is null.
  */
 declare const __LATEST_VERSION__: string;
 declare const __LATEST_BLOG_SLUG__: string;
+declare const __LATEST_RELEASE_URL__: string | null;
 
 const version = __LATEST_VERSION__;
-const releaseLink = withBase(`/blog/${__LATEST_BLOG_SLUG__}`);
+const releaseLink = __LATEST_RELEASE_URL__ ?? withBase(`/blog/${__LATEST_BLOG_SLUG__}`);
 </script>
 
 <style scoped>

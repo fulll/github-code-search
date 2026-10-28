@@ -8,13 +8,11 @@ This file provides context for AI coding agents (GitHub Copilot, Claude, Gemini,
 
 ## Runtime & toolchain
 
-| Tool           | Version                                                  |
-| -------------- | -------------------------------------------------------- |
-| **Bun**        | ≥ 1.4 (runtime, bundler, test runner, package manager)   |
-| **TypeScript** | via Bun (no separate `tsc` invocation needed at runtime) |
-| **oxlint**     | linter (`bun run lint`)                                  |
-| **oxfmt**      | formatter (`bun run format`)                             |
-| **knip**       | dead-code detector (`bun run knip`)                      |
+| Tool           | Version                                                                |
+| -------------- | ---------------------------------------------------------------------- |
+| **Bun**        | ≥ 1.4.4 (runtime, bundler, tests, packages, formatting, type checking) |
+| **TypeScript** | via Bun (no separate `tsc` invocation needed at runtime)               |
+| **knip**       | dead-code detector (`bun run knip`)                                    |
 
 There is **no Node.js / npm** involved. Always use `bun` commands.
 
@@ -47,16 +45,31 @@ All TypeScript tests use Bun's built-in test runner (`@jest/globals`-compatible 
 
 Shell-integration tests use [bats-core](https://github.com/bats-core/bats-core) (`brew install bats-core` or install via your package manager). They cover `install_completions()` from `install.sh` and are located in `install.test.bats`.
 
-## Linting & formatting
+## Type checking & formatting
 
 ```bash
-bun run lint          # oxlint — must pass before submitting
-bun run format        # oxfmt write (auto-fix)
-bun run format:check  # oxfmt check (CI check)
+bun run typecheck     # bun check — strict TypeScript checking
+bun run lint          # compatibility alias for typecheck (not a linter)
+bun run format        # bun fmt write (auto-fix)
+bun run format:check  # bun fmt --check (CI check)
 bun run knip          # detect unused exports / files
 ```
 
-Always run `bun run lint` and `bun run format:check` before considering a change complete.
+Always run `bun run typecheck` and `bun run format:check` before considering a change complete.
+
+`bun check` reads `tsconfig.json` and checks application code, tests and supporting
+TypeScript scripts. It does not check Vue templates or replace general-purpose
+lint rules. The former oxlint correctness/suspicious rules are intentionally retired;
+do not reintroduce a standalone linter or formatter as part of routine changes.
+
+Formatting options live in `[fmt]` in `bunfig.toml` (100-column print width).
+`knip.json` ignores `fmt` and `check` as binaries because knip currently mistakes
+these native Bun subcommands for external executables.
+All CI/CD and docs workflows read the pinned Bun version from `.bun-version`.
+When updating that version, keep the minimum `engines.bun` requirement and current
+installation/contributor documentation consistent. Compiled binaries do not need Bun.
+No repository custom agent definitions are currently shipped; any future agents
+must use the same native tooling and validation commands.
 
 ## Project layout
 

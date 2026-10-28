@@ -61,8 +61,8 @@ For bugs in `tui.ts` or `api.ts` (side-effectful code), a test may not be practi
 
 ```bash
 bun test               # the previously failing test now passes; full suite still green
-bun run lint           # oxlint — zero errors
-bun run format:check   # oxfmt — no formatting diff
+bun run typecheck      # bun check — zero type errors
+bun run format:check   # bun fmt --check — no formatting diff
 bun run knip           # no unused exports or imports
 bun run build.ts       # binary compiles without errors
 ```

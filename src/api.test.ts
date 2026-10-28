@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { mockFetch } from "./test-setup.ts";
 import {
   buildFetchProgress,
   buildLineResolutionProgress,
@@ -57,14 +58,16 @@ describe("searchCode", () => {
   });
 
   it("returns items and total from GitHub API", async () => {
-    globalThis.fetch = (async () =>
-      new Response(
-        JSON.stringify({
-          items: [{ path: "src/foo.ts" }],
-          total_count: 1,
-        }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      )) as typeof fetch;
+    mockFetch(
+      async () =>
+        new Response(
+          JSON.stringify({
+            items: [{ path: "src/foo.ts" }],
+            total_count: 1,
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    );
 
     const result = await searchCode("myquery", "myorg", "mytoken", 1);
     expect(result.total).toBe(1);
@@ -73,30 +76,32 @@ describe("searchCode", () => {
 
   it("passes page parameter in the request URL", async () => {
     let capturedUrl = "";
-    globalThis.fetch = (async (url: string | URL | Request) => {
+    mockFetch(async (url: string | URL | Request) => {
       capturedUrl = url.toString();
       return new Response(JSON.stringify({ items: [], total_count: 0 }), {
         status: 200,
         headers: { "content-type": "application/json" },
       });
-    }) as typeof fetch;
+    });
 
     await searchCode("q", "org", "tok", 3);
     expect(capturedUrl).toContain("page=3");
   });
 
   it("throws on non-OK API response", async () => {
-    globalThis.fetch = (async () => new Response("Unauthorized", { status: 401 })) as typeof fetch;
+    mockFetch(async () => new Response("Unauthorized", { status: 401 }));
 
     await expect(searchCode("q", "org", "token")).rejects.toThrow("401");
   });
 
   it("returns empty items and zero total on empty results", async () => {
-    globalThis.fetch = (async () =>
-      new Response(JSON.stringify({ items: [], total_count: 0 }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      })) as typeof fetch;
+    mockFetch(
+      async () =>
+        new Response(JSON.stringify({ items: [], total_count: 0 }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    );
 
     const result = await searchCode("q", "org", "tok");
     expect(result.items).toHaveLength(0);
@@ -128,11 +133,13 @@ describe("fetchAllResults", () => {
   });
 
   it("returns empty array when API returns no items", async () => {
-    globalThis.fetch = (async () =>
-      new Response(JSON.stringify({ items: [], total_count: 0 }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      })) as typeof fetch;
+    mockFetch(
+      async () =>
+        new Response(JSON.stringify({ items: [], total_count: 0 }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    );
 
     const results = await fetchAllResults("q", "org", "tok");
     expect(results).toHaveLength(0);
@@ -150,11 +157,13 @@ describe("fetchAllResults", () => {
         },
       ],
     };
-    globalThis.fetch = (async () =>
-      new Response(JSON.stringify({ items: [fakeItem], total_count: 1 }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      })) as typeof fetch;
+    mockFetch(
+      async () =>
+        new Response(JSON.stringify({ items: [fakeItem], total_count: 1 }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    );
 
     const results = await fetchAllResults("hello", "org", "tok");
     expect(results).toHaveLength(1);
@@ -179,11 +188,13 @@ describe("fetchAllResults", () => {
         },
       ],
     };
-    globalThis.fetch = (async () =>
-      new Response(JSON.stringify({ items: [fakeItem], total_count: 1 }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      })) as typeof fetch;
+    mockFetch(
+      async () =>
+        new Response(JSON.stringify({ items: [fakeItem], total_count: 1 }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    );
 
     const results = await fetchAllResults("world", "org", "tok");
     expect(results[0].textMatches[0].matches[0].text).toBe("world");
@@ -196,11 +207,13 @@ describe("fetchAllResults", () => {
       repository: { full_name: "org/oldie", archived: true },
       text_matches: [],
     };
-    globalThis.fetch = (async () =>
-      new Response(JSON.stringify({ items: [fakeItem], total_count: 1 }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      })) as typeof fetch;
+    mockFetch(
+      async () =>
+        new Response(JSON.stringify({ items: [fakeItem], total_count: 1 }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    );
 
     const results = await fetchAllResults("old", "org", "tok");
     expect(results[0].archived).toBe(true);
@@ -212,11 +225,13 @@ describe("fetchAllResults", () => {
       html_url: "https://github.com/org/repo/blob/main/src/bar.ts",
       repository: { full_name: "org/repo", archived: false },
     };
-    globalThis.fetch = (async () =>
-      new Response(JSON.stringify({ items: [fakeItem], total_count: 1 }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      })) as typeof fetch;
+    mockFetch(
+      async () =>
+        new Response(JSON.stringify({ items: [fakeItem], total_count: 1 }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    );
 
     const results = await fetchAllResults("bar", "org", "tok");
     expect(results[0].textMatches).toHaveLength(0);
@@ -224,7 +239,7 @@ describe("fetchAllResults", () => {
 
   it("stops fetching once total is reached in first page", async () => {
     let callCount = 0;
-    globalThis.fetch = (async () => {
+    mockFetch(async () => {
       callCount++;
       return new Response(
         JSON.stringify({
@@ -240,7 +255,7 @@ describe("fetchAllResults", () => {
         }),
         { status: 200, headers: { "content-type": "application/json" } },
       );
-    }) as typeof fetch;
+    });
 
     await fetchAllResults("q", "org", "tok");
     expect(callCount).toBe(1);
@@ -251,7 +266,7 @@ describe("fetchAllResults", () => {
     // Page 1: exactly 100 items → full page → continue
     // Page 2: 3 items → partial page → stop
     let searchPage = 0;
-    globalThis.fetch = (async (url: string | URL | Request) => {
+    mockFetch(async (url: string | URL | Request) => {
       const urlStr = url.toString();
       if (new URL(urlStr).hostname === "raw.githubusercontent.com") {
         return new Response("", { status: 404 });
@@ -265,7 +280,7 @@ describe("fetchAllResults", () => {
         status: 200,
         headers: { "content-type": "application/json" },
       });
-    }) as typeof fetch;
+    });
 
     const results = await fetchAllResults("q", "org", "tok");
     expect(results).toHaveLength(103);
@@ -286,7 +301,7 @@ describe("fetchAllResults", () => {
         },
       ],
     };
-    globalThis.fetch = (async (url: string | URL | Request) => {
+    mockFetch(async (url: string | URL | Request) => {
       const urlStr = url.toString();
       if (new URL(urlStr).hostname === "raw.githubusercontent.com") {
         return new Response(fileContent, { status: 200 });
@@ -295,7 +310,7 @@ describe("fetchAllResults", () => {
         status: 200,
         headers: { "content-type": "application/json" },
       });
-    }) as typeof fetch;
+    });
 
     const results = await fetchAllResults("doSomething", "org", "tok");
     // "const x = doSomething()" starts on line 3; match offset 10 is within that line
@@ -314,7 +329,7 @@ describe("fetchAllResults", () => {
         },
       ],
     };
-    globalThis.fetch = (async (url: string | URL | Request) => {
+    mockFetch(async (url: string | URL | Request) => {
       const urlStr = url.toString();
       if (new URL(urlStr).hostname === "raw.githubusercontent.com") {
         throw new Error("network error");
@@ -323,7 +338,7 @@ describe("fetchAllResults", () => {
         status: 200,
         headers: { "content-type": "application/json" },
       });
-    }) as typeof fetch;
+    });
 
     const results = await fetchAllResults("hello", "org", "tok");
     // Fragment starts at line 1 (fallback); offset 0 → line 1
@@ -334,7 +349,7 @@ describe("fetchAllResults", () => {
     // Regression guard for the 422 "Cannot access beyond the first 1000 results"
     // error that occurred when total_count was an exact multiple of 100.
     let searchCallCount = 0;
-    globalThis.fetch = (async (url: string | URL | Request) => {
+    mockFetch(async (url: string | URL | Request) => {
       const urlStr = url.toString();
       if (new URL(urlStr).hostname === "raw.githubusercontent.com") {
         return new Response("", { status: 404 });
@@ -347,7 +362,7 @@ describe("fetchAllResults", () => {
         }),
         { status: 200, headers: { "content-type": "application/json" } },
       );
-    }) as typeof fetch;
+    });
 
     const results = await fetchAllResults("q", "org", "tok");
     expect(results).toHaveLength(1000);
@@ -367,7 +382,7 @@ describe("fetchAllResults", () => {
         },
       ],
     };
-    globalThis.fetch = (async (url: string | URL | Request) => {
+    mockFetch(async (url: string | URL | Request) => {
       const urlStr = url.toString();
       if (new URL(urlStr).hostname === "raw.githubusercontent.com") {
         return new Response("Not Found", { status: 404 });
@@ -376,7 +391,7 @@ describe("fetchAllResults", () => {
         status: 200,
         headers: { "content-type": "application/json" },
       });
-    }) as typeof fetch;
+    });
 
     const results = await fetchAllResults("hello", "org", "tok");
     expect(results[0].textMatches[0].matches[0].line).toBe(1);
@@ -390,7 +405,7 @@ describe("fetchAllResults", () => {
       repository: { full_name: "org/repo", archived: false },
       text_matches: [{ fragment: "const x = doSomething()", matches: [] }],
     };
-    globalThis.fetch = (async (url: string | URL | Request) => {
+    mockFetch(async (url: string | URL | Request) => {
       const urlStr = url.toString();
       if (new URL(urlStr).hostname === "raw.githubusercontent.com") {
         return new Response(fileContent, { status: 200 });
@@ -399,7 +414,7 @@ describe("fetchAllResults", () => {
         status: 200,
         headers: { "content-type": "application/json" },
       });
-    }) as typeof fetch;
+    });
 
     const results = await fetchAllResults("doSomething", "org", "tok", undefined, true);
     expect(results[0].fileContent).toBe(fileContent);
@@ -412,7 +427,7 @@ describe("fetchAllResults", () => {
       repository: { full_name: "org/repo", archived: false },
       text_matches: [{ fragment: "hello world", matches: [] }],
     };
-    globalThis.fetch = (async (url: string | URL | Request) => {
+    mockFetch(async (url: string | URL | Request) => {
       const urlStr = url.toString();
       if (new URL(urlStr).hostname === "raw.githubusercontent.com") {
         return new Response("Not Found", { status: 404 });
@@ -421,7 +436,7 @@ describe("fetchAllResults", () => {
         status: 200,
         headers: { "content-type": "application/json" },
       });
-    }) as typeof fetch;
+    });
 
     const results = await fetchAllResults("hello", "org", "tok", undefined, true);
     expect(results[0].fileContent).toBeUndefined();
@@ -435,7 +450,7 @@ describe("fetchAllResults", () => {
       repository: { full_name: "org/repo", archived: false },
       text_matches: [{ fragment: "const x = doSomething()", matches: [] }],
     };
-    globalThis.fetch = (async (url: string | URL | Request) => {
+    mockFetch(async (url: string | URL | Request) => {
       const urlStr = url.toString();
       if (new URL(urlStr).hostname === "raw.githubusercontent.com") {
         return new Response(fileContent, { status: 200 });
@@ -444,7 +459,7 @@ describe("fetchAllResults", () => {
         status: 200,
         headers: { "content-type": "application/json" },
       });
-    }) as typeof fetch;
+    });
 
     // No keepFileContent argument — defaults to false.
     const results = await fetchAllResults("doSomething", "org", "tok");
@@ -460,18 +475,20 @@ describe("fetchRepoTeams", () => {
   });
 
   it("returns empty map when no teams match the prefix", async () => {
-    globalThis.fetch = (async () =>
-      new Response(JSON.stringify([{ slug: "backend-core", name: "Backend" }]), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      })) as typeof fetch;
+    mockFetch(
+      async () =>
+        new Response(JSON.stringify([{ slug: "backend-core", name: "Backend" }]), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    );
 
     const result = await fetchRepoTeams("myorg", "tok", ["frontend"], false);
     expect(result.size).toBe(0);
   });
 
   it("maps repos to matching team slugs", async () => {
-    globalThis.fetch = (async (url: string | URL | Request) => {
+    mockFetch(async (url: string | URL | Request) => {
       const urlStr = url.toString();
       if (urlStr.includes("/orgs/myorg/teams?")) {
         return new Response(JSON.stringify([{ slug: "frontend-web", name: "Frontend Web" }]), {
@@ -484,14 +501,14 @@ describe("fetchRepoTeams", () => {
         status: 200,
         headers: { "content-type": "application/json" },
       });
-    }) as typeof fetch;
+    });
 
     const result = await fetchRepoTeams("myorg", "tok", ["frontend"], false);
     expect(result.get("myorg/my-repo")).toEqual(["frontend-web"]);
   });
 
   it("assigns multiple team slugs to a repo that belongs to several matching teams", async () => {
-    globalThis.fetch = (async (url: string | URL | Request) => {
+    mockFetch(async (url: string | URL | Request) => {
       const urlStr = url.toString();
       if (urlStr.includes("/orgs/myorg/teams?")) {
         return new Response(
@@ -507,7 +524,7 @@ describe("fetchRepoTeams", () => {
         status: 200,
         headers: { "content-type": "application/json" },
       });
-    }) as typeof fetch;
+    });
 
     const result = await fetchRepoTeams("myorg", "tok", ["frontend"], false);
     const slugs = result.get("myorg/shared-ui") ?? [];
@@ -516,13 +533,13 @@ describe("fetchRepoTeams", () => {
   });
 
   it("throws when the teams list request fails", async () => {
-    globalThis.fetch = (async () => new Response("Forbidden", { status: 403 })) as typeof fetch;
+    mockFetch(async () => new Response("Forbidden", { status: 403 }));
 
     await expect(fetchRepoTeams("myorg", "tok", ["frontend"], false)).rejects.toThrow("403");
   });
 
   it("silently skips a team's repos when its repo list request fails", async () => {
-    globalThis.fetch = (async (url: string | URL | Request) => {
+    mockFetch(async (url: string | URL | Request) => {
       const urlStr = url.toString();
       if (urlStr.includes("/orgs/myorg/teams?")) {
         return new Response(JSON.stringify([{ slug: "frontend-web", name: "FE" }]), {
@@ -531,7 +548,7 @@ describe("fetchRepoTeams", () => {
         });
       }
       return new Response("Not Found", { status: 404 });
-    }) as typeof fetch;
+    });
 
     const result = await fetchRepoTeams("myorg", "tok", ["frontend"], false);
     expect(result.size).toBe(0);
@@ -539,7 +556,7 @@ describe("fetchRepoTeams", () => {
 
   it("paginates through teams when the first page returns 100 items", async () => {
     let teamPage = 0;
-    globalThis.fetch = (async (url: string | URL | Request) => {
+    mockFetch(async (url: string | URL | Request) => {
       const urlStr = url.toString();
       if (urlStr.includes("/teams?")) {
         teamPage++;
@@ -564,7 +581,7 @@ describe("fetchRepoTeams", () => {
         status: 200,
         headers: { "content-type": "application/json" },
       });
-    }) as typeof fetch;
+    });
 
     await fetchRepoTeams("myorg", "tok", ["frontend"], false);
     expect(teamPage).toBe(2);
@@ -572,7 +589,7 @@ describe("fetchRepoTeams", () => {
 
   it("paginates through repos when a team's first repo page returns 100 items", async () => {
     let repoPage = 0;
-    globalThis.fetch = (async (url: string | URL | Request) => {
+    mockFetch(async (url: string | URL | Request) => {
       const urlStr = url.toString();
       if (urlStr.includes("/teams?")) {
         return new Response(JSON.stringify([{ slug: "frontend-web", name: "FE" }]), {
@@ -595,7 +612,7 @@ describe("fetchRepoTeams", () => {
         status: 200,
         headers: { "content-type": "application/json" },
       });
-    }) as typeof fetch;
+    });
 
     const result = await fetchRepoTeams("myorg", "tok", ["frontend"], false);
     expect(result.has("myorg/repo-extra")).toBe(true);
@@ -604,7 +621,7 @@ describe("fetchRepoTeams", () => {
 
   it("throws a clean rate-limit error when the team repo list returns 403 rate-limit", async () => {
     const resetTimestamp = Math.ceil((Date.now() + 300_000) / 1_000); // 5 minutes from now
-    globalThis.fetch = (async (url: string | URL | Request) => {
+    mockFetch(async (url: string | URL | Request) => {
       const urlStr = url.toString();
       if (urlStr.includes("/teams?")) {
         return new Response(JSON.stringify([{ slug: "frontend-web", name: "FE" }]), {
@@ -624,7 +641,7 @@ describe("fetchRepoTeams", () => {
           },
         },
       );
-    }) as typeof fetch;
+    });
 
     await expect(fetchRepoTeams("myorg", "tok", ["frontend"], false)).rejects.toThrow(
       /GitHub API rate limit exceeded\. Please retry in \d+ minute/,
@@ -632,7 +649,7 @@ describe("fetchRepoTeams", () => {
   });
 
   it("prefix matching is case-insensitive", async () => {
-    globalThis.fetch = (async (url: string | URL | Request) => {
+    mockFetch(async (url: string | URL | Request) => {
       const urlStr = url.toString();
       if (urlStr.includes("/teams?")) {
         return new Response(JSON.stringify([{ slug: "Frontend-Web", name: "FE" }]), {
@@ -644,7 +661,7 @@ describe("fetchRepoTeams", () => {
         status: 200,
         headers: { "content-type": "application/json" },
       });
-    }) as typeof fetch;
+    });
 
     const result = await fetchRepoTeams("myorg", "tok", ["FRONTEND"], false);
     expect(result.has("myorg/repo-a")).toBe(true);

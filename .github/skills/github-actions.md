@@ -13,13 +13,21 @@ repository. Read this before writing or modifying any `.github/workflows/*.yaml`
     start-preview-server/     ← composite reusable action (shared server start logic)
       action.yml
   workflows/
-    ci.yaml                   ← unit tests, format, lint, knip + coverage PR comment
+    ci.yaml                   ← unit tests, native format/type checks, knip + coverage PR comment
     cd.yaml                   ← binary build + GitHub Release on tag push
     docs.yaml                 ← VitePress Pages deploy + versioned snapshot
     a11y.yaml                 ← WCAG 2.1 AA audit via pa11y-ci
     lighthouse.yaml           ← Lighthouse CI eco-design budgets + PR comment
     responsive.yaml           ← Playwright mobile viewport checks
 ```
+
+All Bun setup steps use `bun-version-file: .bun-version` (Bun 1.4.4 or newer).
+Update that single pin rather than using `latest` or per-workflow versions.
+CI and release checks use `bun run typecheck` (`bun check`) and
+`bun run format:check` (`bun fmt --check .`). `bun run lint` is retained only as a
+compatibility alias: TypeScript checking does not enforce the retired oxlint rules.
+Documentation audit path filters include `.bun-version`, `package.json` and
+`bun.lock` so runtime/dependency changes are verified too.
 
 ### Composite action: `start-preview-server`
 

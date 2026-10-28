@@ -77,7 +77,7 @@ Pushing `vX.Y.Z` triggers the release pipeline automatically:
 
 ## Version badge
 
-`VersionBadge.vue` reads `version` from `package.json` at build time via `vite.define`. It auto-derives the blog post slug (`release-vX-Y-Z`) from the version — no manual update needed. Verify it shows correctly after the docs deploy (~5 min after tag push).
+`VersionBadge.vue` reads `version` from `package.json` at build time via `vite.define`. It auto-derives the blog post slug (`release-vX-Y-Z`) from the version and falls back to the GitHub Release page when that post does not exist (optional for patch releases) — no manual update needed. Verify it shows correctly after the docs deploy (~5 min after tag push).
 
 ---
 
@@ -160,8 +160,8 @@ The version selector in the VitePress nav (`themeConfig.versionSelector`) reads 
 
 ```bash
 bun test               # full suite green
-bun run lint           # oxlint — zero errors
-bun run format:check   # oxfmt — no diff
+bun run typecheck      # bun check — zero type errors
+bun run format:check   # bun fmt --check — no diff
 bun run knip           # no unused exports
 bun run build.ts       # binary compiles for current platform
 

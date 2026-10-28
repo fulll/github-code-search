@@ -16,9 +16,11 @@ function createTestGroup(name: string, repoSelected = true): RepoGroup {
     folded: false,
     matches: [
       {
-        filePath: "src/test.ts",
+        path: "src/test.ts",
+        repoFullName: name,
+        htmlUrl: `https://github.com/${name}/blob/main/src/test.ts`,
+        archived: false,
         textMatches: [],
-        extractSelected: false,
       },
     ],
     extractSelected: [false],
@@ -202,7 +204,7 @@ describe("hitTestClick", () => {
   describe("section rows", () => {
     it("detects navigate action on section row (no fold/select zones)", () => {
       const groups = [createTestGroup("org/repo")];
-      const rows: Row[] = [{ type: "section", sectionLabel: "Test Section" }];
+      const rows: Row[] = [{ type: "section", repoIndex: -1, sectionLabel: "Test Section" }];
       // Section rows don't have fold or select actions, always navigate
       const result = hitTestClick(groups, rows, 0, FOLD_COLUMN_START, 1);
       expect(result?.action).toBe("navigate");
@@ -210,7 +212,7 @@ describe("hitTestClick", () => {
 
     it("detects navigate action on section row at any column", () => {
       const groups = [createTestGroup("org/repo")];
-      const rows: Row[] = [{ type: "section", sectionLabel: "Test Section" }];
+      const rows: Row[] = [{ type: "section", repoIndex: -1, sectionLabel: "Test Section" }];
       const result = hitTestClick(groups, rows, 0, CHECKBOX_COLUMN_START, 1);
       expect(result?.action).toBe("navigate");
     });

@@ -4,7 +4,7 @@ Thank you for taking the time to contribute! This document describes how to set 
 
 ## Prerequisites
 
-- [Bun](https://bun.sh) ≥ 1.4
+- [Bun](https://bun.sh) ≥ 1.4.4 (CI uses the version pinned in `.bun-version`)
 - A GitHub personal access token with `repo` scope (for integration testing)
 
 ## Development setup
@@ -106,14 +106,20 @@ Compiled binaries require no runtime dependencies and can be distributed as a si
 - TypeScript throughout.
 - Pure functions wherever possible (makes unit testing straightforward).
 - Side-effectful code (CLI parsing, API calls, TTY interaction) is isolated in `github-code-search`, `src/api.ts`, and `src/tui.ts`.
-- Run `bun run lint` (oxlint) — must pass with zero errors before submitting.
-- Run `bun run format:check` (oxfmt) — auto-fix locally with `bun run format`.
+- Run `bun run typecheck` (`bun check`) — strict TypeScript checking of application code, tests and supporting TypeScript scripts.
+- Run `bun run format:check` (`bun fmt --check .`) — auto-fix locally with `bun run format` (`bun fmt .`).
+
+Formatting options live in `[fmt]` in `bunfig.toml`, retaining the 100-column print
+width. No standalone formatter or linter is installed. `bun run lint` remains a
+compatibility alias for type checking: `bun check` is not a linter, and the previous
+oxlint correctness/suspicious rules are intentionally no longer enforced. Vue
+templates are validated by the documentation build, not by `bun check`.
 
 ## Submitting a pull request
 
 1. Fork the repository and create a branch: `git checkout -b my-feature`.
 2. Make your changes, add or update tests.
-3. Ensure `bun test` passes.
+3. Ensure `bun test`, `bun run typecheck`, `bun run format:check`, `bun run knip` and `bun run build.ts` pass.
 4. Open a pull request against `main` with a clear description of the motivation and changes.
 
 If your PR touches docs (`docs/**`), also verify:

@@ -88,7 +88,6 @@ async function findOverflowingElements(page: Page): Promise<OverflowHit[]> {
     const vw = window.innerWidth;
     const hits: { selector: string; overflow: number }[] = [];
 
-    // oxlint-disable-next-line unicorn/consistent-function-scoping -- must stay inside page.evaluate()
     function isContainedByAncestor(el: Element): boolean {
       let parent = el.parentElement;
       while (parent && parent !== document.documentElement) {

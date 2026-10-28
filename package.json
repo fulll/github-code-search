@@ -33,13 +33,17 @@
   "bin": {
     "github-code-search": "./github-code-search.ts"
   },
+  "engines": {
+    "bun": ">=1.4.4"
+  },
   "scripts": {
     "build": "bun build.ts",
     "test": "bun test",
     "test:bats": "bats install.test.bats",
-    "format": "oxfmt --write .",
-    "format:check": "oxfmt --check .",
-    "lint": "oxlint .",
+    "format": "bun fmt .",
+    "format:check": "bun fmt --check .",
+    "typecheck": "bun check",
+    "lint": "bun run typecheck",
     "knip": "knip",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
@@ -61,8 +65,6 @@
     "bun-types": "^1.4.2",
     "knip": "^6.39.0",
     "mermaid": "^12.2.0",
-    "oxfmt": "^0.74.0",
-    "oxlint": "^1.86.0",
     "pa11y-ci": "^5.0.0",
     "sharp": "^0.35.5",
     "vitepress": "^1.6.4",

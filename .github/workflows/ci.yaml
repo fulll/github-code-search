@@ -1,3 +1,5 @@
+# Validate pull requests and manually dispatched snapshot branches with tests,
+# native Bun formatting/type checking and knip; retain the coverage PR report.
 name: CI
 
 on:
@@ -12,11 +14,20 @@ on:
   # evaluation.
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
+    # Keep the existing status-check name for branch protection compatibility.
     name: Test · Format · Lint · Dead code
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pull-requests: write
 
     steps:
@@ -26,7 +37,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: latest
+          bun-version-file: .bun-version
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -42,11 +53,11 @@ jobs:
           lcov-file: coverage/lcov.info
         continue-on-error: true
 
-      - name: Check formatting (oxfmt)
+      - name: Check formatting (bun fmt)
         run: bun run format:check
 
-      - name: Lint (oxlint)
-        run: bun run lint
+      - name: Type check (bun check)
+        run: bun run typecheck
 
       - name: Dead code detection (knip)
         run: bun run knip

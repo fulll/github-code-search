@@ -1,3 +1,5 @@
+# Validate and compile release tags for each supported target, then publish
+# the self-contained binaries and compatibility aliases in a GitHub Release.
 name: CD
 
 on:
@@ -55,10 +57,16 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: latest
+          bun-version-file: .bun-version
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      - name: Type check (bun check)
+        run: bun run typecheck
+
+      - name: Check formatting (bun fmt)
+        run: bun run format:check
 
       - name: Run tests
         run: bun test

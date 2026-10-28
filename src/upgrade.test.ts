@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { mockFetch } from "./test-setup.ts";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -172,18 +173,20 @@ describe("fetchLatestRelease", () => {
   });
 
   it("returns release data from the GitHub API", async () => {
-    globalThis.fetch = (async () =>
-      new Response(
-        JSON.stringify({
-          tag_name: "v1.2.0",
-          html_url: "https://github.com/fulll/github-code-search/releases/tag/v1.2.0",
-          assets: [],
-        }),
-        {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        },
-      )) as typeof fetch;
+    mockFetch(
+      async () =>
+        new Response(
+          JSON.stringify({
+            tag_name: "v1.2.0",
+            html_url: "https://github.com/fulll/github-code-search/releases/tag/v1.2.0",
+            assets: [],
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        ),
+    );
     const release = await fetchLatestRelease("faketoken");
     expect(release.tag_name).toBe("v1.2.0");
     expect(release.html_url).toBe(
@@ -193,24 +196,26 @@ describe("fetchLatestRelease", () => {
   });
 
   it("works without a token", async () => {
-    globalThis.fetch = (async () =>
-      new Response(
-        JSON.stringify({
-          tag_name: "v2.0.0",
-          html_url: "https://github.com/fulll/github-code-search/releases/tag/v2.0.0",
-          assets: [],
-        }),
-        {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        },
-      )) as typeof fetch;
+    mockFetch(
+      async () =>
+        new Response(
+          JSON.stringify({
+            tag_name: "v2.0.0",
+            html_url: "https://github.com/fulll/github-code-search/releases/tag/v2.0.0",
+            assets: [],
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        ),
+    );
     const release = await fetchLatestRelease();
     expect(release.tag_name).toBe("v2.0.0");
   });
 
   it("throws on non-OK response", async () => {
-    globalThis.fetch = (async () => new Response("Not Found", { status: 404 })) as typeof fetch;
+    mockFetch(async () => new Response("Not Found", { status: 404 }));
     await expect(fetchLatestRelease()).rejects.toThrow("404");
   });
 });
@@ -237,18 +242,20 @@ describe("performUpgrade", () => {
   });
 
   it("prints 'up to date' when no newer version", async () => {
-    globalThis.fetch = (async () =>
-      new Response(
-        JSON.stringify({
-          tag_name: "v1.0.0",
-          html_url: "https://github.com/fulll/github-code-search/releases/tag/v1.0.0",
-          assets: [],
-        }),
-        {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        },
-      )) as typeof fetch;
+    mockFetch(
+      async () =>
+        new Response(
+          JSON.stringify({
+            tag_name: "v1.0.0",
+            html_url: "https://github.com/fulll/github-code-search/releases/tag/v1.0.0",
+            assets: [],
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        ),
+    );
 
     const writes: string[] = [];
     const origWrite = process.stdout.write.bind(process.stdout);
@@ -267,18 +274,20 @@ describe("performUpgrade", () => {
   });
 
   it("throws when no matching binary asset found in the release", async () => {
-    globalThis.fetch = (async () =>
-      new Response(
-        JSON.stringify({
-          tag_name: "v9.9.9",
-          html_url: "https://github.com/fulll/github-code-search/releases/tag/v9.9.9",
-          assets: [],
-        }),
-        {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        },
-      )) as typeof fetch;
+    mockFetch(
+      async () =>
+        new Response(
+          JSON.stringify({
+            tag_name: "v9.9.9",
+            html_url: "https://github.com/fulll/github-code-search/releases/tag/v9.9.9",
+            assets: [],
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        ),
+    );
 
     await expect(performUpgrade("1.0.0", "/tmp/test-binary-noasset")).rejects.toThrow(
       "No binary found",
@@ -294,29 +303,33 @@ describe("checkForUpdate", () => {
   });
 
   it("returns the latest version tag when a newer version exists", async () => {
-    globalThis.fetch = (async () =>
-      new Response(
-        JSON.stringify({
-          tag_name: "v2.0.0",
-          html_url: "https://github.com/fulll/github-code-search/releases/tag/v2.0.0",
-          assets: [],
-        }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      )) as typeof fetch;
+    mockFetch(
+      async () =>
+        new Response(
+          JSON.stringify({
+            tag_name: "v2.0.0",
+            html_url: "https://github.com/fulll/github-code-search/releases/tag/v2.0.0",
+            assets: [],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    );
     const result = await checkForUpdate("1.0.0");
     expect(result).toBe("v2.0.0");
   });
 
   it("returns null when already on the latest version", async () => {
-    globalThis.fetch = (async () =>
-      new Response(
-        JSON.stringify({
-          tag_name: "v1.0.0",
-          html_url: "https://github.com/fulll/github-code-search/releases/tag/v1.0.0",
-          assets: [],
-        }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      )) as typeof fetch;
+    mockFetch(
+      async () =>
+        new Response(
+          JSON.stringify({
+            tag_name: "v1.0.0",
+            html_url: "https://github.com/fulll/github-code-search/releases/tag/v1.0.0",
+            assets: [],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    );
     const result = await checkForUpdate("1.0.0");
     expect(result).toBeNull();
   });
@@ -327,13 +340,13 @@ describe("checkForUpdate", () => {
   });
 
   it("returns null silently on network error", async () => {
-    globalThis.fetch = (() => Promise.reject(new Error("network failure"))) as typeof fetch;
+    mockFetch(() => Promise.reject(new Error("network failure")));
     const result = await checkForUpdate("1.0.0");
     expect(result).toBeNull();
   });
 
   it("returns null on non-OK API response", async () => {
-    globalThis.fetch = (async () => new Response("Not Found", { status: 404 })) as typeof fetch;
+    mockFetch(async () => new Response("Not Found", { status: 404 }));
     const result = await checkForUpdate("1.0.0");
     expect(result).toBeNull();
   });
@@ -342,10 +355,10 @@ describe("checkForUpdate", () => {
     const controller = new AbortController();
     controller.abort();
     // fetch will throw an AbortError; checkForUpdate must catch it and return null.
-    globalThis.fetch = (async (_url: string, opts?: RequestInit) => {
+    mockFetch(async (_url: string | URL | Request, opts?: RequestInit) => {
       if (opts?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
       throw new Error("fetch should not succeed with an aborted signal");
-    }) as typeof fetch;
+    });
     const result = await checkForUpdate("1.0.0", undefined, controller.signal);
     expect(result).toBeNull();
   });
@@ -377,7 +390,7 @@ describe("performUpgrade — download path", () => {
     const suffix = p === "windows" ? ".exe" : "";
     const assetName = `github-code-search-${p}-${process.arch}${suffix}`;
     let callCount = 0;
-    globalThis.fetch = (async () => {
+    mockFetch(async () => {
       callCount++;
       if (callCount === 1) {
         return new Response(
@@ -393,7 +406,7 @@ describe("performUpgrade — download path", () => {
         );
       }
       return downloadResponse;
-    }) as typeof fetch;
+    });
   }
 
   it("throws when the binary download returns a non-OK status", async () => {
@@ -445,7 +458,7 @@ describe("performUpgrade — download path", () => {
     const assetName = `github-code-search-${p}-${process.arch}${suffix}`;
     let firstCall = true;
     const origFetch = globalThis.fetch;
-    globalThis.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
+    mockFetch(async (url: RequestInfo | URL, init?: RequestInit) => {
       if (firstCall) {
         firstCall = false;
         return new Response(
@@ -458,7 +471,7 @@ describe("performUpgrade — download path", () => {
         );
       }
       return origFetch(url, init);
-    }) as typeof fetch;
+    });
     return assetName;
   }
 
@@ -467,7 +480,7 @@ describe("performUpgrade — download path", () => {
     // Override fetch so the download returns a redirect to an attacker-controlled host
     const origFetch = globalThis.fetch;
     let releaseApiDone = false;
-    globalThis.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
+    mockFetch(async (url: RequestInfo | URL, init?: RequestInit) => {
       if (!releaseApiDone) {
         releaseApiDone = true;
         return origFetch(url, init);
@@ -476,7 +489,7 @@ describe("performUpgrade — download path", () => {
         status: 302,
         headers: { location: "https://attacker.example.com/evil-binary" },
       });
-    }) as typeof fetch;
+    });
 
     await expect(performUpgrade("1.0.0", "/tmp/gcs-test-ssrf-redirect")).rejects.toThrow(
       "Redirect blocked",
@@ -487,7 +500,7 @@ describe("performUpgrade — download path", () => {
     mockReleaseApi();
     const origFetch = globalThis.fetch;
     let releaseApiDone = false;
-    globalThis.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
+    mockFetch(async (url: RequestInfo | URL, init?: RequestInit) => {
       if (!releaseApiDone) {
         releaseApiDone = true;
         return origFetch(url, init);
@@ -496,7 +509,7 @@ describe("performUpgrade — download path", () => {
         status: 302,
         headers: { location: "http://github.com/downgrade-attack" },
       });
-    }) as typeof fetch;
+    });
 
     await expect(performUpgrade("1.0.0", "/tmp/gcs-test-http-redirect")).rejects.toThrow(
       "Redirect blocked",
@@ -507,7 +520,7 @@ describe("performUpgrade — download path", () => {
     mockReleaseApi();
     const origFetch = globalThis.fetch;
     let releaseApiDone = false;
-    globalThis.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
+    mockFetch(async (url: RequestInfo | URL, init?: RequestInit) => {
       if (!releaseApiDone) {
         releaseApiDone = true;
         return origFetch(url, init);
@@ -519,7 +532,7 @@ describe("performUpgrade — download path", () => {
           location: "https://github.com/fulll/github-code-search/releases/download/v9.9.9/binary",
         },
       });
-    }) as typeof fetch;
+    });
 
     await expect(performUpgrade("1.0.0", "/tmp/gcs-test-too-many-redirects")).rejects.toThrow(
       "Too many redirects",
@@ -531,7 +544,7 @@ describe("performUpgrade — download path", () => {
     const origFetch = globalThis.fetch;
     let releaseApiDone = false;
     let redirectDone = false;
-    globalThis.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
+    mockFetch(async (url: RequestInfo | URL, init?: RequestInit) => {
       if (!releaseApiDone) {
         releaseApiDone = true;
         return origFetch(url, init);
@@ -545,7 +558,7 @@ describe("performUpgrade — download path", () => {
         });
       }
       return new Response(new Uint8Array([1, 2, 3]).buffer, { status: 200 });
-    }) as typeof fetch;
+    });
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (Bun as any).write = async () => 3;
