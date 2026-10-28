@@ -71,6 +71,30 @@ installation/contributor documentation consistent. Compiled binaries do not need
 No repository custom agent definitions are currently shipped; any future agents
 must use the same native tooling and validation commands.
 
+## Documentation accessibility
+
+The docs audit uses `@axe-core/playwright` and the existing Playwright dependency.
+Run `bun run docs:build:a11y`, start `bun run docs:preview -- --port 4173` in another
+terminal, then run `bun run docs:a11y` and `bun run docs:test:a11y`.
+Install local Chromium with `bun run playwright install chromium`, or point
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` at an installed Chrome executable.
+CI uses system Chrome without downloading another browser.
+
+`scripts/a11y.ts` scans every sitemap URL with two workers, explicit WCAG
+2.0/2.1/2.2 A/AA tags, and readiness checks for Vue hydration, Mermaid and fonts.
+Pure URL validation and Markdown formatting live in `scripts/a11y-utils.ts`.
+The generated `a11y-report.json` includes full axe results and operational
+errors; `a11y-report.md` is used for the job summary and sticky PR comment.
+Violations and operational failures must fail CI. Incomplete results require
+manual review, not an automatic compliance claim. Never disable contrast/ARIA
+rules or carry over HTML_CodeSniffer exclusions as a shortcut.
+
+Read `.github/skills/documentation.md` for accessible theme patterns and
+`.github/skills/github-actions.md` before changing the workflow. The comparison,
+measurement caveats and manual-review checklist are in
+`docs/reference/accessibility.md`. Repository-local custom agents are not
+currently defined; these shared instructions are the agent entry point.
+
 ## Project layout
 
 ```

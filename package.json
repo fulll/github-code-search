@@ -51,21 +51,22 @@
     "docs:build:og": "bun scripts/generate-og.ts",
     "generate-ico": "bun scripts/generate-ico.ts",
     "docs:preview": "vitepress preview docs",
-    "docs:a11y": "pa11y-ci --config .pa11yci.json --sitemap http://localhost:4173${VITEPRESS_BASE:-/github-code-search/}sitemap.xml",
+    "docs:a11y": "bun scripts/a11y.ts",
     "docs:lhci": "lhci autorun --config .lhci.config.cjs",
-    "docs:test:responsive": "playwright test"
+    "docs:test:responsive": "playwright test responsive.pw.ts",
+    "docs:test:a11y": "playwright test a11y.pw.ts"
   },
   "dependencies": {
     "commander": "^15.0.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.63.0",
     "@resvg/resvg-js": "^2.6.2",
     "bun-types": "^1.4.2",
     "knip": "^6.39.0",
     "mermaid": "^12.2.0",
-    "pa11y-ci": "^5.0.0",
     "sharp": "^0.35.5",
     "vitepress": "^1.6.4",
     "vitepress-mermaid-renderer": "^1.2.2"

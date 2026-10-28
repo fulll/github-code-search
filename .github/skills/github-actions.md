@@ -16,7 +16,7 @@ repository. Read this before writing or modifying any `.github/workflows/*.yaml`
     ci.yaml                   ← unit tests, native format/type checks, knip + coverage PR comment
     cd.yaml                   ← binary build + GitHub Release on tag push
     docs.yaml                 ← VitePress Pages deploy + versioned snapshot
-    a11y.yaml                 ← WCAG 2.1 AA audit via pa11y-ci
+    a11y.yaml                 ← WCAG 2.2 AA automated audit via axe-core + Playwright
     lighthouse.yaml           ← Lighthouse CI eco-design budgets + PR comment
     responsive.yaml           ← Playwright mobile viewport checks
 ```
@@ -155,7 +155,7 @@ should post a **single sticky comment** per PR, updated on every push:
   if: github.event_name == 'pull_request'
   uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
   with:
-    header: <unique-workflow-id> # e.g. "lighthouse-ci", "coverage", "pa11y"
+    header: <unique-workflow-id> # e.g. "lighthouse-ci", "coverage", "accessibility-audit"
     message: ${{ steps.report.outputs.result }}
 ```
 
@@ -223,6 +223,28 @@ the Pages site in a broken state; use a more specific group key instead.
 
 ## Chrome / Puppeteer on Ubuntu runners
 
+The accessibility workflow uses `@axe-core/playwright` with the already installed
+Playwright stack and system Chrome:
+
+```yaml
+env:
+  PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: /usr/bin/google-chrome-stable
+```
+
+Do not install/download another browser in this job. Run `docs:test:a11y` after
+the preview starts, then `docs:a11y`. The audit scans the entire sitemap with two
+workers and explicit WCAG 2.0/2.1/2.2 A/AA tags. Its path filters must include
+`scripts/a11y*.ts`, `playwright.config.ts`, `package.json`, `bun.lock` and the shared
+preview action as well as docs and the workflow itself.
+
+Always upload `a11y-report.json` and `a11y-report.md`, publish the Markdown to
+`GITHUB_STEP_SUMMARY`, and post the `accessibility-audit` sticky comment only
+for same-repository PRs (fork tokens cannot write comments). Preserve a failing
+job after reporting violations or operational errors; do not mask scan failures
+with `continue-on-error` alone. Incomplete results are manual-review findings,
+not proof of compliance.
+
+Lighthouse still uses Puppeteer-core; do not remove its transitive dependencies.
 Ubuntu `ubuntu-latest` ships `google-chrome-stable`. Skip the ~200 MB Puppeteer
 Chromium download and use the system binary:
 

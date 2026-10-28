@@ -1,4 +1,4 @@
-import { h, nextTick, onMounted, watch } from "vue";
+import { h, nextTick, onMounted, onUnmounted, watch } from "vue";
 import type { App } from "vue";
 import type { Theme } from "vitepress";
 import DefaultTheme from "vitepress/theme";
@@ -16,6 +16,13 @@ import VersionBadge from "./VersionBadge.vue";
 import TestimonialsSection from "./TestimonialsSection.vue";
 import "./custom.css";
 
+// aria-label is only permitted on elements with a role; Mermaid containers lack one.
+function labelDiagrams() {
+  for (const diagram of document.querySelectorAll(".mermaid[aria-label]:not([role])")) {
+    diagram.setAttribute("role", "group");
+  }
+}
+
 export default {
   extends: DefaultTheme,
   enhanceApp({ app }: { app: App }) {
@@ -28,15 +35,19 @@ export default {
     app.component("TestimonialsSection", TestimonialsSection);
   },
   setup() {
-    // Fix: DocSearch button has aria-label="Search" but its visible text includes
-    // the keyboard-shortcut keys ("⌘ K"), which triggers a label-content-name-
-    // mismatch accessibility failure. Marking the keys container aria-hidden hides
-    // it from assistive technology so the button's accessible name ("Search") and
-    // its visible label agree.
+    let diagramObserver: MutationObserver | undefined;
     onMounted(() => {
-      const keys = document.querySelector<HTMLElement>(".DocSearch-Button-Keys");
-      if (keys) keys.setAttribute("aria-hidden", "true");
+      // Derive the name from visible content, including the shortcut. The label
+      // stays screen-reader-visible on mobile via custom.css.
+      document.querySelector(".DocSearch")?.removeAttribute("aria-label");
+      labelDiagrams();
+      const content = document.getElementById("VPContent");
+      if (content) {
+        diagramObserver = new MutationObserver(labelDiagrams);
+        diagramObserver.observe(content, { childList: true, subtree: true });
+      }
     });
+    onUnmounted(() => diagramObserver?.disconnect());
   },
   Layout: () => {
     const { isDark, frontmatter } = useData();

@@ -359,6 +359,7 @@ export default defineConfig({
               link: "/reference/github-api-limits",
             },
             { text: "Environment variables", link: "/reference/environment" },
+            { text: "Accessibility audits", link: "/reference/accessibility" },
           ],
         },
       ],
@@ -417,9 +418,10 @@ export default defineConfig({
   // ── Sitemap ───────────────────────────────────────────────────────────────
   // VITEPRESS_HOSTNAME overrides the default for local/CI a11y audits:
   //   VITEPRESS_HOSTNAME=http://localhost:4173 vitepress build docs
-  // → sitemap.xml contains localhost URLs that pa11y-ci can reach directly.
+  // → sitemap.xml contains localhost URLs that the accessibility audit can reach.
   sitemap: {
     hostname:
-      (process.env.VITEPRESS_HOSTNAME ?? "https://fulll.github.io") + "/github-code-search/",
+      (process.env.VITEPRESS_HOSTNAME ?? "https://fulll.github.io") +
+      (process.env.VITEPRESS_BASE ?? "/github-code-search/"),
   },
 });

@@ -4,8 +4,9 @@ coverage/
 .env
 *.local
 
-# pa11y accessibility testing results
+# Accessibility audit reports
 a11y-report.json
+a11y-report.md
 
 # Lighthouse CI
 .lighthouseci/

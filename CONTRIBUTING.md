@@ -128,9 +128,24 @@ If your PR touches docs (`docs/**`), also verify:
 bun run docs:build           # no dead links, no build errors
 bun run docs:build:a11y
 bun run docs:preview -- --port 4173 &
-bun run docs:a11y            # 0 pa11y WCAG 2.1 AA violations
+bun run docs:a11y            # 0 axe-core WCAG 2.2 AA automated violations
+bun run docs:test:a11y       # audit failure-path fixtures and theme semantics
 bun run docs:test:responsive # 20/20 Playwright responsive tests green
 ```
+
+Install the local test browser once with `bun run playwright install chromium`,
+or set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to an existing Chrome executable.
+The accessibility workflow uses `/usr/bin/google-chrome-stable` on Ubuntu, with
+no browser download. `PLAYWRIGHT_BASE_URL` overrides the preview origin;
+`VITEPRESS_BASE` selects the documentation base path, including versioned builds.
+The build and audit must use the same base path.
+
+Inspect `a11y-report.json` for affected nodes, rule help links, scan errors and
+incomplete findings; `a11y-report.md` summarizes every page. Any violation or
+operational error fails the command. Do not copy obsolete HTML_CodeSniffer
+exceptions into axe or disable rules to make CI pass. Manual keyboard,
+screen-reader and interaction checks remain necessary. See the
+[audit guide](docs/reference/accessibility.md) for coverage and benchmark details.
 
 ## AI agent tooling
 
@@ -154,13 +169,14 @@ Each file covers **one task type** — ordered numbered steps, PR conventions, v
 Deep domain-knowledge files — **read these for reference**, not for step-by-step guidance.
 Skills provide patterns, checklists, architectural details and examples that are too large for instruction files.
 
-| File               | Domain                                                                 |
-| ------------------ | ---------------------------------------------------------------------- |
-| `bug-fixing.md`    | Extended symptom→module table, test-first patterns, minimal fix rules  |
-| `feature.md`       | Layer map, type-first design, CLI options, render sub-module extension |
-| `refactoring.md`   | Architectural invariants, safe rename playbook, knip output guide      |
-| `release.md`       | Semver guide, CD pipeline mechanics, blog post format, CHANGELOG rules |
-| `documentation.md` | VitePress theme API, CSS variables, WCAG patterns, responsive patterns |
+| File                | Domain                                                                 |
+| ------------------- | ---------------------------------------------------------------------- |
+| `bug-fixing.md`     | Extended symptom→module table, test-first patterns, minimal fix rules  |
+| `feature.md`        | Layer map, type-first design, CLI options, render sub-module extension |
+| `refactoring.md`    | Architectural invariants, safe rename playbook, knip output guide      |
+| `release.md`        | Semver guide, CD pipeline mechanics, blog post format, CHANGELOG rules |
+| `documentation.md`  | VitePress theme API, CSS variables, WCAG patterns, responsive patterns |
+| `github-actions.md` | CI workflows, pinned actions, browser reuse and accessibility reports  |
 
 **How they fit together:** instruction files say _what steps to follow_; skill files say _what to know deeply_. Instructions reference their companion skill via a `> Skill reference:` note at the top.
 
