@@ -25,14 +25,15 @@ async function readSitemap(page: Page, base: string): Promise<string[]> {
   return validateSitemapUrls(locations, base);
 }
 
-async function auditPage(browser: Browser, url: string) {
-  // `vitepress preview` Brotli-compresses on every request: ~5 s per page for the
-  // 4 MB Mermaid chunk. Encoding is irrelevant to axe, so request raw bytes.
-  const context = await browser.newContext({
+// `vitepress preview` Brotli-compresses on every request (~5 s for the 4 MB Mermaid
+// chunk). Encoding is irrelevant to axe, so request raw bytes.
+const newAuditContext = (browser: Browser) =>
+  browser.newContext({
     reducedMotion: "reduce",
     extraHTTPHeaders: { "Accept-Encoding": "identity" },
   });
-  const page = await context.newPage();
+
+async function auditPage(page: Page, url: string) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const results = await Promise.race([
@@ -45,9 +46,24 @@ async function auditPage(browser: Browser, url: string) {
           const app = document.getElementById("app");
           return app && "__vue_app__" in app;
         });
-        await page.waitForFunction(() => !document.querySelector(".mermaid-rendering"));
+        // Mermaid is lazy-loaded: wait until every visible diagram is rendered.
+        // Off-screen blocks stay as source until scrolled into view (200px margin).
+        await page.waitForFunction(
+          () =>
+            !document.querySelector(".mermaid-rendering") &&
+            Array.from(document.querySelectorAll("div.language-mermaid")).every(
+              (block) =>
+                block.querySelector(".mermaid svg") ||
+                (block.querySelector("pre[data-mermaid-processed]") &&
+                  block.getBoundingClientRect().top >= innerHeight + 200),
+            ),
+        );
         await page.evaluate(() => document.fonts.ready);
-        return new AxeBuilder({ page }).withTags(WCAG_TAGS).analyze();
+        // options() replaces runOnly, so it must come before withTags().
+        return new AxeBuilder({ page })
+          .options({ resultTypes: ["violations", "incomplete"] })
+          .withTags(WCAG_TAGS)
+          .analyze();
       })(),
       new Promise<never>((_, reject) => {
         timer = setTimeout(() => reject(new Error(`Audit timed out on ${url}`)), 60_000);
@@ -58,7 +74,6 @@ async function auditPage(browser: Browser, url: string) {
     return { url, results: null, error: String(error) };
   } finally {
     clearTimeout(timer);
-    await context.close();
   }
 }
 
@@ -80,11 +95,20 @@ async function runAudit(): Promise<number> {
     const urls = await readSitemap(discovery, base);
     await discovery.close();
     let next = 0;
+    // One context per worker: navigations reuse the HTTP and V8 code caches
+    // (~4x faster page loads). A fresh context replaces it after any error.
     const worker = async () => {
+      let context = await newAuditContext(activeBrowser);
+      let page = await context.newPage();
       while (next < urls.length) {
         const url = urls[next++];
-        const result = await auditPage(activeBrowser, url);
+        const result = await auditPage(page, url);
         pages.push(result);
+        if (result.error) {
+          await context.close().catch(() => {});
+          context = await newAuditContext(activeBrowser);
+          page = await context.newPage();
+        }
         console.log(
           `${result.error ? "ERROR" : result.results?.violations.length ? "FAIL" : "PASS"} ${url}`,
         );
@@ -95,6 +119,7 @@ async function runAudit(): Promise<number> {
             console.error(`  ${node.target}: ${node.failureSummary}`);
         }
       }
+      await context.close();
     };
     await Promise.all(
       Array.from({ length: Math.min(4, availableParallelism(), urls.length) }, worker),

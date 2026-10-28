@@ -231,9 +231,12 @@ env:
   PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: /usr/bin/google-chrome-stable
 ```
 
-Do not install/download another browser in this job. Run `docs:test:a11y` after
-the preview starts, then `docs:a11y`. The audit scans the entire sitemap with two
-workers and explicit WCAG 2.0/2.1/2.2 A/AA tags. Its path filters must include
+Do not install/download another browser in this job. The audit-harness fixture
+tests (`docs:test:a11y --grep "audit harness"`) need no docs build and run in a
+parallel `harness` job. The `audit` job runs the theme-semantics tests
+(`--grep-invert "audit harness"`) after the preview starts, then `docs:a11y`. The
+audit scans the entire sitemap with up to four workers and explicit WCAG
+2.0/2.1/2.2 A/AA tags. Its path filters must include
 `scripts/a11y*.ts`, `playwright.config.ts`, `package.json`, `bun.lock` and the shared
 preview action as well as docs and the workflow itself.
 

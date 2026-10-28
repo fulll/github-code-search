@@ -71,7 +71,6 @@ runs:
             echo "::error::Preview server did not respond within ${TIMEOUT} s on ${URL}."
             exit 1
           fi
-          echo "… retrying in 2 s"
-          sleep 2
+          sleep 0.5
         done
         echo "Preview server is ready."

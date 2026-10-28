@@ -69,9 +69,11 @@ bun run docs:test:a11y    # passing/failing fixtures and theme regression tests
 
 Runner: `scripts/a11y.ts`; pure helpers/tests: `scripts/a11y-utils.ts` and its
 companion test; browser regression tests: `scripts/a11y.pw.ts`. The official
-`@axe-core/playwright` adapter reuses Playwright. One browser, at most two
-parallel pages, no fixed sleep. Wait for hydrated VitePress, completed Mermaid
-rendering and fonts before scanning. All sitemap URLs must stay within the
+`@axe-core/playwright` adapter reuses Playwright. One browser, up to four workers
+(one per CPU) each reusing a browser context, no fixed sleep. Wait for hydrated
+VitePress, rendered visible Mermaid diagrams and fonts before scanning. Keep the
+Mermaid renderer lazily imported by the theme and the Vue runtime in the `framework`
+chunk so pages without diagrams never download Mermaid. All sitemap URLs must stay within the
 preview origin/base; empty, malformed or unreachable sitemaps must fail.
 
 Install local Chromium with `bun run playwright install chromium`, or set

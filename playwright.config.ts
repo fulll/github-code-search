@@ -31,6 +31,9 @@ export default defineConfig({
     baseURL: BASE_URL,
     /* Disable JS animations — they don't affect layout but speed up page load */
     reducedMotion: "reduce",
+    /* `vitepress preview` Brotli-compresses every response on the fly (~5 s for
+       the 4 MB Mermaid chunk); encoding is irrelevant to these tests. */
+    extraHTTPHeaders: { "Accept-Encoding": "identity" },
     launchOptions: {
       executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
     },

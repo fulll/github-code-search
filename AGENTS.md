@@ -80,8 +80,13 @@ Install local Chromium with `bun run playwright install chromium`, or point
 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` at an installed Chrome executable.
 CI uses system Chrome without downloading another browser.
 
-`scripts/a11y.ts` scans every sitemap URL with up to four workers (one per CPU), explicit WCAG
-2.0/2.1/2.2 A/AA tags, and readiness checks for Vue hydration, Mermaid and fonts.
+`scripts/a11y.ts` scans every sitemap URL with up to four workers (one per CPU), each
+reusing one browser context, explicit WCAG 2.0/2.1/2.2 A/AA tags, and readiness
+checks for Vue hydration, visible Mermaid diagrams and fonts. Call axe's `options()`
+before `withTags()`: `options()` replaces the `runOnly` tag filter.
+The theme lazy-loads the Mermaid renderer only on pages with a diagram, and the
+custom `manualChunks` in `docs/.vitepress/config.mts` must keep the Vue runtime and
+Vite helpers in the `framework` chunk; otherwise every page loads ~5 MB of Mermaid.
 Pure URL validation and Markdown formatting live in `scripts/a11y-utils.ts`.
 The generated `a11y-report.json` includes full axe results and operational
 errors; `a11y-report.md` is used for the job summary and sticky PR comment.

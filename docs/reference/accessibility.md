@@ -37,8 +37,10 @@ VITEPRESS_HOSTNAME=http://localhost:4174 VITEPRESS_BASE=/github-code-search/v2/ 
 
 The official Deque `@axe-core/playwright` adapter runs axe-core in a real browser.
 `scripts/a11y.ts` scans every distinct sitemap URL with up to four workers (one per CPU) sharing one
-browser. It waits for Vue hydration, Mermaid rendering and fonts, rather than a fixed
-sleep. Pages have isolated browser contexts and a 60-second audit deadline.
+browser. It waits for Vue hydration, rendering of every visible Mermaid diagram and
+fonts, rather than a fixed sleep. Each page is a fresh document with a 60-second audit
+deadline; a worker reuses its browser context (HTTP and compiled-code caches) and
+replaces it after any error. axe only collects `violations` and `incomplete` results.
 
 Enabled tags are `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa` and `wcag22aa`: WCAG
 2.0/2.1/2.2 A/AA rules supported by axe. No contrast or ARIA rules are disabled.
@@ -113,6 +115,15 @@ affect axe results; Lighthouse keeps compression) and uses one worker per CPU, u
 to four. On the 37-page sitemap this brought the local audit from 116 s to 14–20 s
 and the hosted CI audit step from 220 s (two workers) to the duration reported on
 the pull request.
+
+A second profiling pass found that every page, even without a diagram, downloaded
+~5.4 MB of JavaScript: the custom `manualChunks` replaced VitePress's own chunking,
+so Rollup bundled the Vue runtime into the Mermaid chunk, and the theme imported
+the Mermaid renderer statically. The Vue runtime and Vite helpers now go to the
+`framework` chunk, and the theme only imports the renderer on pages that contain a
+diagram, so other pages modulepreload ~200 kB. Combined with per-worker context reuse,
+this brought the local audit from 14 s to 8 s. In CI, the audit-harness fixture tests
+(which need no docs build) now run in a parallel job.
 
 The old `WCAG2AA` HTML_CodeSniffer configuration did not explicitly add WCAG 2.1
 rules despite the workflow title. It also ignored background-image contrast

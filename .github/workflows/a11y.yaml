@@ -12,8 +12,12 @@
 #      http://localhost:4173 so the generated sitemap.xml contains localhost
 #      URLs that the audit can reach directly)
 #   2. Start `vitepress preview` via the shared composite action
-#   3. Exercise the audit harness, then scan the full sitemap with up to four workers (one per CPU)
+#   3. Check theme semantics, then scan the full sitemap with up to four workers
+#      (one per CPU, each reusing a single browser context)
 #   4. Publish JSON/Markdown artifacts and a sticky same-repository PR summary
+#
+# The audit-harness fixture tests need no docs build, so they run in a parallel
+# `harness` job instead of extending the critical path of the audit job.
 #
 # Chrome: Playwright reuses Ubuntu's system Chrome; no browser download.
 name: Accessibility audit (WCAG 2.2 AA)
@@ -42,6 +46,28 @@ permissions:
   contents: read
 
 jobs:
+  harness:
+    name: Audit harness (fixtures)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: /usr/bin/google-chrome-stable
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Test accessibility audit harness
+        run: bun run docs:test:a11y --grep "audit harness" --reporter=dot
+
   audit:
     name: WCAG 2.2 AA pages audit
     runs-on: ubuntu-latest
@@ -71,8 +97,8 @@ jobs:
       - name: Start VitePress preview server
         uses: ./.github/actions/start-preview-server
 
-      - name: Test accessibility audit harness and theme semantics
-        run: bun run docs:test:a11y --reporter=dot
+      - name: Test theme accessibility semantics
+        run: bun run docs:test:a11y --grep-invert "audit harness" --reporter=dot
 
       - name: Run accessibility audit (axe-core)
         id: audit
