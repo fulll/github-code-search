@@ -142,6 +142,9 @@ grep -rn "uses:" .github/workflows/ | grep -v "@[a-f0-9]\{40\}"
 
 Also verify:
 
+- [ ] Accessibility uses `@axe-core/playwright` with system Chrome, scans the full sitemap,
+      preserves failing exit codes, and publishes JSON/Markdown reports without requiring
+      write permissions on fork PRs (see `.github/skills/github-actions.md`).
 - [ ] All `.yml` workflow files have been renamed to `.yaml`
 - [ ] Every new third-party action has a `# vX.Y.Z` comment after its SHA
 - [ ] New reusable composite actions are under `.github/actions/<name>/action.yml`

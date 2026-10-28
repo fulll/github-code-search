@@ -34,7 +34,9 @@ runs:
       shell: bash
       env:
         PORT: ${{ inputs.port }}
-      run: bun run docs:preview -- --port "$PORT" &
+      # Redirect output: a background process holding the step's stdout open
+      # makes the runner wait ~5 s before moving on.
+      run: bun run docs:preview -- --port "$PORT" > "$RUNNER_TEMP/vitepress-preview.log" 2>&1 &
 
     - name: Wait for preview server to be ready
       shell: bash
@@ -69,9 +71,9 @@ runs:
         until curl -sf "${URL}" > /dev/null 2>&1; do
           if [ "$(date +%s)" -ge "${DEADLINE}" ]; then
             echo "::error::Preview server did not respond within ${TIMEOUT} s on ${URL}."
+            cat "$RUNNER_TEMP/vitepress-preview.log" || true
             exit 1
           fi
-          echo "… retrying in 2 s"
-          sleep 2
+          sleep 0.5
         done
         echo "Preview server is ready."

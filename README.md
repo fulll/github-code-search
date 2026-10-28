@@ -131,3 +131,23 @@ The official [`gh` CLI](https://cli.github.com/) does support `gh search code`, 
 | Pagination (up to 1 000 results)                          |        ✓         |          ✓           |
 
 `github-code-search` is purpose-built for **org-wide code audits and interactive triage** — not just a search wrapper.
+
+## Contributing and documentation quality
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and checks.
+Documentation accessibility uses the maintained Deque `@axe-core/playwright` adapter,
+reusing Playwright rather than installing a second browser automation stack:
+
+```bash
+bun run docs:build:a11y
+bun run docs:preview -- --port 4173
+# In another terminal, with Playwright Chromium installed:
+bun run docs:a11y
+```
+
+The audit checks every sitemap URL with WCAG 2.0/2.1/2.2 A/AA tags and writes JSON
+and Markdown reports. CI reuses system Chrome without downloading a browser.
+Automated checks do not certify WCAG compliance: incomplete results, keyboard use,
+screen-reader behavior and interactive states still need manual review.
+See [CONTRIBUTING.md](CONTRIBUTING.md#contributing) for the audit workflow and
+[#241](https://github.com/fulll/github-code-search/issues/241) for the alternatives benchmark.

@@ -1,24 +1,26 @@
-# Accessibility audit — WCAG 2.1 AA
+# Accessibility audit — axe-core / WCAG 2.2 AA
 #
-# Runs pa11y-ci against the built VitePress docs to ensure the homepage and
-# key pages remain WCAG 2.1 AA compliant.
+# Audits every built VitePress sitemap page with axe-core's WCAG A/AA rules.
+# Automated findings complement, but never replace, manual accessibility review.
 #
 # Triggers:
-#   - push to main touching docs/** or this workflow / config
 #   - every pull_request touching the same paths
 #   - workflow_dispatch (manual run)
 #
 # Strategy:
 #   1. Build the docs with `bun run docs:build:a11y` (sets VITEPRESS_HOSTNAME=
 #      http://localhost:4173 so the generated sitemap.xml contains localhost
-#      URLs that pa11y-ci can reach directly)
+#      URLs that the audit can reach directly)
 #   2. Start `vitepress preview` via the shared composite action
-#   3. Run pa11y-ci configured in .pa11yci.json (WCAG 2.1 AA, errors only)
+#   3. Scan the full sitemap with up to four workers (one per CPU, each reusing
+#      a single browser context) while the theme-semantics tests run alongside
+#   4. Publish JSON/Markdown artifacts and a sticky same-repository PR summary
 #
-# Chrome: Ubuntu-latest ships google-chrome-stable. We skip Puppeteer's own
-# Chromium download (PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=1) and point directly to
-# the system Chrome via PUPPETEER_EXECUTABLE_PATH at runtime (~200 MB saved).
-name: Accessibility audit (WCAG 2.1 AA)
+# The audit-harness fixture tests need no docs build, so they run in a parallel
+# `harness` job instead of extending the critical path of the audit job.
+#
+# Chrome: Playwright reuses Ubuntu's system Chrome; no browser download.
+name: Accessibility audit (WCAG 2.2 AA)
 
 on:
   pull_request:
@@ -28,7 +30,11 @@ on:
       - "package.json"
       - "bun.lock"
       - ".github/workflows/a11y.yaml"
-      - ".pa11yci.json"
+      - ".github/actions/start-preview-server/**"
+      - "scripts/a11y*.ts"
+      - "playwright.config.ts"
+      - "package.json"
+      - "bun.lock"
   workflow_dispatch:
 
 # One audit at a time per branch; cancel stale runs on new push.
@@ -40,9 +46,34 @@ permissions:
   contents: read
 
 jobs:
-  audit:
-    name: WCAG 2.1 AA pages audit
+  harness:
+    name: Audit harness (fixtures)
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: /usr/bin/google-chrome-stable
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Test accessibility audit harness
+        run: bun run docs:test:a11y --grep "audit harness" --reporter=dot
+
+  audit:
+    name: WCAG 2.2 AA pages audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: /usr/bin/google-chrome-stable
     permissions:
       contents: read
       pull-requests: write
@@ -66,20 +97,53 @@ jobs:
       - name: Start VitePress preview server
         uses: ./.github/actions/start-preview-server
 
-      # Run the audit. The env vars tell Puppeteer (used by pa11y) to use the
-      # pre-installed system Chrome instead of downloading a Chromium binary.
-      - name: Run accessibility audit (pa11y-ci)
-        env:
-          PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome-stable
-          PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "1"
+      # Theme-semantics tests run concurrently with the audit (same preview);
+      # their result is checked after the audit step.
+      - name: Start theme accessibility semantics tests
+        id: theme
+        run: |
+          (
+            rc=0
+            bun run docs:test:a11y --grep-invert "audit harness" --reporter=dot || rc=$?
+            echo "$rc" > "$RUNNER_TEMP/theme-tests.exit"
+          ) > "$RUNNER_TEMP/theme-tests.log" 2>&1 &
+
+      - name: Run accessibility audit (axe-core)
+        id: audit
+        continue-on-error: true
         run: bun run docs:a11y
 
-      # Upload the pa11y-ci JSON report as an artifact so failures are
-      # easy to inspect without re-running the workflow.
+      - name: Check theme accessibility semantics tests
+        if: ${{ !cancelled() && steps.theme.outcome == 'success' }}
+        timeout-minutes: 3
+        run: |
+          until [ -f "$RUNNER_TEMP/theme-tests.exit" ]; do sleep 0.5; done
+          cat "$RUNNER_TEMP/theme-tests.log"
+          exit "$(cat "$RUNNER_TEMP/theme-tests.exit")"
+
+      - name: Publish job summary
+        if: ${{ !cancelled() && steps.audit.outcome != 'skipped' }}
+        run: cat a11y-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post / update accessibility report on PR
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' && steps.audit.outcome != 'skipped' }}
+        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
+        with:
+          header: accessibility-audit
+          path: a11y-report.md
+
+      - name: Fail if accessibility audit failed
+        if: ${{ !cancelled() && steps.audit.outcome == 'failure' }}
+        run: |
+          echo "::error::Accessibility audit failed — see the report for violations or operational errors"
+          exit 1
+
       - name: Upload audit report
         if: always()
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
-          name: pa11y-ci-report
-          path: a11y-report.json
+          name: a11y-report
+          path: |
+            a11y-report.json
+            a11y-report.md
           if-no-files-found: ignore

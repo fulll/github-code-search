@@ -53,19 +53,48 @@ Dark mode: VitePress applies a `.dark` class on `<html>`. Use `.dark .selector {
 
 ---
 
-## Accessibility (WCAG 2.1 AA)
+## Accessibility (WCAG 2.2 AA automated checks)
 
-This project maintains **zero pa11y-ci violations** at WCAG 2.1 AA level.
+This project requires **zero axe-core automated violations** using WCAG 2.0,
+2.1 and 2.2 A/AA tags. A passing automated scan is not WCAG certification.
 
 ### Tool
 
 ```bash
 bun run docs:build:a11y   # build with VITEPRESS_HOSTNAME=http://localhost:4173
 bun run docs:preview -- --port 4173 &
-bun run docs:a11y         # pa11y-ci via sitemap — must report 0 errors
+bun run docs:a11y         # axe-core via every sitemap URL — must report 0 violations
+bun run docs:test:a11y    # passing/failing fixtures and theme regression tests
 ```
 
-Config: `.pa11yci.json`. F77 (Mermaid duplicate SVG IDs) is ignored — not blocking for AT users.
+Runner: `scripts/a11y.ts`; pure helpers/tests: `scripts/a11y-utils.ts` and its
+companion test; browser regression tests: `scripts/a11y.pw.ts`. The official
+`@axe-core/playwright` adapter reuses Playwright. One browser, up to four workers
+(one per CPU) each reusing a browser context, no fixed sleep. Wait for hydrated
+VitePress, rendered visible Mermaid diagrams and fonts before scanning. Keep the
+Mermaid renderer lazily imported by the theme and the Vue runtime in the `framework`
+chunk so pages without diagrams never download Mermaid. All sitemap URLs must stay within the
+preview origin/base; empty, malformed or unreachable sitemaps must fail.
+
+Install local Chromium with `bun run playwright install chromium`, or set
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to an installed Chrome. CI uses system
+Chrome, with no browser download. `PLAYWRIGHT_BASE_URL` overrides the preview
+origin and `VITEPRESS_BASE` overrides the base path for both build and audit.
+
+Reports: `a11y-report.json` (full violations, incomplete rules and errors) and
+`a11y-report.md` (per-page summary). Violations and operational errors fail;
+incomplete results require manual review. There are no blanket rule exclusions.
+Do not translate obsolete HTML_CodeSniffer F77/contrast suppressions into axe
+disables. Check duplicate ARIA references and Mermaid semantics explicitly.
+
+DocSearch derives its accessible name from visible content, including the
+shortcut. Its mobile label is visually hidden, not `display:none`. Mermaid
+wrappers with `aria-label` receive `role="group"` via a scoped observer so
+asynchronously rendered diagrams and client-side navigation stay valid.
+
+The audit only covers the documentation site, not the product: keep it out of the
+product docs (`docs/`). The manual-review checklist is in `CONTRIBUTING.md`; the
+sourced alternatives benchmark and engine-coverage differences are in issue #241.
 
 ### Common patterns
 
@@ -156,7 +185,8 @@ Before opening a PR for any docs change:
 bun run docs:build           # must complete without errors or dead-link warnings
 bun run docs:build:a11y      # build for a11y audit
 bun run docs:preview -- --port 4173 &
-bun run docs:a11y            # 0 pa11y violations
+bun run docs:a11y            # 0 axe-core automated violations
+bun run docs:test:a11y       # audit harness and accessible theme semantics
 bun run docs:test:responsive # 20/20 Playwright tests green
 bun run format:check         # bun fmt --check — no formatting diff
 ```

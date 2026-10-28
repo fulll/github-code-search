@@ -485,3 +485,17 @@ html.dark .vp-doc table code {
   background-color: #2d333b;
   color: #c9d1d9;
 }
+/* Keep the icon-only mobile search button named without overriding its desktop label. */
+@media (max-width: 767px) {
+  .DocSearch-Button .DocSearch-Button-Placeholder {
+    display: block;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}

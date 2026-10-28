@@ -203,24 +203,36 @@ export default defineConfig({
       },
     ],
     // ── Chunk splitting ──────────────────────────────────────────────────────
-    // Four async chunk groups — all loaded lazily via vitepress-mermaid-renderer,
-    // so none affect initial page load. Target: keep every chunk under 500 kB.
+    // The theme imports vitepress-mermaid-renderer dynamically, only on pages
+    // that contain a diagram, so the Mermaid chunk groups below never weigh on
+    // other pages (~200 kB of JS modulepreloaded instead of ~5.4 MB).
     //
     // Approximate minified sizes (actual, measured):
-    //   mermaid        ~1 769 kB  (mermaid core + d3, circular-dep locked together)
-    //   mermaid-graph    ~442 kB  (cytoscape core)
-    //   mermaid-layout   ~201 kB  (cytoscape-fcose + cytoscape-cose-bilkent)
-    //   mermaid-utils    ~163 kB  (lodash-es, khroma, dayjs, roughjs, …)
-    //   katex            ~261 kB  (own chunk, handled by vitepress-mermaid-renderer)
+    //   mermaid        ~4 040 kB  (mermaid core + d3, circular-dep locked together)
+    //   mermaid-graph    ~433 kB  (cytoscape core)
+    //   mermaid-layout   ~196 kB  (cytoscape-fcose + cytoscape-cose-bilkent)
+    //   mermaid-utils    ~162 kB  (lodash-es, khroma, dayjs, roughjs, …)
+    //   katex            ~255 kB  (own chunk, handled by vitepress-mermaid-renderer)
     //
-    // mermaid+d3 is the one inescapable large chunk (~1 769 kB). The 1 800 kB
-    // limit silences the Rollup warning for that known bundle without masking
-    // real bloat in any other chunk (next largest is mermaid-graph at ~442 kB).
+    // mermaid+d3 is the one inescapable large chunk, so it still triggers the
+    // Rollup size warning; the 1 800 kB limit keeps every other chunk in check
+    // (next largest is mermaid-graph at ~433 kB).
     build: {
       chunkSizeWarningLimit: 1800,
       rollupOptions: {
         output: {
           manualChunks(id: string) {
+            // This function replaces VitePress's own chunking. Rollup pulls the
+            // unassigned dependencies of a manual chunk into it, so keep the
+            // Vue runtime in VitePress's "framework" chunk: otherwise every page
+            // statically imports the multi-MB Mermaid chunk just to get Vue.
+            if (
+              id.startsWith("\0vite") ||
+              id.includes("plugin-vue:export-helper") ||
+              /node_modules\/(@vue\/|vue\/)/.test(id)
+            )
+              return "framework";
+
             // cytoscape-fcose + cytoscape-cose-bilkent: layout algorithm extensions
             // (~200 kB combined). Must be checked before the bare "cytoscape" catch.
             if (
@@ -254,7 +266,6 @@ export default defineConfig({
             // circular dependencies that Rollup cannot untangle further.
             if (
               id.includes("node_modules/mermaid") ||
-              id.includes("node_modules/vitepress-mermaid-renderer") ||
               id.includes("node_modules/d3") ||
               id.includes("node_modules/dagre-d3-es") ||
               id.includes("node_modules/internmap") ||
@@ -417,9 +428,10 @@ export default defineConfig({
   // ── Sitemap ───────────────────────────────────────────────────────────────
   // VITEPRESS_HOSTNAME overrides the default for local/CI a11y audits:
   //   VITEPRESS_HOSTNAME=http://localhost:4173 vitepress build docs
-  // → sitemap.xml contains localhost URLs that pa11y-ci can reach directly.
+  // → sitemap.xml contains localhost URLs that the accessibility audit can reach.
   sitemap: {
     hostname:
-      (process.env.VITEPRESS_HOSTNAME ?? "https://fulll.github.io") + "/github-code-search/",
+      (process.env.VITEPRESS_HOSTNAME ?? "https://fulll.github.io") +
+      (process.env.VITEPRESS_BASE ?? "/github-code-search/"),
   },
 });

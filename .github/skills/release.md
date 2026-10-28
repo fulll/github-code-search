@@ -169,6 +169,7 @@ bun run build.ts       # binary compiles for current platform
 bun run docs:build
 bun run docs:build:a11y
 bun run docs:preview -- --port 4173 &
-bun run docs:a11y            # 0 pa11y violations
+bun run docs:a11y            # 0 axe-core WCAG 2.2 AA automated violations
+bun run docs:test:a11y       # audit harness and theme semantics
 bun run docs:test:responsive # 20/20 Playwright tests green
 ```

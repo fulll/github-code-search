@@ -71,6 +71,36 @@ installation/contributor documentation consistent. Compiled binaries do not need
 No repository custom agent definitions are currently shipped; any future agents
 must use the same native tooling and validation commands.
 
+## Documentation accessibility
+
+The docs audit uses `@axe-core/playwright` and the existing Playwright dependency.
+Run `bun run docs:build:a11y`, start `bun run docs:preview -- --port 4173` in another
+terminal, then run `bun run docs:a11y` and `bun run docs:test:a11y`.
+Install local Chromium with `bun run playwright install chromium`, or point
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` at an installed Chrome executable.
+CI uses system Chrome without downloading another browser.
+
+`scripts/a11y.ts` scans every sitemap URL with up to four workers (one per CPU), each
+reusing one browser context, explicit WCAG 2.0/2.1/2.2 A/AA tags, and readiness
+checks for Vue hydration, visible Mermaid diagrams and fonts. Call axe's `options()`
+before `withTags()`: `options()` replaces the `runOnly` tag filter.
+The theme lazy-loads the Mermaid renderer only on pages with a diagram, and the
+custom `manualChunks` in `docs/.vitepress/config.mts` must keep the Vue runtime and
+Vite helpers in the `framework` chunk; otherwise every page loads ~5 MB of Mermaid.
+Pure URL validation and Markdown formatting live in `scripts/a11y-utils.ts`.
+The generated `a11y-report.json` includes full axe results and operational
+errors; `a11y-report.md` is used for the job summary and sticky PR comment.
+Violations and operational failures must fail CI. Incomplete results require
+manual review, not an automatic compliance claim. Never disable contrast/ARIA
+rules or carry over HTML_CodeSniffer exclusions as a shortcut.
+
+Read `.github/skills/documentation.md` for accessible theme patterns and
+`.github/skills/github-actions.md` before changing the workflow. The audit only
+guarantees the accessibility of the documentation site, not of the CLI, so it is
+documented for contributors in `CONTRIBUTING.md` (manual-review checklist), not in
+the product docs. The alternatives benchmark is in issue #241. Repository-local custom agents are not
+currently defined; these shared instructions are the agent entry point.
+
 ## Project layout
 
 ```

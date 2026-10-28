@@ -107,8 +107,18 @@ If the PR modifies any Vue component, CSS, or page layout, also run the accessib
 ```bash
 bun run docs:build:a11y
 bun run docs:preview -- --port 4173 &
-bun run docs:a11y            # pa11y-ci WCAG 2.1 AA — must report 0 errors
+bun run docs:a11y            # axe-core WCAG 2.2 AA — must report 0 automated violations
+bun run docs:test:a11y       # audit failure paths and theme semantics
 bun run docs:test:responsive # Playwright — 20/20 tests green (4 viewports × 5 pages)
 ```
 
-See `.github/skills/documentation.md` for pa11y configuration details, WCAG contrast rules, accessible component patterns, and responsive breakpoint guidance.
+Use local Playwright Chromium (`bun run playwright install chromium`) or set
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to an installed Chrome executable.
+CI reuses system Chrome. Inspect both audit reports, including incomplete
+findings requiring manual review. Do not disable contrast/ARIA rules or treat
+passing automation as WCAG certification.
+
+See `.github/skills/documentation.md` for the axe runner, WCAG contrast rules,
+accessible component patterns and responsive guidance, and `CONTRIBUTING.md` for
+the manual-review checklist. The audit covers the documentation site only, so do
+not document it in the product docs (`docs/`); the benchmark lives in issue #241.
