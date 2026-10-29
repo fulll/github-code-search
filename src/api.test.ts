@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import { mockFetch } from "./test-setup.ts";
+import { visibleWidth } from "./render.ts";
 import {
   buildFetchProgress,
   buildLineResolutionProgress,
@@ -121,9 +122,15 @@ const makeFetchItem = (i: number) => ({
 describe("fetch progress lifecycle (issues #247 and #248)", () => {
   let writes: string[];
   let stderr: ReturnType<typeof spyOn<typeof process.stderr, "write">>;
+  const columnsDescriptor = Object.getOwnPropertyDescriptor(process.stderr, "columns");
 
   beforeEach(() => {
     writes = [];
+    Object.defineProperty(process.stderr, "columns", {
+      configurable: true,
+      value: 200,
+      writable: true,
+    });
     stderr = spyOn(process.stderr, "write").mockImplementation((chunk) => {
       writes.push(String(chunk));
       return true;
@@ -133,6 +140,8 @@ describe("fetch progress lifecycle (issues #247 and #248)", () => {
   afterEach(() => {
     stderr.mockRestore();
     globalThis.fetch = originalFetch;
+    if (columnsDescriptor) Object.defineProperty(process.stderr, "columns", columnsDescriptor);
+    else Reflect.deleteProperty(process.stderr, "columns");
   });
 
   it.each([0, 1])("clears the results progress line after fetching %i results", async (count) => {
@@ -159,7 +168,7 @@ describe("fetch progress lifecycle (issues #247 and #248)", () => {
 
   it("clears results before line resolution and clears resolution when finished", async () => {
     mockFetch(async (url) =>
-      String(url).includes("raw.githubusercontent.com")
+      new URL(String(url)).hostname === "raw.githubusercontent.com"
         ? new Response("hello")
         : Response.json({
             items: [{ ...makeFetchItem(0), text_matches: [{ fragment: "hello" }] }],
@@ -225,6 +234,118 @@ describe("fetch progress lifecycle (issues #247 and #248)", () => {
 
     await expect(fetchRepoTeams("org", "tok", ["squad-"], false)).rejects.toThrow("401");
 
+    expect(writes.at(-1)).toBe("\x1b[2K\r");
+  });
+
+  it.each(["results", "teams"])(
+    "clears %s progress before a countdown writes a newline",
+    async (phase) => {
+      let limited = false;
+      mockFetch(async (url) => {
+        if (phase === "teams" && new URL(String(url)).pathname.endsWith("/teams")) {
+          return Response.json([{ slug: "squad-web", name: "Web" }]);
+        }
+        if (!limited) {
+          limited = true;
+          return new Response(null, { status: 429, headers: { "Retry-After": "11" } });
+        }
+        return phase === "results"
+          ? Response.json({ items: [], total_count: 0 })
+          : Response.json([]);
+      });
+      const countdown = async () => {
+        expect(writes.at(-1)).toBe("\x1b[2K\r");
+        process.stderr.write("\n");
+      };
+
+      if (phase === "results") await fetchAllResults("q", "org", "tok", countdown);
+      else await fetchRepoTeams("org", "tok", ["squad-"], false, countdown);
+
+      expect(writes.at(-1)).toBe("\x1b[2K\r");
+    },
+  );
+
+  it.each(["results", "teams"])("clears %s progress when a countdown rejects", async (phase) => {
+    mockFetch(async (url) => {
+      if (phase === "teams" && new URL(String(url)).pathname.endsWith("/teams")) {
+        return Response.json([{ slug: "squad-web", name: "Web" }]);
+      }
+      return new Response(null, { status: 429, headers: { "Retry-After": "11" } });
+    });
+    const countdown = async () => {
+      expect(writes.at(-1)).toBe("\x1b[2K\r");
+      process.stderr.write("\n");
+      throw new Error("Countdown cancelled");
+    };
+
+    await expect(
+      phase === "results"
+        ? fetchAllResults("q", "org", "tok", countdown)
+        : fetchRepoTeams("org", "tok", ["squad-"], false, countdown),
+    ).rejects.toThrow("Countdown cancelled");
+    expect(writes.at(-1)).toBe("\x1b[2K\r");
+  });
+
+  it("keeps all 93-team progress updates on one row at 80 columns", async () => {
+    process.stderr.columns = 80;
+    mockFetch(async (url) =>
+      new URL(String(url)).pathname.endsWith("/teams")
+        ? Response.json(
+            Array.from({ length: 93 }, (_, i) => ({ slug: `squad-${i}`, name: `Team ${i}` })),
+          )
+        : Response.json([]),
+    );
+
+    await fetchRepoTeams("org", "tok", ["squad-", "chapter-"], false);
+
+    for (const line of writes.slice(0, -1)) {
+      expect(visibleWidth(line)).toBeLessThan(80);
+      expect(line).toContain("\x1b[38;5;129m");
+      expect(line).toMatch(/\d+\/93$/);
+    }
+    expect(writes.at(-2)).toContain("93/93");
+    expect(writes.at(-1)).toBe("\x1b[2K\r");
+  });
+
+  it("does not redraw team progress while another team is showing a countdown", async () => {
+    let releaseCountdown!: () => void;
+    let signalCountdown!: () => void;
+    const countdownStarted = new Promise<void>((resolve) => {
+      signalCountdown = resolve;
+    });
+    const countdownFinished = new Promise<void>((resolve) => {
+      releaseCountdown = resolve;
+    });
+    let limited = false;
+    mockFetch(async (url) => {
+      const path = new URL(String(url)).pathname;
+      if (path.endsWith("/teams")) {
+        return Response.json([
+          { slug: "squad-limited", name: "Limited" },
+          { slug: "squad-fast", name: "Fast" },
+        ]);
+      }
+      if (path.endsWith("/squad-limited/repos") && !limited) {
+        limited = true;
+        return new Response(null, { status: 429, headers: { "Retry-After": "11" } });
+      }
+      if (path.endsWith("/squad-fast/repos")) await countdownStarted;
+      return Response.json([]);
+    });
+    const fetch = fetchRepoTeams("org", "tok", ["squad-"], false, async () => {
+      process.stderr.write("\nCOUNTDOWN");
+      signalCountdown();
+      await countdownFinished;
+    });
+    await countdownStarted;
+    // Let the other worker finish while the countdown still owns stderr.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const lastDuringCountdown = writes.at(-1);
+    releaseCountdown();
+    await fetch;
+
+    expect(lastDuringCountdown).toBe("\nCOUNTDOWN");
+    expect(writes.at(-2)).toContain("2/2");
     expect(writes.at(-1)).toBe("\x1b[2K\r");
   });
 });
