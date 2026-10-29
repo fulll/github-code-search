@@ -36,6 +36,7 @@ import { runInteractive } from "./src/tui.ts";
 import { generateCompletion, detectShell } from "./src/completions.ts";
 import { getGhAuthToken } from "./src/gh-cli.ts";
 import { clipToWidth } from "./src/render.ts";
+import { ANSI_ERASE_LINE, CARRIAGE_RETURN, LINE_FEED } from "./src/terminal-control.ts";
 import {
   buildApiQuery,
   detectPathWildcardLimitation,
@@ -76,7 +77,7 @@ const HAS_COLOR = Boolean(process.stdout.isTTY);
 function colorDesc(s: string): string {
   if (!HAS_COLOR) return s;
   return s
-    .split("\n")
+    .split(LINE_FEED)
     .map((line) => {
       const docsMatch = line.match(/^(\s*Docs:\s*)(https?:\/\/\S+)$/);
       if (docsMatch)
@@ -91,7 +92,7 @@ function colorDesc(s: string): string {
       // Colorize any remaining bare URL (http/https) anywhere in the line
       return line.replace(/(https?:\/\/\S+)/g, (url) => style.style(["cyan", "underline"], url));
     })
-    .join("\n");
+    .join(LINE_FEED);
 }
 
 /** Colored hyperlink (cyan + underline), falls back to plain when not a TTY. */
@@ -105,7 +106,7 @@ function helpLink(url: string): string {
  */
 function helpSection(label: string, url: string): string {
   const t = HAS_COLOR ? style.bold(label) : label;
-  return `\n${t}\n  ${helpLink(url)}`;
+  return `${LINE_FEED}${t}${LINE_FEED}  ${helpLink(url)}`;
 }
 
 /**
@@ -147,7 +148,7 @@ function addSearchOptions(cmd: Command): Command {
         [
           "GitHub organization to search in.",
           "Falls back to the GCS_DEFAULT_ORG environment variable when omitted.",
-        ].join("\n"),
+        ].join(LINE_FEED),
       ).env("GCS_DEFAULT_ORG"),
     )
     .option(
@@ -157,7 +158,7 @@ function addSearchOptions(cmd: Command): Command {
         "Short form (without org prefix) or full form accepted:",
         "repoA,repoB  OR  myorg/repoA,myorg/repoB",
         "Docs: https://fulll.github.io/github-code-search/usage/filtering",
-      ].join("\n"),
+      ].join(LINE_FEED),
       "",
     )
     .option(
@@ -168,7 +169,7 @@ function addSearchOptions(cmd: Command): Command {
         "e.g.  repoA:src/foo.ts:0,repoB:lib/core.ts:2",
         "Full form also accepted: myorg/repoA:src/foo.ts:0",
         "Docs: https://fulll.github.io/github-code-search/usage/filtering",
-      ].join("\n"),
+      ].join(LINE_FEED),
       "",
     )
     .option(
@@ -180,7 +181,7 @@ function addSearchOptions(cmd: Command): Command {
       [
         "Output format: markdown (default) or json.",
         "Docs: https://fulll.github.io/github-code-search/usage/output-formats",
-      ].join("\n"),
+      ].join(LINE_FEED),
       "markdown",
     )
     .option(
@@ -188,7 +189,7 @@ function addSearchOptions(cmd: Command): Command {
       [
         "Output type: repo-and-matches (default) or repo-only.",
         "Docs: https://fulll.github.io/github-code-search/usage/output-formats",
-      ].join("\n"),
+      ].join(LINE_FEED),
       "repo-and-matches",
     )
     .option("--include-archived", "Include archived repositories in results", false)
@@ -204,7 +205,7 @@ function addSearchOptions(cmd: Command): Command {
         "level. Repos matching no prefix go into 'other'. Team names that overlap",
         "(e.g. squad-a and squad-a-legacy) are combined automatically.",
         "Docs: https://fulll.github.io/github-code-search/usage/team-grouping",
-      ].join("\n"),
+      ].join(LINE_FEED),
       "",
     )
     .option(
@@ -217,7 +218,7 @@ function addSearchOptions(cmd: Command): Command {
         "A repo left with no matching team after exclusion falls into 'other'.",
         "Only applies with --group-by-team-prefix.",
         "Docs: https://fulll.github.io/github-code-search/usage/team-grouping#excluding-noisy-team-prefixes",
-      ].join("\n"),
+      ].join(LINE_FEED),
       "",
     )
     .option(
@@ -231,7 +232,7 @@ function addSearchOptions(cmd: Command): Command {
         "Repeatable — one flag per combined section to resolve.",
         "Only applies with --group-by-team-prefix.",
         "Docs: https://fulll.github.io/github-code-search/usage/team-grouping#team-pick-mode",
-      ].join("\n"),
+      ].join(LINE_FEED),
       (val: string, list: string[]) => [...list, val],
       [] as string[],
     )
@@ -245,7 +246,7 @@ function addSearchOptions(cmd: Command): Command {
         "unresolved. An explicit --pick-team for the same section always wins.",
         "Applies at every hierarchy depth. Only applies with --group-by-team-prefix.",
         "Docs: https://fulll.github.io/github-code-search/usage/team-grouping#auto-pick-by-common-prefix",
-      ].join("\n"),
+      ].join(LINE_FEED),
       false,
     )
     .option(
@@ -259,7 +260,7 @@ function addSearchOptions(cmd: Command): Command {
         "Useful when auto-extraction produces a term that is too broad or too narrow.",
         'Example: --regex-hint "axios"  (for query /from.*[\'"]axios/)',
         "Docs: https://fulll.github.io/github-code-search/usage/search-syntax#regex-queries",
-      ].join("\n"),
+      ].join(LINE_FEED),
     );
 }
 
@@ -369,14 +370,16 @@ async function searchAction(
         const remaining = cooldownUntil - Date.now();
         if (remaining <= 0) break;
         process.stderr.write(
-          `\x1b[2K\r${clipToWidth(
-            `  ${style.yellow("Rate limited")} — resuming in ${formatRetryWait(remaining)}\u2026`,
-            Math.max(0, (process.stderr.columns ?? 80) - 1),
-          )}`,
+          ANSI_ERASE_LINE +
+            CARRIAGE_RETURN +
+            clipToWidth(
+              `  ${style.yellow("Rate limited")} — resuming in ${formatRetryWait(remaining)}\u2026`,
+              Math.max(0, (process.stderr.columns ?? 80) - 1),
+            ),
         );
         await new Promise((r) => setTimeout(r, 1_000));
       }
-      process.stderr.write("\x1b[2K\r");
+      process.stderr.write(ANSI_ERASE_LINE + CARRIAGE_RETURN);
     })().finally(() => {
       activeCooldown = null;
       cooldownUntil = 0;
@@ -403,7 +406,9 @@ async function searchAction(
     effectiveQuery = opts.regexHint ?? apiQuery;
     regexFilter = rf ?? undefined;
     process.stderr.write(
-      style.dim(`  ℹ  Regex mode — GitHub query: "${effectiveQuery}", local filter: ${query}\n`),
+      style.dim(
+        `  ℹ  Regex mode — GitHub query: "${effectiveQuery}", local filter: ${query}${LINE_FEED}`,
+      ),
     );
   }
 
@@ -430,18 +435,18 @@ async function searchAction(
   if (!opts.groupByTeamPrefix && opts.pickTeam && opts.pickTeam.length > 0) {
     for (const assignment of opts.pickTeam) {
       process.stderr.write(
-        `warning: --pick-team "${assignment}" requires --group-by-team-prefix; skipping\n`,
+        `warning: --pick-team "${assignment}" requires --group-by-team-prefix; skipping${LINE_FEED}`,
       );
     }
   }
   if (!opts.groupByTeamPrefix && opts.excludeTeamPrefixes) {
     process.stderr.write(
-      "warning: --exclude-team-prefixes requires --group-by-team-prefix; skipping\n",
+      "warning: --exclude-team-prefixes requires --group-by-team-prefix; skipping" + LINE_FEED,
     );
   }
   if (opts.groupByTeamPrefix) {
     const { chains, warnings: chainWarnings } = parseTeamPrefixChains(opts.groupByTeamPrefix);
-    for (const w of chainWarnings) process.stderr.write(`warning: ${w}\n`);
+    for (const w of chainWarnings) process.stderr.write(`warning: ${w}${LINE_FEED}`);
 
     if (chains.length > 0) {
       const allPrefixes = [...new Set(chains.flat())];
@@ -472,7 +477,7 @@ async function searchAction(
       for (const assignment of opts.pickTeam) {
         const resolution = resolvePickTeamAssignment(sections, assignment);
         if ("error" in resolution) {
-          process.stderr.write(`warning: ${resolution.error}\n`);
+          process.stderr.write(`warning: ${resolution.error}${LINE_FEED}`);
           continue;
         }
         sections = applyTeamPickInTree(sections, resolution.path, resolution.chosen);
@@ -492,9 +497,9 @@ async function searchAction(
       if (unresolved.length > 0 && (opts.pickTeam.length > 0 || opts.pickTeamAuto)) {
         process.stderr.write(
           `note: ${unresolved.length} combined section${unresolved.length !== 1 ? "s" : ""} still unresolved ` +
-            `(press "p" in TUI or use --pick-team to assign):\n` +
-            unresolved.map((p) => `  "${p.join(" > ")}"`).join("\n") +
-            "\n",
+            `(press "p" in TUI or use --pick-team to assign):${LINE_FEED}` +
+            unresolved.map((p) => `  "${p.join(" > ")}"`).join(LINE_FEED) +
+            LINE_FEED,
         );
       }
 
@@ -554,7 +559,7 @@ async function searchAction(
             `│ ${pad("Run: github-code-search upgrade")} │`,
             `╰${bottomBar}╯`,
             "",
-          ].join("\n"),
+          ].join(LINE_FEED),
         ),
       );
     }
@@ -614,31 +619,33 @@ program
         ? process.execPath
         : resolve(process.argv[0]);
     if (opts.debug) {
-      process.stdout.write(`[debug] process.execPath  = ${process.execPath}\n`);
-      process.stdout.write(`[debug] process.argv[0]   = ${process.argv[0]}\n`);
-      process.stdout.write(`[debug] selfPath (dest)    = ${selfPath}\n`);
-      process.stdout.write(`[debug] process.platform   = ${process.platform}\n`);
-      process.stdout.write(`[debug] process.arch       = ${process.arch}\n`);
-      process.stdout.write(`[debug] VERSION            = ${VERSION}\n`);
+      process.stdout.write(`[debug] process.execPath  = ${process.execPath}${LINE_FEED}`);
+      process.stdout.write(`[debug] process.argv[0]   = ${process.argv[0]}${LINE_FEED}`);
+      process.stdout.write(`[debug] selfPath (dest)    = ${selfPath}${LINE_FEED}`);
+      process.stdout.write(`[debug] process.platform   = ${process.platform}${LINE_FEED}`);
+      process.stdout.write(`[debug] process.arch       = ${process.arch}${LINE_FEED}`);
+      process.stdout.write(`[debug] VERSION            = ${VERSION}${LINE_FEED}`);
     }
     try {
       await performUpgrade(VERSION, selfPath, token, opts.debug);
     } catch (e: unknown) {
       // Print upgrade errors to stdout so they are always visible (stderr
       // is sometimes swallowed by shells or terminal multiplexers).
-      process.stdout.write(`error: ${e instanceof Error ? e.message : String(e)}\n`);
+      process.stdout.write(`error: ${e instanceof Error ? e.message : String(e)}${LINE_FEED}`);
       process.exit(1);
     }
     try {
       const { refreshCompletions } = await import("./src/upgrade.ts");
       const refreshedPath = await refreshCompletions(detectShell(), undefined, opts.debug);
       if (refreshedPath) {
-        process.stdout.write(`✓ Shell completions installed/refreshed at ${refreshedPath}\n`);
+        process.stdout.write(
+          `✓ Shell completions installed/refreshed at ${refreshedPath}${LINE_FEED}`,
+        );
       }
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : String(e);
       const prefix = opts.debug ? "[debug] " : "warning: ";
-      process.stdout.write(`${prefix}failed to refresh shell completions: ${message}\n`);
+      process.stdout.write(`${prefix}failed to refresh shell completions: ${message}${LINE_FEED}`);
     }
     process.exit(0);
   });
@@ -654,21 +661,21 @@ program
   )
   .option(
     "--shell <shell>",
-    ["Target shell: bash, zsh or fish.", "Auto-detected from $SHELL when omitted."].join("\n"),
+    ["Target shell: bash, zsh or fish.", "Auto-detected from $SHELL when omitted."].join(LINE_FEED),
   )
   .action((opts: { shell?: string }) => {
     const shell = opts.shell ?? detectShell();
     if (!shell) {
       writeFileSync(
         2,
-        `error: could not detect shell. Use --shell bash|zsh|fish to specify it explicitly.\n`,
+        `error: could not detect shell. Use --shell bash|zsh|fish to specify it explicitly.${LINE_FEED}`,
       );
       process.exit(1);
     }
     try {
-      writeFileSync(1, generateCompletion(shell) + "\n");
+      writeFileSync(1, generateCompletion(shell) + LINE_FEED);
     } catch (e: unknown) {
-      writeFileSync(2, `error: ${e instanceof Error ? e.message : String(e)}\n`);
+      writeFileSync(2, `error: ${e instanceof Error ? e.message : String(e)}${LINE_FEED}`);
       process.exit(1);
     }
     process.exit(0);
@@ -708,10 +715,10 @@ queryCmd.exitOverride().configureOutput(silenceErrors);
 async function main(): Promise<void> {
   const rawArgs = process.argv.slice(2);
   if (rawArgs.includes("--version") || rawArgs.includes("-V")) {
-    writeFileSync(1, VERSION_FULL + "\n");
+    writeFileSync(1, VERSION_FULL + LINE_FEED);
     process.exit(0);
   } else if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
-    writeFileSync(1, program.helpInformation() + "\n");
+    writeFileSync(1, program.helpInformation() + LINE_FEED);
     process.exit(0);
   }
 
@@ -727,13 +734,13 @@ async function main(): Promise<void> {
       typeof (e as { code: unknown }).code === "string" &&
       (e as { code: string }).code.startsWith("commander.")
     ) {
-      writeFileSync(2, queryCmd.helpInformation() + "\n");
+      writeFileSync(2, queryCmd.helpInformation() + LINE_FEED);
       process.exit(1);
     }
     // Any other known Error (e.g. rate-limit exceeded) → print a clean message
     // to stderr without a stack trace, then exit 1.
     if (e instanceof Error) {
-      writeFileSync(2, `error: ${e.message}\n`);
+      writeFileSync(2, `error: ${e.message}${LINE_FEED}`);
       process.exit(1);
     }
     throw e;

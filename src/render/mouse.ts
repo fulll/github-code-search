@@ -1,5 +1,6 @@
 // Mouse event parsing for SGR-mode terminal mouse reporting.
 // SGR format: CSI [< button ; x ; y M/m where M=press, m=release
+import { SGR_MOUSE_PREFIX } from "../terminal-control.ts";
 
 export interface MouseEvent {
   button: number;
@@ -12,7 +13,7 @@ export interface MouseEvent {
  * Parses an SGR-format mouse event sequence.
  * Returns a structured event or null if the sequence doesn't match or is malformed.
  *
- * SGR format: \x1b[<button;x;yM (press) or \x1b[<button;x;ym (release)
+ * SGR format: CSI <button;x;yM (press) or CSI <button;x;ym (release)
  * Button codes:
  *   0 = left click
  *   1 = middle click
@@ -20,8 +21,6 @@ export interface MouseEvent {
  *   64 = wheel up
  *   65 = wheel down
  */
-const SGR_MOUSE_PREFIX = "\x1b[<";
-
 export function parseMouseEvent(sequence: string): MouseEvent | null {
   if (!sequence.startsWith(SGR_MOUSE_PREFIX)) return null;
   const match = sequence.slice(SGR_MOUSE_PREFIX.length).match(/^(\d+);(\d+);(\d+)([Mm])$/);

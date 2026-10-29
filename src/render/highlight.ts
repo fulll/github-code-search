@@ -1,5 +1,6 @@
 import * as style from "../style.ts";
 import type { TextMatchSegment } from "../types.ts";
+import { LINE_FEED } from "../terminal-control.ts";
 
 // ─── Language detection ───────────────────────────────────────────────────────
 
@@ -310,7 +311,7 @@ export function highlightFragment(
   maxLineChars = MAX_LINE_CHARS,
 ): string[] {
   const lang = detectLang(filePath);
-  const rawLines = fragment.split("\n");
+  const rawLines = fragment.split(LINE_FEED);
   const result: string[] = [];
   let offset = 0;
 
@@ -345,7 +346,7 @@ export function highlightFragment(
     }
 
     result.push(colored);
-    offset += line.length + 1; // +1 for the consumed '\n'
+    offset += line.length + LINE_FEED.length;
   }
 
   if (rawLines.length > MAX_FRAGMENT_LINES) {

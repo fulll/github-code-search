@@ -5,6 +5,7 @@ import {
   applySelectNone,
   buildFileUrl,
   buildFilterStats,
+  buildFrameUpdate,
   buildRows,
   getSectionPath,
   isCursorVisible,
@@ -36,42 +37,38 @@ import {
 import { hitTestClick } from "./render/mouse-hit.ts";
 import type { FilterTarget, OutputFormat, OutputType, RepoGroup, Row } from "./types.ts";
 
-// ─── Key binding constants ────────────────────────────────────────────────────
-
-const ANSI_CLEAR = "\x1b[2J\x1b[H";
-const ANSI_ARROW_UP = "\x1b[A";
-const ANSI_ARROW_DOWN = "\x1b[B";
-const ANSI_ARROW_LEFT = "\x1b[D";
-const ANSI_ARROW_RIGHT = "\x1b[C";
-const KEY_CTRL_C = "\u0003";
-const KEY_ENTER_CR = "\r";
-const KEY_ENTER_LF = "\n";
-// Cursor / word navigation (filter mode)
-const KEY_TAB = "\t";
-const KEY_HOME = "\x1b[H";
-const KEY_END = "\x1b[F";
-const KEY_CTRL_A = "\x01";
-const KEY_CTRL_E = "\x05";
-const KEY_CTRL_W = "\x17";
-const KEY_ALT_BACKSPACE = "\x1b\x7f";
-
-// ─── Terminal mouse reporting (SGR protocol) ──────────────────────────────────
-// https://en.wikipedia.org/wiki/X11_mouse_protocol#SGR_1006_Protocol
-// Enable/disable both basic mouse support (?1000) and SGR encoding (?1006)
-const ANSI_ENABLE_MOUSE_REPORTING = "\x1b[?1000h\x1b[?1006h";
-const ANSI_DISABLE_MOUSE_REPORTING = "\x1b[?1000l\x1b[?1006l";
-const KEY_CTRL_ARROW_LEFT = "\x1b[1;5D";
-const KEY_CTRL_ARROW_RIGHT = "\x1b[1;5C";
-const KEY_ALT_ARROW_LEFT = "\x1b[1;3D"; // Alt/Option+← (xterm, iTerm2 with Use Option as Meta key)
-const KEY_ALT_ARROW_RIGHT = "\x1b[1;3C"; // Alt/Option+→
-const KEY_ALT_B = "\x1bb";
-const KEY_ALT_F = "\x1bf";
-const KEY_DELETE = "\x1b[3~";
-const KEY_SHIFT_TAB = "\x1b[Z"; // Shift+Tab — cycle filter target in filter mode
-const KEY_PAGE_UP = "\x1b[5~"; // Page Up — scroll up one page
-const KEY_PAGE_DOWN = "\x1b[6~"; // Page Down — scroll down one page
-const KEY_CTRL_U = "\x15"; // Ctrl+U — page up (Vim-style)
-const KEY_CTRL_D = "\x04"; // Ctrl+D — page down (Vim-style)
+import {
+  ANSI_CLEAR,
+  ANSI_ARROW_UP,
+  ANSI_ARROW_DOWN,
+  ANSI_ARROW_LEFT,
+  ANSI_ARROW_RIGHT,
+  ANSI_ENABLE_MOUSE_REPORTING,
+  ANSI_DISABLE_MOUSE_REPORTING,
+  ESCAPE,
+  KEY_CTRL_C,
+  CARRIAGE_RETURN as KEY_ENTER_CR,
+  LINE_FEED as KEY_ENTER_LF,
+  TAB as KEY_TAB,
+  ANSI_CURSOR_HOME as KEY_HOME,
+  KEY_END,
+  KEY_CTRL_A,
+  KEY_CTRL_E,
+  KEY_CTRL_W,
+  KEY_ALT_BACKSPACE,
+  KEY_CTRL_ARROW_LEFT,
+  KEY_CTRL_ARROW_RIGHT,
+  KEY_ALT_ARROW_LEFT,
+  KEY_ALT_ARROW_RIGHT,
+  KEY_ALT_B,
+  KEY_ALT_F,
+  KEY_DELETE,
+  KEY_SHIFT_TAB,
+  KEY_PAGE_UP,
+  KEY_PAGE_DOWN,
+  KEY_CTRL_U,
+  KEY_CTRL_D,
+} from "./terminal-control.ts";
 
 // ─── Word-boundary helpers ────────────────────────────────────────────────────
 
@@ -162,6 +159,7 @@ export async function runInteractive(
   let scrollOffset = 0;
   let termHeight = process.stdout.rows ?? 40;
   let termWidth = process.stdout.columns ?? 120;
+  let previousFrame: string | null = null;
   // HEADER_LINES (4) + position indicator (2) = 6 fixed lines consumed by renderGroups.
   // filterBarLines (0–2) and the sticky repo line (0–1) are added dynamically below.
   // Use getViewportHeight() for scroll decisions so they match what renderGroups actually renders.
@@ -296,14 +294,15 @@ export async function runInteractive(
       filterCursor,
       filterLiveStats,
       showHelp,
-      termWidth: process.stdout.columns ?? 80,
+      termWidth,
       filterTarget,
       filterRegex,
       teamPickMode: teamPickMode.active ? teamPickMode : undefined,
       repickMode: repickMode.active ? repickMode : undefined,
     });
-    process.stdout.write(ANSI_CLEAR);
-    process.stdout.write(rendered);
+    const update = buildFrameUpdate(rendered, previousFrame, termWidth, termHeight);
+    if (update) process.stdout.write(update);
+    previousFrame = rendered;
   };
 
   redraw();
@@ -332,6 +331,7 @@ export async function runInteractive(
     if (newHeight !== termHeight || newWidth !== termWidth) {
       termHeight = newHeight;
       termWidth = newWidth;
+      previousFrame = null;
       redraw();
     }
   };
@@ -489,7 +489,7 @@ export async function runInteractive(
         const newRows = buildRows(groups, filterPath, filterTarget, filterRegex);
         cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
         scrollOffset = Math.min(scrollOffset, cursor);
-      } else if (key === "\x1b" && !key.startsWith("\x1b[") && !key.startsWith("\x1b\x1b")) {
+      } else if (key === ESCAPE) {
         // Esc — cancel with no change
         teamPickMode = {
           active: false,
@@ -551,7 +551,7 @@ export async function runInteractive(
         cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
         scrollOffset = Math.min(scrollOffset, cursor);
         repickMode = { active: false, repoIndex: -1, candidates: [], focusedIndex: 0 };
-      } else if (key === "\x1b" && !key.startsWith("\x1b[") && !key.startsWith("\x1b\x1b")) {
+      } else if (key === ESCAPE) {
         // Esc — cancel re-pick mode
         repickMode = { active: false, repoIndex: -1, candidates: [], focusedIndex: 0 };
       } else if (key === "t") {
@@ -566,7 +566,7 @@ export async function runInteractive(
     if (filterMode) {
       if (key === KEY_CTRL_C) {
         exit();
-      } else if (key === "\x1b" && !key.startsWith("\x1b[") && !key.startsWith("\x1b\x1b")) {
+      } else if (key === ESCAPE) {
         // ESC (bare) — cancel filter input
         filterMode = false;
         filterInput = "";
@@ -648,7 +648,7 @@ export async function runInteractive(
         cursor = Math.min(cursor, Math.max(0, newRows.length - 1));
         scrollOffset = Math.min(scrollOffset, cursor);
         scheduleStatsUpdate();
-      } else if (!key.startsWith("\x1b")) {
+      } else if (!key.startsWith(ESCAPE)) {
         // Printable character(s) — insert at cursor.
         // Handles both single keystrokes and paste (multi-char chunk).
         // Discard control chars (code < 32 or DEL 127) without using a regex
@@ -715,7 +715,7 @@ export async function runInteractive(
     }
 
     // `h` / `?` / Esc — toggle help overlay (Esc closes only, h/? toggle)
-    if (key === "h" || key === "?" || (key === "\x1b" && showHelp)) {
+    if (key === "h" || key === "?" || (key === ESCAPE && showHelp)) {
       showHelp = !showHelp;
       redraw();
       continue;

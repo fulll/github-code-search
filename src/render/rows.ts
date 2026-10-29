@@ -1,6 +1,7 @@
 import type { FilterTarget, RepoGroup, Row } from "../types.ts";
 import { MAX_FRAGMENT_LINES } from "./highlight.ts";
 import { makeExtractMatcher, makeRepoMatcher } from "./filter-match.ts";
+import { LINE_FEED } from "../terminal-control.ts";
 
 // ─── Row helpers ──────────────────────────────────────────────────────────────
 
@@ -14,7 +15,7 @@ export function rowTerminalLines(group: RepoGroup | undefined, row: Row): number
   // 1 line for the file path + N lines per fragment
   let total = 1;
   for (const tm of match.textMatches) {
-    const rawLines = tm.fragment.split("\n");
+    const rawLines = tm.fragment.split(LINE_FEED);
     total += Math.min(rawLines.length, MAX_FRAGMENT_LINES + 1); // +1 for potential "more" line
   }
   return total;
