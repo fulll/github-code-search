@@ -7,31 +7,32 @@ This skill complements `.github/instructions/bug-fixing.instructions.md`.
 
 ## Symptom → module diagnostic table
 
-| Symptom                                                           | Primary suspect                                        | Secondary suspect                             |
-| ----------------------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------- |
-| Results missing or duplicated                                     | `src/aggregate.ts`                                     | `src/api.ts` (pagination)                     |
-| Wrong repository grouping                                         | `src/group.ts`                                         | `src/aggregate.ts`                            |
-| `--exclude-repositories` / `--exclude-extracts` not working       | `src/aggregate.ts`                                     | `github-code-search.ts` (parsing)             |
-| Markdown output malformed                                         | `src/output.ts`                                        | —                                             |
-| JSON output missing fields or wrong shape                         | `src/output.ts`                                        | `src/types.ts` (interface)                    |
-| Syntax highlighting wrong colour / wrong language                 | `src/render/highlight.ts`                              | —                                             |
-| Row navigation skips or wraps incorrectly                         | `src/render/rows.ts`                                   | `src/tui.ts` (key handler)                    |
-| Select-all / select-none inconsistent                             | `src/render/selection.ts`                              | `src/tui.ts`                                  |
-| Filter count / stats incorrect                                    | `src/render/filter.ts`, `src/render/summary.ts`        | —                                             |
-| Path filter (`/regex/`) doesn't match expected                    | `src/render/filter-match.ts`                           | `src/tui.ts` (filter state)                   |
-| API returns 0 results or stops paginating                         | `src/api.ts`                                           | `src/api-utils.ts`                            |
-| Rate limit hit / 429 not retried                                  | `src/api-utils.ts` (`fetchWithRetry`)                  | —                                             |
-| TUI shows blank screen or wrong row                               | `src/tui.ts`                                           | `src/render/rows.ts`                          |
-| Mouse clicks land on the wrong row/zone                           | `src/render/mouse-hit.ts`                              | `src/tui.ts` (click dispatch)                 |
-| Mouse escape sequences not parsed / terminal stuck in mouse mode  | `src/render/mouse.ts`                                  | `src/tui.ts` (enable/disable mouse reporting) |
-| Wheel scroll wrong step size or accidental clicks after scrolling | `src/render/layout-constants.ts` (`MOUSE_SCROLL_STEP`) | `src/scroll-cooldown.ts`                      |
-| Help overlay doesn't appear / has wrong keys                      | `src/render.ts` (`renderHelpOverlay`)                  | `src/tui.ts`                                  |
-| Upgrade fails or replaces wrong binary                            | `src/upgrade.ts`                                       | —                                             |
-| Completion script wrong content                                   | `src/completions.ts`                                   | —                                             |
-| Completion file written to wrong path                             | `src/completions.ts` (`getCompletionFilePath`)         | env vars (`XDG_*`, `ZDOTDIR`)                 |
-| Completion not refreshed after upgrade                            | `src/upgrade.ts` (`refreshCompletions`)                | —                                             |
-| `--version` shows wrong info                                      | `build.ts` (SHA injection)                             | —                                             |
-| CLI option ignored or parsed wrong                                | `github-code-search.ts`                                | `src/types.ts` (`OutputType`)                 |
+| Symptom                                                                    | Primary suspect                                        | Secondary suspect                                   |
+| -------------------------------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------------- |
+| Results missing or duplicated                                              | `src/aggregate.ts`                                     | `src/api.ts` (pagination)                           |
+| Wrong repository grouping                                                  | `src/group.ts`                                         | `src/aggregate.ts`                                  |
+| `--exclude-repositories` / `--exclude-extracts` not working                | `src/aggregate.ts`                                     | `github-code-search.ts` (parsing)                   |
+| Markdown output malformed                                                  | `src/output.ts`                                        | —                                                   |
+| JSON output missing fields or wrong shape                                  | `src/output.ts`                                        | `src/types.ts` (interface)                          |
+| Syntax highlighting wrong colour / wrong language                          | `src/render/highlight.ts`                              | —                                                   |
+| Row navigation skips or wraps incorrectly                                  | `src/render/rows.ts`                                   | `src/tui.ts` (key handler)                          |
+| Select-all / select-none inconsistent                                      | `src/render/selection.ts`                              | `src/tui.ts`                                        |
+| Filter count / stats incorrect                                             | `src/render/filter.ts`, `src/render/summary.ts`        | —                                                   |
+| Path filter (`/regex/`) doesn't match expected                             | `src/render/filter-match.ts`                           | `src/tui.ts` (filter state)                         |
+| API returns 0 results or stops paginating                                  | `src/api.ts`                                           | `src/api-utils.ts`                                  |
+| Rate limit hit / 429 not retried                                           | `src/api-utils.ts` (`fetchWithRetry`)                  | —                                                   |
+| TUI shows blank screen or wrong row                                        | `src/tui.ts`                                           | `src/render/rows.ts`                                |
+| Flicker, erased CRLF snippets, stale tab indentation or missing edge cells | `src/render/frame.ts`                                  | `src/terminal-control.ts`, `src/render/terminal.ts` |
+| Mouse clicks land on the wrong row/zone                                    | `src/render/mouse-hit.ts`                              | `src/tui.ts` (click dispatch)                       |
+| Mouse escape sequences not parsed / terminal stuck in mouse mode           | `src/render/mouse.ts`                                  | `src/tui.ts` (enable/disable mouse reporting)       |
+| Wheel scroll wrong step size or accidental clicks after scrolling          | `src/render/layout-constants.ts` (`MOUSE_SCROLL_STEP`) | `src/scroll-cooldown.ts`                            |
+| Help overlay doesn't appear / has wrong keys                               | `src/render.ts` (`renderHelpOverlay`)                  | `src/tui.ts`                                        |
+| Upgrade fails or replaces wrong binary                                     | `src/upgrade.ts`                                       | —                                                   |
+| Completion script wrong content                                            | `src/completions.ts`                                   | —                                                   |
+| Completion file written to wrong path                                      | `src/completions.ts` (`getCompletionFilePath`)         | env vars (`XDG_*`, `ZDOTDIR`)                       |
+| Completion not refreshed after upgrade                                     | `src/upgrade.ts` (`refreshCompletions`)                | —                                                   |
+| `--version` shows wrong info                                               | `build.ts` (SHA injection)                             | —                                                   |
+| CLI option ignored or parsed wrong                                         | `github-code-search.ts`                                | `src/types.ts` (`OutputType`)                       |
 
 ---
 
@@ -109,6 +110,11 @@ Document manual repro steps in the PR description:
 
 - **Touch only the root cause.** Do not opportunistically refactor neighbouring code in the same PR — it makes the fix harder to review and risks introducing new bugs.
 - **Respect pure/IO layering**: a fix in `aggregate.ts` must not add a `console.log` call.
+- **Terminal regressions need cell assertions.** Reuse `src/terminal-control.ts`
+  constants (including named line breaks) in fixes and new tests. Follow
+  `.github/instructions/terminal.instructions.md`; the normal Bun suite enforces
+  the architecture guard. For redraw changes reproduce CRLF, tab indentation,
+  full-width cells and scrolling over old content, not just emitted string shapes.
 - **Type changes cascade**: if `src/types.ts` must change, run `bun run knip` to find all affected consumers and update them all in the same PR.
 - **Regression comment**: if the root cause is non-obvious, add one line above the fix:
   ```typescript

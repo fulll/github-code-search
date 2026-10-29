@@ -140,6 +140,8 @@ src/
   style.ts               # Sole call site for node:util's styleText — dim/bold/italic/
                          #   underline/colors + style(names[], text) composer for combined
                          #   styles — no I/O
+  terminal-control.ts    # Shared named terminal controls, key sequences, line breaks,
+                         #   tab stops and cursorPosition() — no I/O
 
   render/
     frame.ts             # Pure differential terminal updates — repaints changed lines,
@@ -170,6 +172,8 @@ src/
 - **`render.ts` is a façade.** It re-exports everything from `render/` and adds two top-level rendering functions. Consumers import from `render.ts`, not directly from sub-modules. Exceptions: `render/team-pick.ts`, `render/mouse.ts` and `render/mouse-hit.ts` are pure modules imported **directly** by their sole consumer (`render.ts` for `team-pick.ts`, `tui.ts` for the mouse modules) and are not re-exported publicly (knip would flag unused re-exports otherwise).
 - **`render/terminal.ts` is the sole Bun API call site.** All calls to `Bun.stringWidth()`, `Bun.stripANSI()`, and `Bun.sliceAnsi()` must go through the `terminal.ts` wrapper functions (`visibleWidth()`, `stripAnsi()`, `clipToWidth()`, `hasAnsi()`). This centralizes terminal handling logic and makes it easy to verify correct Unicode handling (graphemes, emoji, CJK, ZWJ sequences).
 - **`src/style.ts` is the sole call site for `node:util`'s `styleText`.** All ANSI styling across the codebase (`render.ts`, `render/highlight.ts`, `render/summary.ts`, `render/team-pick.ts`, `tui.ts`, `upgrade.ts`, `api.ts`, `github-code-search.ts`) goes through this facade instead of importing `styleText` directly or reintroducing a styling npm package. Multi-style compositions (e.g. bold+yellow) must use the `style(names[], text)` array form, not chained/nested calls — `bold` and `dim` share the same SGR reset code, so naive chaining can produce incorrect output when there is trailing content after a nested style.
+- **`src/terminal-control.ts` owns encoded terminal controls.** Reuse its named cursor, erase, SGR, keyboard and mouse constants; use `cursorPosition()` for parameterized movement. Terminal surfaces and their new tests must compose named controls, including `LINE_FEED`, `CARRIAGE_RETURN` and `TAB`, instead of embedding escape strings. Standard text styling still uses `src/style.ts`; the shared constants cover protocol resets and the existing custom 256-colour styles. Raw bytes are allowed in the vocabulary's independent wire-format tests, existing legacy protocol fixtures and syntax-parsing regular expressions, not in new terminal output code.
+- **Differential redraws must preserve terminal cells, not merely strings.** Remove carriage returns and expand tabs to visible-column-aware spaces before clipping/comparing frames. Ignore ANSI styles when measuring tab stops. Never erase a line tail when the line fills the terminal width: the terminal cursor still occupies its final cell. Test CRLF snippets, styled/Unicode tab indentation, full-width ASCII/wide-glyph lines and scrolling over occupied cells.
 - **`types.ts` is the single source of truth** for all shared interfaces. Any new shared type must go there.
 - **No classes** — the codebase uses plain TypeScript interfaces and functions throughout.
 
@@ -184,6 +188,7 @@ src/
 - When adding a function to an existing module, add the corresponding test case in the existing `<module>.test.ts`.
 - When creating a new module that contains pure functions, create a companion `<module>.test.ts`.
 - Tests must be self-contained: no network calls, no filesystem side effects.
+- `src/terminal-control.test.ts` includes a read-only architecture guard in the normal `bun test`/CI suite. It rejects encoded control bytes outside the shared vocabulary and raw line/tab escapes in terminal surfaces and the frame regression tests. New render modules are covered automatically; extend the terminal-surface set for new emitters outside `render/`. Do not bypass the guard by adding exceptions for production emitters. Existing text parsers/fixtures are not a mandate to replace every data-format newline in the repository.
 
 ## Git conventions
 

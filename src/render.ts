@@ -6,6 +6,18 @@ import { getSectionPath, rowTerminalLines } from "./render/rows.ts";
 import { buildMatchCountLabel, buildSummaryFull } from "./render/summary.ts";
 import { renderTeamPickHeader } from "./render/team-pick.ts";
 import { visibleWidth, stripAnsi, clipToWidth } from "./render/terminal.ts";
+import {
+  ANSI_ACTIVE_BACKGROUND,
+  ANSI_ACCENT_FOREGROUND,
+  ANSI_FOREGROUND_RESET,
+  ANSI_BACKGROUND_RESET,
+  ANSI_COUNT_FOREGROUND,
+  ANSI_UNDERLINE,
+  ANSI_UNDERLINE_OFF,
+  ANSI_INVERSE,
+  ANSI_INVERSE_OFF,
+  LINE_FEED,
+} from "./terminal-control.ts";
 
 // ─── Re-exports ───────────────────────────────────────────────────────────────
 // Consumers (tui.ts, output.ts, tests) continue to import from render.ts.
@@ -132,7 +144,7 @@ export function renderHelpOverlay(): string {
     ),
     bot,
   ];
-  return rows.join("\n");
+  return rows.join(LINE_FEED);
 }
 
 // ─── Rendering ────────────────────────────────────────────────────────────────
@@ -151,11 +163,7 @@ const HEADER_LINES = 4; // title + summaryFull + hints + blank
  * width to equal `termWidth`.
  */
 function renderActiveLine(content: string): string {
-  // \x1b[48;5;53m  — dark purple background (256-colour bg)
-  // \x1b[38;5;129m  — saturated purple foreground for the ▌ bar
-  // \x1b[39m        — reset foreground only (background stays active)
-  // \x1b[49m        — reset background at the end of the line
-  return `\x1b[48;5;53m\x1b[38;5;129m▌\x1b[39m${content}\x1b[49m`;
+  return `${ANSI_ACTIVE_BACKGROUND}${ANSI_ACCENT_FOREGROUND}▌${ANSI_FOREGROUND_RESET}${content}${ANSI_BACKGROUND_RESET}`;
 }
 
 /** Width in visible columns of the left-bar character. */
@@ -387,7 +395,7 @@ export function renderGroups(
     // Underline the whole field; cursor char gets inverse video on top
     const inputLine =
       `🔍${targetBadge}` +
-      `\x1b[4m${before}\x1b[7m${atCursor}\x1b[27m${after}${pad}\x1b[24m` +
+      `${ANSI_UNDERLINE}${before}${ANSI_INVERSE}${atCursor}${ANSI_INVERSE_OFF}${after}${pad}${ANSI_UNDERLINE_OFF}` +
       statsRight;
     lines.push(inputLine);
 
@@ -449,17 +457,17 @@ export function renderGroups(
     // Use visibleWidth to account for CJK and multi-code-point graphemes.
     const padLen = Math.max(0, barWidth - visibleWidth(barPlain));
     const line = style.dim(REPICK_PREFIX) + bar + " ".repeat(padLen) + style.dim(REPICK_SUFFIX);
-    lines.push(clipToWidth(line, termWidth) + "\n");
+    lines.push(clipToWidth(line, termWidth) + LINE_FEED);
   } else if (opts.teamPickMode?.active) {
     const PICK_HINTS = `Pick team: ← / → move focus  ↵ confirm  Esc cancel`;
     const clippedPick = PICK_HINTS.length > termWidth ? PICK_HINTS.slice(0, termWidth) : PICK_HINTS;
-    lines.push(style.dim(`${clippedPick}\n`));
+    lines.push(style.dim(clippedPick + LINE_FEED));
   } else {
     const HINTS_TEXT =
       "← / → fold/unfold  Z fold-all  ↑ / ↓ navigate  gg/G top/bot  PgUp/Dn page  spc select  a all  n none  o open  f filter  t target/re-pick  p pick-team  h help  ↵ confirm  q quit";
     const clippedHints =
       HINTS_TEXT.length > termWidth ? HINTS_TEXT.slice(0, termWidth) : HINTS_TEXT;
-    lines.push(style.dim(`${clippedHints}\n`));
+    lines.push(style.dim(clippedHints + LINE_FEED));
   }
 
   // ── Sticky current-repo ───────────────────────────────────────────────────
@@ -616,13 +624,13 @@ export function renderGroups(
         : highlightText(
             group.repoFullName,
             "repo",
-            (s) => `\x1b[38;5;129m${style.bold(s)}\x1b[39m`,
+            (s) => `${ANSI_ACCENT_FOREGROUND}${style.bold(s)}${ANSI_FOREGROUND_RESET}`,
           );
       // ◈ badge — signals the repo was moved from a combined section via pick.
       // Future split mode will use this to identify pickable repos and add a hint.
       const pickedBadge = group.pickedFrom ? ` ${style.dim("◈")}` : "";
       // Use muted purple for the match count (both active and inactive rows).
-      const count = `\x1b[38;5;99m${buildMatchCountLabel(group)}\x1b[39m`;
+      const count = `${ANSI_COUNT_FOREGROUND}${buildMatchCountLabel(group)}${ANSI_FOREGROUND_RESET}`;
       // Right-align the match count flush to the terminal edge.
       // When active, subtract ACTIVE_BAR_WIDTH from padding so that
       // bar (1 char) + line content = termWidth total.
@@ -710,19 +718,19 @@ export function renderGroups(
   // shorter than viewportHeight (e.g. few results, many repos folded, or cursor
   // near the bottom of the list), the footer floats immediately after the last
   // item instead of staying at the bottom — see issue #105.
-  // Each pushed "" contributes exactly 1 physical blank line in lines.join("\n").
+  // Each pushed "" contributes exactly 1 physical blank line in the joined frame.
   for (let i = usedLines; i < viewportHeight; i++) {
     lines.push("");
   }
 
   // Position indicator — uses cursor position so it always updates on every
   // navigation keystroke, regardless of whether scrollOffset changed.
-  // The leading \n produces a blank separator between the viewport content and
+  // The leading line feed produces a blank separator between the viewport content and
   // the indicator (the separator is the last padding blank when full, or an
   // explicit extra blank here when viewport is full).
   if (rows.length > 0) {
-    lines.push(style.dim(`\n  ↕ row ${cursor + 1} of ${rows.length}`));
+    lines.push(style.dim(`${LINE_FEED}  ↕ row ${cursor + 1} of ${rows.length}`));
   }
 
-  return lines.join("\n");
+  return lines.join(LINE_FEED);
 }

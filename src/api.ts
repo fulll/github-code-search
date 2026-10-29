@@ -3,6 +3,14 @@ import type { CodeMatch } from "./types.ts";
 import { concurrentMap, fetchWithRetry, formatRetryWait, paginatedFetch } from "./api-utils.ts";
 import { getCacheKey, readCache, writeCache } from "./cache.ts";
 import { clipToWidth, visibleWidth } from "./render.ts";
+import {
+  ANSI_ACCENT_FOREGROUND,
+  ANSI_MUTED_FOREGROUND,
+  ANSI_STYLE_RESET,
+  ANSI_ERASE_LINE,
+  CARRIAGE_RETURN,
+  LINE_FEED,
+} from "./terminal-control.ts";
 
 // ─── Raw GitHub API types (internal) ─────────────────────────────────────────
 
@@ -107,7 +115,7 @@ function computeFragmentStartLine(fileContent: string, fragment: string): number
   if (!fragment) return 1;
   const idx = fileContent.indexOf(fragment);
   if (idx === -1) return 1;
-  return fileContent.slice(0, idx).split("\n").length;
+  return fileContent.slice(0, idx).split(LINE_FEED).length;
 }
 
 /**
@@ -117,7 +125,7 @@ function computeFragmentStartLine(fileContent: string, fragment: string): number
  */
 export function segmentLineCol(fragment: string, offset: number): { line: number; col: number } {
   const before = fragment.slice(0, offset);
-  const lines = before.split("\n");
+  const lines = before.split(LINE_FEED);
   return {
     line: lines.length, // 1-based
     col: (lines[lines.length - 1]?.length ?? 0) + 1, // 1-based
@@ -168,8 +176,7 @@ const PROGRESS_BAR_WIDTH = 20;
 /**
  * Build the coloured block portion of a progress bar.
  * Pure function — no side effects.
- * \x1b[38;5;129m — bright purple (filled blocks)
- * \x1b[38;5;240m — dark grey (empty blocks)
+ * Bright purple filled blocks and dark grey empty blocks.
  *
  * `filled` is clamped to [0, PROGRESS_BAR_WIDTH] so callers never produce a
  * negative repeat count (which would throw a RangeError) — e.g. when
@@ -179,12 +186,12 @@ const PROGRESS_BAR_WIDTH = 20;
 function buildProgressBar(filled: number): string {
   const clampedFilled = Math.min(Math.max(0, Math.round(filled)), PROGRESS_BAR_WIDTH);
   const clampedEmpty = PROGRESS_BAR_WIDTH - clampedFilled;
-  return `\x1b[38;5;129m${"▓".repeat(clampedFilled)}\x1b[38;5;240m${"░".repeat(clampedEmpty)}\x1b[0m`;
+  return `${ANSI_ACCENT_FOREGROUND}${"▓".repeat(clampedFilled)}${ANSI_MUTED_FOREGROUND}${"░".repeat(clampedEmpty)}${ANSI_STYLE_RESET}`;
 }
 
 /**
  * Build a single-line purple progress bar string suitable for writing to
- * stderr with a leading \r so it overwrites the current line.
+ * stderr with a leading carriage return so it overwrites the current line.
  *
  * Pure function — no side effects; exported for unit testing.
  */
@@ -217,7 +224,7 @@ function buildProgressLine(
       : visibleWidth(label) > labelWidth
         ? `${clipToWidth(label, labelWidth - 1)}…`
         : label;
-  return `\r${clipToWidth(`  ${shortened}${suffix}`, width)}`;
+  return CARRIAGE_RETURN + clipToWidth(`  ${shortened}${suffix}`, width);
 }
 
 function buildCountProgress(
@@ -234,7 +241,7 @@ function createFetchProgress(onRateLimit?: (waitMs: number) => Promise<void>) {
   let latest = "";
   let waiting = 0;
   const clear = () => {
-    process.stderr.write("\x1b[2K\r");
+    process.stderr.write(ANSI_ERASE_LINE + CARRIAGE_RETURN);
   };
   const write = (line: string) => {
     latest = line;
@@ -283,7 +290,7 @@ export async function fetchAllResults(
   // downloaded raw file alive in memory for the whole run — see PR #154 review.
   keepFileContent = false,
 ): Promise<CodeMatch[]> {
-  // Write the initial progress line (no newline — will be overwritten by \r).
+  // Write the initial progress line (no newline — will be overwritten in place).
   const progress = createFetchProgress(onRateLimit);
   progress.write(
     clipToWidth(
@@ -420,7 +427,9 @@ export async function fetchRepoTeams(
   if (useCache) {
     const cached = readCache<[string, string[]][]>(cacheKey);
     if (cached !== null) {
-      process.stderr.write(style.dim("Using cached team data (— use --no-cache to refresh)\n"));
+      process.stderr.write(
+        style.dim("Using cached team data (— use --no-cache to refresh)" + LINE_FEED),
+      );
       return new Map(cached);
     }
   }

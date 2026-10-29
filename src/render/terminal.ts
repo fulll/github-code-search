@@ -1,5 +1,6 @@
 // Wrappers around Bun 1.4 native terminal APIs: stringWidth, stripANSI, sliceAnsi.
 // This is the sole authorized call site for these APIs across the codebase.
+import { ANSI_BOLD_FOREGROUND_RESET } from "../terminal-control.ts";
 
 /**
  * Returns the number of terminal columns this string occupies.
@@ -21,7 +22,7 @@ export function stripAnsi(str: string): string {
 /**
  * Truncates str to maxCols visible terminal columns, preserving open ANSI styles.
  *
- * After truncation, appends \x1b[22;39m (reset bold + foreground) to ensure
+ * After truncation, resets bold + foreground to ensure
  * the caller's background color (e.g., applied by renderActiveLine) is not
  * unintentionally reset mid-line. This partial reset leaves any background
  * color applied before the truncation intact.
@@ -35,7 +36,7 @@ export function clipToWidth(str: string, maxCols: number): string {
   }
   const clipped = Bun.sliceAnsi(str, 0, maxCols);
   // Append a partial reset: turn off bold (22) and reset foreground (39) without affecting background.
-  return clipped + "\x1b[22;39m";
+  return clipped + ANSI_BOLD_FOREGROUND_RESET;
 }
 
 /**
