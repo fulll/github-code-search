@@ -118,7 +118,7 @@ const makeFetchItem = (i: number) => ({
   text_matches: [],
 });
 
-describe("fetch progress cleanup (issue #247)", () => {
+describe("fetch progress lifecycle (issues #247 and #248)", () => {
   let writes: string[];
   let stderr: ReturnType<typeof spyOn<typeof process.stderr, "write">>;
 
@@ -171,6 +171,60 @@ describe("fetch progress cleanup (issue #247)", () => {
 
     const resolutionStart = writes.findIndex((line) => line.includes("Resolving line numbers"));
     expect(writes[resolutionStart - 1]).toBe("\x1b[2K\r");
+    expect(writes.at(-1)).toBe("\x1b[2K\r");
+  });
+
+  it.each([0, 1, 2])("shows matching progress style for %i teams and clears it", async (count) => {
+    mockFetch(async (url) =>
+      String(url).includes("/teams?")
+        ? Response.json(
+            Array.from({ length: count }, (_, i) => ({ slug: `squad-${i}`, name: `Team ${i}` })),
+          )
+        : new Response(null, { status: 404 }),
+    );
+
+    await fetchRepoTeams("org", "tok", ["squad-", "chapter-"], false);
+
+    const label = `Fetching repos for ${count} team${count !== 1 ? "s" : ""} matching prefixes [squad-, chapter-]…`;
+    const expected = (done: number) =>
+      buildLineResolutionProgress(done, count).replace("Resolving line numbers…", label);
+    expect(writes).toEqual([
+      expected(0),
+      ...Array.from({ length: count }, (_, i) => expected(i + 1)),
+      "\x1b[2K\r",
+    ]);
+  });
+
+  it("counts a team only after all of its repository pages finish", async () => {
+    mockFetch(async (url) => {
+      const parsed = new URL(String(url));
+      if (parsed.pathname.endsWith("/teams")) {
+        return Response.json([{ slug: "squad-web", name: "Web" }]);
+      }
+      expect(writes.at(-1)).toContain("0/1");
+      return Response.json(
+        parsed.searchParams.get("page") === "1"
+          ? Array.from({ length: 100 }, (_, i) => ({ full_name: `org/repo-${i}` }))
+          : [],
+      );
+    });
+
+    const teams = await fetchRepoTeams("org", "tok", ["squad-"], false);
+
+    expect(teams.size).toBe(100);
+    expect(writes.at(-2)).toContain("1/1");
+    expect(writes.at(-1)).toBe("\x1b[2K\r");
+  });
+
+  it("clears team progress before propagating a repository fetch error", async () => {
+    mockFetch(async (url) =>
+      String(url).includes("/teams?")
+        ? Response.json([{ slug: "squad-web", name: "Web" }])
+        : Response.json({ message: "Unauthorized" }, { status: 401 }),
+    );
+
+    await expect(fetchRepoTeams("org", "tok", ["squad-"], false)).rejects.toThrow("401");
+
     expect(writes.at(-1)).toBe("\x1b[2K\r");
   });
 });
