@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import { mockFetch } from "./test-setup.ts";
 import {
   buildFetchProgress,
@@ -116,6 +116,63 @@ const makeFetchItem = (i: number) => ({
   html_url: `https://github.com/org/repo/blob/main/src/file${i}.ts`,
   repository: { full_name: "org/repo", archived: false },
   text_matches: [],
+});
+
+describe("fetch progress cleanup (issue #247)", () => {
+  let writes: string[];
+  let stderr: ReturnType<typeof spyOn<typeof process.stderr, "write">>;
+
+  beforeEach(() => {
+    writes = [];
+    stderr = spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      writes.push(String(chunk));
+      return true;
+    });
+  });
+
+  afterEach(() => {
+    stderr.mockRestore();
+    globalThis.fetch = originalFetch;
+  });
+
+  it.each([0, 1])("clears the results progress line after fetching %i results", async (count) => {
+    mockFetch(async () =>
+      Response.json({
+        items: Array.from({ length: count }, (_, i) => makeFetchItem(i)),
+        total_count: count,
+      }),
+    );
+
+    await fetchAllResults("q", "org", "tok");
+
+    expect(writes.at(-1)).toBe("\x1b[2K\r");
+    expect(writes).not.toContain("\n");
+  });
+
+  it("clears the results progress line before propagating an API error", async () => {
+    mockFetch(async () => Response.json({ message: "Unauthorized" }, { status: 401 }));
+
+    await expect(fetchAllResults("q", "org", "tok")).rejects.toThrow("401");
+
+    expect(writes.at(-1)).toBe("\x1b[2K\r");
+  });
+
+  it("clears results before line resolution and clears resolution when finished", async () => {
+    mockFetch(async (url) =>
+      String(url).includes("raw.githubusercontent.com")
+        ? new Response("hello")
+        : Response.json({
+            items: [{ ...makeFetchItem(0), text_matches: [{ fragment: "hello" }] }],
+            total_count: 1,
+          }),
+    );
+
+    await fetchAllResults("hello", "org", "tok");
+
+    const resolutionStart = writes.findIndex((line) => line.includes("Resolving line numbers"));
+    expect(writes[resolutionStart - 1]).toBe("\x1b[2K\r");
+    expect(writes.at(-1)).toBe("\x1b[2K\r");
+  });
 });
 
 describe("fetchAllResults", () => {
