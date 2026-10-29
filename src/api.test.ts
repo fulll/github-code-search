@@ -940,6 +940,15 @@ describe("buildFetchProgress", () => {
 // ─── buildLineResolutionProgress ─────────────────────────────────────────────────
 
 describe("buildLineResolutionProgress", () => {
+  it("preserves the full counter when the label budget is zero", () => {
+    const progress = buildLineResolutionProgress(93, 93, 31);
+
+    expect(visibleWidth(progress)).toBe(30);
+    expect(progress).toEndWith("93/93");
+    expect(progress).not.toContain("…");
+    expect(progress.match(/▓/g)).toHaveLength(20);
+  });
+
   it("starts with \\r to overwrite the current line", () => {
     const s = buildLineResolutionProgress(5, 20);
     expect(s.startsWith("\r")).toBe(true);
