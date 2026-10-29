@@ -142,6 +142,8 @@ src/
                          #   styles — no I/O
 
   render/
+    frame.ts             # Pure differential terminal updates — repaints changed lines,
+                         #   erases stale content and clips frames to the viewport
     terminal.ts          # Bun 1.4+ native API wrappers (stringWidth, stripANSI, sliceAnsi)
                          #   sole authorized call site for these APIs
     highlight.ts         # Syntax highlighting (language detection + token rules)

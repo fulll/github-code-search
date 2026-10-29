@@ -5,6 +5,7 @@ import {
   applySelectNone,
   buildFileUrl,
   buildFilterStats,
+  buildFrameUpdate,
   buildRows,
   getSectionPath,
   isCursorVisible,
@@ -162,6 +163,7 @@ export async function runInteractive(
   let scrollOffset = 0;
   let termHeight = process.stdout.rows ?? 40;
   let termWidth = process.stdout.columns ?? 120;
+  let previousFrame: string | null = null;
   // HEADER_LINES (4) + position indicator (2) = 6 fixed lines consumed by renderGroups.
   // filterBarLines (0–2) and the sticky repo line (0–1) are added dynamically below.
   // Use getViewportHeight() for scroll decisions so they match what renderGroups actually renders.
@@ -296,14 +298,15 @@ export async function runInteractive(
       filterCursor,
       filterLiveStats,
       showHelp,
-      termWidth: process.stdout.columns ?? 80,
+      termWidth,
       filterTarget,
       filterRegex,
       teamPickMode: teamPickMode.active ? teamPickMode : undefined,
       repickMode: repickMode.active ? repickMode : undefined,
     });
-    process.stdout.write(ANSI_CLEAR);
-    process.stdout.write(rendered);
+    const update = buildFrameUpdate(rendered, previousFrame, termWidth, termHeight);
+    if (update) process.stdout.write(update);
+    previousFrame = rendered;
   };
 
   redraw();
@@ -332,6 +335,7 @@ export async function runInteractive(
     if (newHeight !== termHeight || newWidth !== termWidth) {
       termHeight = newHeight;
       termWidth = newWidth;
+      previousFrame = null;
       redraw();
     }
   };

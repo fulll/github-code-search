@@ -32,6 +32,7 @@ export {
   buildSelectionSummary,
 } from "./render/summary.ts";
 export { applySelectAll, applySelectNone } from "./render/selection.ts";
+export { buildFrameUpdate } from "./render/frame.ts";
 
 // ─── buildFileUrl ─────────────────────────────────────────────────────────────
 
