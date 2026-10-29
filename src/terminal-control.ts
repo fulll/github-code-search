@@ -22,7 +22,7 @@ export const ANSI_UNDERLINE = `${ANSI_CSI}4m`;
 export const ANSI_UNDERLINE_OFF = `${ANSI_CSI}24m`;
 export const ANSI_INVERSE = `${ANSI_CSI}7m`;
 export const ANSI_INVERSE_OFF = `${ANSI_CSI}27m`;
-export const ANSI_SGR_PATTERN = new RegExp(`(${ANSI_CSI.replace("[", "\\[")}[0-9;]*m)`, "g");
+export const ANSI_SGR_PATTERN = new RegExp(`(${ANSI_CSI.replaceAll("[", "\\[")}[0-9;]*m)`, "g");
 export const TERMINAL_TAB_WIDTH = 8;
 
 export function cursorPosition(row: number, column = 1): string {

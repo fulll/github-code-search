@@ -52,6 +52,16 @@ describe("terminal control vocabulary", () => {
     ];
     for (const [actual, expected] of keys) expect(actual).toBe(expected);
   });
+
+  it("recognizes complete SGR controls without consuming their surrounding text", () => {
+    expect("\x1b[31mred\x1b[39m".split(control.ANSI_SGR_PATTERN)).toEqual([
+      "",
+      "\x1b[31m",
+      "red",
+      "\x1b[39m",
+      "",
+    ]);
+  });
 });
 
 const encodedControl = /\\(?:x(?:0[0-9a-f]|1[0-9a-f]|7f)|u00(?:0[0-9a-f]|1[0-9a-f]|7f))/i;
