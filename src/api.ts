@@ -2,6 +2,7 @@ import * as style from "./style.ts";
 import type { CodeMatch } from "./types.ts";
 import { concurrentMap, fetchWithRetry, formatRetryWait, paginatedFetch } from "./api-utils.ts";
 import { getCacheKey, readCache, writeCache } from "./cache.ts";
+import { clipToWidth, visibleWidth } from "./render.ts";
 
 // ─── Raw GitHub API types (internal) ─────────────────────────────────────────
 
@@ -187,14 +188,73 @@ function buildProgressBar(filled: number): string {
  *
  * Pure function — no side effects; exported for unit testing.
  */
-export function buildFetchProgress(currentPage: number, totalPages: number): string {
+export function buildFetchProgress(
+  currentPage: number,
+  totalPages: number,
+  columns = Infinity,
+): string {
   const filled = totalPages > 0 ? Math.round((currentPage / totalPages) * PROGRESS_BAR_WIDTH) : 0;
-  return `\r  Fetching results from GitHub… ${buildProgressBar(filled)}  page ${currentPage}/${totalPages}`;
+  return buildProgressLine(
+    "Fetching results from GitHub…",
+    `page ${currentPage}/${totalPages}`,
+    filled,
+    columns,
+  );
 }
 
-function buildCountProgress(label: string, done: number, total: number): string {
+function buildProgressLine(
+  label: string,
+  counter: string,
+  filled: number,
+  columns: number,
+): string {
+  const width = Math.max(0, columns - 1);
+  const suffix = ` ${buildProgressBar(filled)}  ${counter}`;
+  const labelWidth = Math.max(0, width - visibleWidth(suffix) - 2);
+  const shortened =
+    visibleWidth(label) > labelWidth
+      ? `${clipToWidth(label, Math.max(0, labelWidth - 1))}…`
+      : label;
+  return `\r${clipToWidth(`  ${shortened}${suffix}`, width)}`;
+}
+
+function buildCountProgress(
+  label: string,
+  done: number,
+  total: number,
+  columns = Infinity,
+): string {
   const filled = total > 0 ? Math.round((done / total) * PROGRESS_BAR_WIDTH) : 0;
-  return `\r  ${label} ${buildProgressBar(filled)}  ${done}/${total}`;
+  return buildProgressLine(label, `${done}/${total}`, filled, columns);
+}
+
+function createFetchProgress(onRateLimit?: (waitMs: number) => Promise<void>) {
+  let latest = "";
+  let waiting = 0;
+  const clear = () => {
+    process.stderr.write("\x1b[2K\r");
+  };
+  const write = (line: string) => {
+    latest = line;
+    if (waiting === 0) process.stderr.write(line);
+  };
+  return {
+    write,
+    clear,
+    onRateLimit: onRateLimit
+      ? async (waitMs: number) => {
+          if (waiting++ === 0) clear();
+          try {
+            await onRateLimit(waitMs);
+          } finally {
+            if (--waiting === 0) {
+              clear();
+              if (latest) process.stderr.write(latest);
+            }
+          }
+        }
+      : undefined,
+  };
 }
 
 /**
@@ -203,8 +263,12 @@ function buildCountProgress(label: string, done: number, total: number): string 
  *
  * Pure function — no side effects; exported for unit testing.
  */
-export function buildLineResolutionProgress(done: number, total: number): string {
-  return buildCountProgress("Resolving line numbers…", done, total);
+export function buildLineResolutionProgress(
+  done: number,
+  total: number,
+  columns = Infinity,
+): string {
+  return buildCountProgress("Resolving line numbers…", done, total, columns);
 }
 
 export async function fetchAllResults(
@@ -218,7 +282,13 @@ export async function fetchAllResults(
   keepFileContent = false,
 ): Promise<CodeMatch[]> {
   // Write the initial progress line (no newline — will be overwritten by \r).
-  process.stderr.write(style.dim("  Fetching results from GitHub…"));
+  const progress = createFetchProgress(onRateLimit);
+  progress.write(
+    clipToWidth(
+      style.dim("  Fetching results from GitHub…"),
+      Math.max(0, (process.stderr.columns ?? 80) - 1),
+    ),
+  );
   let totalPages = 0;
   // GitHub code search is capped at 1000 results; paginatedFetch stops naturally
   // when a page returns fewer than 100 items. When total_count is an exact
@@ -230,14 +300,14 @@ export async function fetchAllResults(
       // Short-circuit: GitHub caps at 1 000 results (10 pages max).
       // Once we know totalPages, skip any page that would exceed the cap.
       if (totalPages > 0 && page > totalPages) return [];
-      const { items, total } = await searchCode(query, org, token, page, onRateLimit);
+      const { items, total } = await searchCode(query, org, token, page, progress.onRateLimit);
       // On the first page, compute the expected number of pages so the bar
       // can show realistic progress. GitHub caps at 1 000 results (10 pages).
       if (page === 1) {
         totalPages = Math.min(Math.ceil(total / 100), 10);
       }
       if (totalPages > 0) {
-        process.stderr.write(buildFetchProgress(page, totalPages));
+        progress.write(buildFetchProgress(page, totalPages, process.stderr.columns ?? 80));
       }
       return items;
     },
@@ -245,7 +315,7 @@ export async function fetchAllResults(
     250, // Be kind to rate limits between pages
   ).finally(() => {
     // Erase rather than terminate the transient line, including on failure (#247).
-    process.stderr.write("\x1b[2K\r");
+    progress.clear();
   });
 
   // ─── Resolve absolute line numbers ──────────────────────────────────────
@@ -265,7 +335,9 @@ export async function fetchAllResults(
     // Fix: limit concurrency to avoid saturating the connection pool on slow
     // networks. A per-request 5 s timeout prevents indefinite stalls;
     // failures fall back to fragment-relative line numbers silently. — see issue #99
-    process.stderr.write(buildLineResolutionProgress(0, urlsToFetch.length));
+    progress.write(
+      buildLineResolutionProgress(0, urlsToFetch.length, process.stderr.columns ?? 80),
+    );
     let resolved = 0;
     await concurrentMap(
       urlsToFetch,
@@ -283,12 +355,14 @@ export async function fetchAllResults(
           // Fall back to fragment-relative line numbers (timeout or network error)
         }
         resolved++;
-        process.stderr.write(buildLineResolutionProgress(resolved, urlsToFetch.length));
+        progress.write(
+          buildLineResolutionProgress(resolved, urlsToFetch.length, process.stderr.columns ?? 80),
+        );
       },
       { concurrency: 20 },
     );
     // Clear the resolution progress line before continuing (ANSI erase-entire-line).
-    process.stderr.write("\x1b[2K\r");
+    progress.clear();
   }
 
   return allItems.map((item) => {
@@ -381,7 +455,8 @@ export async function fetchRepoTeams(
 
   const totalTeams = matchingTeamSlugs.length;
   const label = `Fetching repos for ${totalTeams} team${totalTeams !== 1 ? "s" : ""} matching prefix${prefixes.length !== 1 ? "es" : ""} [${prefixes.join(", ")}]…`;
-  process.stderr.write(buildCountProgress(label, 0, totalTeams));
+  const progress = createFetchProgress(onRateLimit);
+  progress.write(buildCountProgress(label, 0, totalTeams, process.stderr.columns ?? 80));
 
   // ── 2. For each matching team fetch its repos (paginated) ──────────────────
   // @see https://docs.github.com/en/rest/teams/teams?apiVersion=2022-11-28#list-repos-in-a-team
@@ -400,7 +475,7 @@ export async function fetchRepoTeams(
         `https://api.github.com/orgs/${org}/teams/${slug}/repos?${params}`,
         { headers: githubHeaders(token, "application/vnd.github+json") },
         3,
-        onRateLimit,
+        progress.onRateLimit,
       );
       if (!res.ok) {
         // 404 is expected for nested/secret teams — skip silently.
@@ -419,9 +494,11 @@ export async function fetchRepoTeams(
       reposPage++;
     }
     completedTeams++;
-    process.stderr.write(buildCountProgress(label, completedTeams, totalTeams));
+    progress.write(
+      buildCountProgress(label, completedTeams, totalTeams, process.stderr.columns ?? 80),
+    );
   }).finally(() => {
-    process.stderr.write("\x1b[2K\r");
+    progress.clear();
   });
 
   // ── Persist result ──────────────────────────────────────────────────────────

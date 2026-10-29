@@ -35,6 +35,7 @@ import { checkForUpdate } from "./src/upgrade.ts";
 import { runInteractive } from "./src/tui.ts";
 import { generateCompletion, detectShell } from "./src/completions.ts";
 import { getGhAuthToken } from "./src/gh-cli.ts";
+import { clipToWidth } from "./src/render.ts";
 import {
   buildApiQuery,
   detectPathWildcardLimitation,
@@ -363,18 +364,19 @@ async function searchAction(
     // No countdown running — start a fresh one.
     cooldownUntil = desiredEnd;
     activeCooldown = (async () => {
-      // Start on a fresh line so the countdown doesn't overwrite the progress bar
-      process.stderr.write("\n");
+      // The fetch progress is paused and cleared while this countdown owns the row.
       while (true) {
         const remaining = cooldownUntil - Date.now();
         if (remaining <= 0) break;
         process.stderr.write(
-          `\r  ${style.yellow("Rate limited")} — resuming in ${formatRetryWait(remaining)}\u2026${" ".repeat(10)}`,
+          `\x1b[2K\r${clipToWidth(
+            `  ${style.yellow("Rate limited")} — resuming in ${formatRetryWait(remaining)}\u2026`,
+            Math.max(0, (process.stderr.columns ?? 80) - 1),
+          )}`,
         );
         await new Promise((r) => setTimeout(r, 1_000));
       }
-      // Leave cursor at line start; the next \r progress update will overwrite cleanly
-      process.stderr.write(`\r  ${style.dim("Rate limited")} — resuming\u2026${" ".repeat(40)}`);
+      process.stderr.write("\x1b[2K\r");
     })().finally(() => {
       activeCooldown = null;
       cooldownUntil = 0;
