@@ -192,6 +192,11 @@ export function buildFetchProgress(currentPage: number, totalPages: number): str
   return `\r  Fetching results from GitHub… ${buildProgressBar(filled)}  page ${currentPage}/${totalPages}`;
 }
 
+function buildCountProgress(label: string, done: number, total: number): string {
+  const filled = total > 0 ? Math.round((done / total) * PROGRESS_BAR_WIDTH) : 0;
+  return `\r  ${label} ${buildProgressBar(filled)}  ${done}/${total}`;
+}
+
 /**
  * Build a single-line progress bar string for the line-number resolution phase.
  * Shows how many raw file fetches have completed out of the total.
@@ -199,8 +204,7 @@ export function buildFetchProgress(currentPage: number, totalPages: number): str
  * Pure function — no side effects; exported for unit testing.
  */
 export function buildLineResolutionProgress(done: number, total: number): string {
-  const filled = total > 0 ? Math.round((done / total) * PROGRESS_BAR_WIDTH) : 0;
-  return `\r  Resolving line numbers… ${buildProgressBar(filled)}  ${done}/${total}`;
+  return buildCountProgress("Resolving line numbers…", done, total);
 }
 
 export async function fetchAllResults(
@@ -375,47 +379,50 @@ export async function fetchRepoTeams(
     }
   }
 
-  process.stderr.write(
-    style.dim(
-      `Fetching repos for ${matchingTeamSlugs.length} team${matchingTeamSlugs.length !== 1 ? "s" : ""} matching prefix${prefixes.length !== 1 ? "es" : ""} [${prefixes.join(", ")}]…\n`,
-    ),
-  );
+  const totalTeams = matchingTeamSlugs.length;
+  const label = `Fetching repos for ${totalTeams} team${totalTeams !== 1 ? "s" : ""} matching prefix${prefixes.length !== 1 ? "es" : ""} [${prefixes.join(", ")}]…`;
+  process.stderr.write(buildCountProgress(label, 0, totalTeams));
 
   // ── 2. For each matching team fetch its repos (paginated) ──────────────────
   // @see https://docs.github.com/en/rest/teams/teams?apiVersion=2022-11-28#list-repos-in-a-team
   const repoTeams = new Map<string, string[]>();
+  let completedTeams = 0;
 
-  await Promise.all(
-    matchingTeamSlugs.map(async (slug) => {
-      // Paginate repos per-page and update repoTeams incrementally to avoid
-      // holding an extra full repos array in memory for large teams.
-      let reposPage = 1;
-      while (true) {
-        const params = new URLSearchParams({ per_page: "100", page: String(reposPage) });
-        const res = await fetchWithRetry(
-          `https://api.github.com/orgs/${org}/teams/${slug}/repos?${params}`,
-          { headers: githubHeaders(token, "application/vnd.github+json") },
-          3,
-          onRateLimit,
-        );
-        if (!res.ok) {
-          // 404 is expected for nested/secret teams — skip silently.
-          if (res.status === 404) break;
-          // All other errors (rate-limit included) delegate to throwApiError
-          // which detects rate-limits and produces a clean message.
-          await throwApiError(res);
-        }
-        const repos = (await res.json()) as RawRepo[];
-        for (const r of repos) {
-          const list = repoTeams.get(r.full_name) ?? [];
-          if (!list.includes(slug)) list.push(slug);
-          repoTeams.set(r.full_name, list);
-        }
-        if (repos.length < 100) break;
-        reposPage++;
+  // Wait for every worker before clearing, so late completions cannot redraw
+  // the progress line after another team's request fails.
+  await concurrentMap(matchingTeamSlugs, async (slug) => {
+    // Paginate repos per-page and update repoTeams incrementally to avoid
+    // holding an extra full repos array in memory for large teams.
+    let reposPage = 1;
+    while (true) {
+      const params = new URLSearchParams({ per_page: "100", page: String(reposPage) });
+      const res = await fetchWithRetry(
+        `https://api.github.com/orgs/${org}/teams/${slug}/repos?${params}`,
+        { headers: githubHeaders(token, "application/vnd.github+json") },
+        3,
+        onRateLimit,
+      );
+      if (!res.ok) {
+        // 404 is expected for nested/secret teams — skip silently.
+        if (res.status === 404) break;
+        // All other errors (rate-limit included) delegate to throwApiError
+        // which detects rate-limits and produces a clean message.
+        await throwApiError(res);
       }
-    }),
-  );
+      const repos = (await res.json()) as RawRepo[];
+      for (const r of repos) {
+        const list = repoTeams.get(r.full_name) ?? [];
+        if (!list.includes(slug)) list.push(slug);
+        repoTeams.set(r.full_name, list);
+      }
+      if (repos.length < 100) break;
+      reposPage++;
+    }
+    completedTeams++;
+    process.stderr.write(buildCountProgress(label, completedTeams, totalTeams));
+  }).finally(() => {
+    process.stderr.write("\x1b[2K\r");
+  });
 
   // ── Persist result ──────────────────────────────────────────────────────────
   // Serialise the Map as an array of entries for JSON round-trip stability.
