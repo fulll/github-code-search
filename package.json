@@ -69,6 +69,6 @@
     "mermaid": "^12.2.0",
     "sharp": "^0.35.5",
     "vitepress": "^1.6.4",
-    "vitepress-mermaid-renderer": "^1.2.2"
+    "vitepress-mermaid-renderer": "^1.2.3"
   }
 }
