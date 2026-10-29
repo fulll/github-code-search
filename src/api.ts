@@ -239,9 +239,10 @@ export async function fetchAllResults(
     },
     100, // GitHub returns up to 100 items per page
     250, // Be kind to rate limits between pages
-  );
-  // Terminate the progress line.
-  process.stderr.write("\n");
+  ).finally(() => {
+    // Erase rather than terminate the transient line, including on failure (#247).
+    process.stderr.write("\x1b[2K\r");
+  });
 
   // ─── Resolve absolute line numbers ──────────────────────────────────────
   // The GitHub Code Search API returns fragment-relative character indices
