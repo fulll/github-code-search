@@ -212,9 +212,11 @@ function buildProgressLine(
   const suffix = ` ${buildProgressBar(filled)}  ${counter}`;
   const labelWidth = Math.max(0, width - visibleWidth(suffix) - 2);
   const shortened =
-    visibleWidth(label) > labelWidth
-      ? `${clipToWidth(label, Math.max(0, labelWidth - 1))}…`
-      : label;
+    labelWidth === 0
+      ? ""
+      : visibleWidth(label) > labelWidth
+        ? `${clipToWidth(label, labelWidth - 1)}…`
+        : label;
   return `\r${clipToWidth(`  ${shortened}${suffix}`, width)}`;
 }
 
