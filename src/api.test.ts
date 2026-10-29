@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import { mockFetch } from "./test-setup.ts";
+import { visibleWidth } from "./render.ts";
 import {
   buildFetchProgress,
   buildLineResolutionProgress,
@@ -116,6 +117,237 @@ const makeFetchItem = (i: number) => ({
   html_url: `https://github.com/org/repo/blob/main/src/file${i}.ts`,
   repository: { full_name: "org/repo", archived: false },
   text_matches: [],
+});
+
+describe("fetch progress lifecycle (issues #247 and #248)", () => {
+  let writes: string[];
+  let stderr: ReturnType<typeof spyOn<typeof process.stderr, "write">>;
+  const columnsDescriptor = Object.getOwnPropertyDescriptor(process.stderr, "columns");
+
+  beforeEach(() => {
+    writes = [];
+    Object.defineProperty(process.stderr, "columns", {
+      configurable: true,
+      value: 200,
+      writable: true,
+    });
+    stderr = spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      writes.push(String(chunk));
+      return true;
+    });
+  });
+
+  afterEach(() => {
+    stderr.mockRestore();
+    globalThis.fetch = originalFetch;
+    if (columnsDescriptor) Object.defineProperty(process.stderr, "columns", columnsDescriptor);
+    else Reflect.deleteProperty(process.stderr, "columns");
+  });
+
+  it.each([0, 1])("clears the results progress line after fetching %i results", async (count) => {
+    mockFetch(async () =>
+      Response.json({
+        items: Array.from({ length: count }, (_, i) => makeFetchItem(i)),
+        total_count: count,
+      }),
+    );
+
+    await fetchAllResults("q", "org", "tok");
+
+    expect(writes.at(-1)).toBe("\x1b[2K\r");
+    expect(writes).not.toContain("\n");
+  });
+
+  it("clears the results progress line before propagating an API error", async () => {
+    mockFetch(async () => Response.json({ message: "Unauthorized" }, { status: 401 }));
+
+    await expect(fetchAllResults("q", "org", "tok")).rejects.toThrow("401");
+
+    expect(writes.at(-1)).toBe("\x1b[2K\r");
+  });
+
+  it("clears results before line resolution and clears resolution when finished", async () => {
+    mockFetch(async (url) =>
+      new URL(String(url)).hostname === "raw.githubusercontent.com"
+        ? new Response("hello")
+        : Response.json({
+            items: [{ ...makeFetchItem(0), text_matches: [{ fragment: "hello" }] }],
+            total_count: 1,
+          }),
+    );
+
+    await fetchAllResults("hello", "org", "tok");
+
+    const resolutionStart = writes.findIndex((line) => line.includes("Resolving line numbers"));
+    expect(writes[resolutionStart - 1]).toBe("\x1b[2K\r");
+    expect(writes.at(-1)).toBe("\x1b[2K\r");
+  });
+
+  it.each([0, 1, 2])("shows matching progress style for %i teams and clears it", async (count) => {
+    mockFetch(async (url) =>
+      String(url).includes("/teams?")
+        ? Response.json(
+            Array.from({ length: count }, (_, i) => ({ slug: `squad-${i}`, name: `Team ${i}` })),
+          )
+        : new Response(null, { status: 404 }),
+    );
+
+    await fetchRepoTeams("org", "tok", ["squad-", "chapter-"], false);
+
+    const label = `Fetching repos for ${count} team${count !== 1 ? "s" : ""} matching prefixes [squad-, chapter-]…`;
+    const expected = (done: number) =>
+      buildLineResolutionProgress(done, count).replace("Resolving line numbers…", label);
+    expect(writes).toEqual([
+      expected(0),
+      ...Array.from({ length: count }, (_, i) => expected(i + 1)),
+      "\x1b[2K\r",
+    ]);
+  });
+
+  it("counts a team only after all of its repository pages finish", async () => {
+    mockFetch(async (url) => {
+      const parsed = new URL(String(url));
+      if (parsed.pathname.endsWith("/teams")) {
+        return Response.json([{ slug: "squad-web", name: "Web" }]);
+      }
+      expect(writes.at(-1)).toContain("0/1");
+      return Response.json(
+        parsed.searchParams.get("page") === "1"
+          ? Array.from({ length: 100 }, (_, i) => ({ full_name: `org/repo-${i}` }))
+          : [],
+      );
+    });
+
+    const teams = await fetchRepoTeams("org", "tok", ["squad-"], false);
+
+    expect(teams.size).toBe(100);
+    expect(writes.at(-2)).toContain("1/1");
+    expect(writes.at(-1)).toBe("\x1b[2K\r");
+  });
+
+  it("clears team progress before propagating a repository fetch error", async () => {
+    mockFetch(async (url) =>
+      String(url).includes("/teams?")
+        ? Response.json([{ slug: "squad-web", name: "Web" }])
+        : Response.json({ message: "Unauthorized" }, { status: 401 }),
+    );
+
+    await expect(fetchRepoTeams("org", "tok", ["squad-"], false)).rejects.toThrow("401");
+
+    expect(writes.at(-1)).toBe("\x1b[2K\r");
+  });
+
+  it.each(["results", "teams"])(
+    "clears %s progress before a countdown writes a newline",
+    async (phase) => {
+      let limited = false;
+      mockFetch(async (url) => {
+        if (phase === "teams" && new URL(String(url)).pathname.endsWith("/teams")) {
+          return Response.json([{ slug: "squad-web", name: "Web" }]);
+        }
+        if (!limited) {
+          limited = true;
+          return new Response(null, { status: 429, headers: { "Retry-After": "11" } });
+        }
+        return phase === "results"
+          ? Response.json({ items: [], total_count: 0 })
+          : Response.json([]);
+      });
+      const countdown = async () => {
+        expect(writes.at(-1)).toBe("\x1b[2K\r");
+        process.stderr.write("\n");
+      };
+
+      if (phase === "results") await fetchAllResults("q", "org", "tok", countdown);
+      else await fetchRepoTeams("org", "tok", ["squad-"], false, countdown);
+
+      expect(writes.at(-1)).toBe("\x1b[2K\r");
+    },
+  );
+
+  it.each(["results", "teams"])("clears %s progress when a countdown rejects", async (phase) => {
+    mockFetch(async (url) => {
+      if (phase === "teams" && new URL(String(url)).pathname.endsWith("/teams")) {
+        return Response.json([{ slug: "squad-web", name: "Web" }]);
+      }
+      return new Response(null, { status: 429, headers: { "Retry-After": "11" } });
+    });
+    const countdown = async () => {
+      expect(writes.at(-1)).toBe("\x1b[2K\r");
+      process.stderr.write("\n");
+      throw new Error("Countdown cancelled");
+    };
+
+    await expect(
+      phase === "results"
+        ? fetchAllResults("q", "org", "tok", countdown)
+        : fetchRepoTeams("org", "tok", ["squad-"], false, countdown),
+    ).rejects.toThrow("Countdown cancelled");
+    expect(writes.at(-1)).toBe("\x1b[2K\r");
+  });
+
+  it("keeps all 93-team progress updates on one row at 80 columns", async () => {
+    process.stderr.columns = 80;
+    mockFetch(async (url) =>
+      new URL(String(url)).pathname.endsWith("/teams")
+        ? Response.json(
+            Array.from({ length: 93 }, (_, i) => ({ slug: `squad-${i}`, name: `Team ${i}` })),
+          )
+        : Response.json([]),
+    );
+
+    await fetchRepoTeams("org", "tok", ["squad-", "chapter-"], false);
+
+    for (const line of writes.slice(0, -1)) {
+      expect(visibleWidth(line)).toBeLessThan(80);
+      expect(line).toContain("\x1b[38;5;129m");
+      expect(line).toMatch(/\d+\/93$/);
+    }
+    expect(writes.at(-2)).toContain("93/93");
+    expect(writes.at(-1)).toBe("\x1b[2K\r");
+  });
+
+  it("does not redraw team progress while another team is showing a countdown", async () => {
+    let releaseCountdown!: () => void;
+    let signalCountdown!: () => void;
+    const countdownStarted = new Promise<void>((resolve) => {
+      signalCountdown = resolve;
+    });
+    const countdownFinished = new Promise<void>((resolve) => {
+      releaseCountdown = resolve;
+    });
+    let limited = false;
+    mockFetch(async (url) => {
+      const path = new URL(String(url)).pathname;
+      if (path.endsWith("/teams")) {
+        return Response.json([
+          { slug: "squad-limited", name: "Limited" },
+          { slug: "squad-fast", name: "Fast" },
+        ]);
+      }
+      if (path.endsWith("/squad-limited/repos") && !limited) {
+        limited = true;
+        return new Response(null, { status: 429, headers: { "Retry-After": "11" } });
+      }
+      if (path.endsWith("/squad-fast/repos")) await countdownStarted;
+      return Response.json([]);
+    });
+    const fetch = fetchRepoTeams("org", "tok", ["squad-"], false, async () => {
+      process.stderr.write("\nCOUNTDOWN");
+      signalCountdown();
+      await countdownFinished;
+    });
+    await countdownStarted;
+    // Let the other worker finish while the countdown still owns stderr.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const lastDuringCountdown = writes.at(-1);
+    releaseCountdown();
+    await fetch;
+
+    expect(lastDuringCountdown).toBe("\nCOUNTDOWN");
+    expect(writes.at(-2)).toContain("2/2");
+    expect(writes.at(-1)).toBe("\x1b[2K\r");
+  });
 });
 
 describe("fetchAllResults", () => {
@@ -708,6 +940,15 @@ describe("buildFetchProgress", () => {
 // ─── buildLineResolutionProgress ─────────────────────────────────────────────────
 
 describe("buildLineResolutionProgress", () => {
+  it("preserves the full counter when the label budget is zero", () => {
+    const progress = buildLineResolutionProgress(93, 93, 31);
+
+    expect(visibleWidth(progress)).toBe(30);
+    expect(progress).toEndWith("93/93");
+    expect(progress).not.toContain("…");
+    expect(progress.match(/▓/g)).toHaveLength(20);
+  });
+
   it("starts with \\r to overwrite the current line", () => {
     const s = buildLineResolutionProgress(5, 20);
     expect(s.startsWith("\r")).toBe(true);
