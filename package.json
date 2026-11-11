@@ -57,7 +57,7 @@
     "docs:test:a11y": "playwright test a11y.pw.ts"
   },
   "dependencies": {
-    "commander": "^15.0.0"
+    "commander": "^15.1.0"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
